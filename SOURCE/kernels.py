@@ -1,39 +1,33 @@
 #!/usr/bin/python
 
-import sys
 import numpy as np
 import time
 import ase
-import utils
 from ase import io
 from ase.io import read
-import argparse
+from config import Config
 
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-m",   "--msize"  ,     type=int,   default=100, help="number of reference environments")
-    parser.add_argument("-rc",   "--cutoffradius"  , type=float, default=4.0, help="soap cutoff")
-    parser.add_argument("-sg",   "--sigmasoap"  , type=float, default=0.3, help="soap sigma")
-    parser.add_argument("-s",   "--splitting",     type=int, default=1, help="splitting degree")
-    parser.add_argument("-p",   "--portion"  ,     type=int, default=1, help="portion of the dataset")
-    args = parser.parse_args()
-    return args
+conf = Config()
 
-def set_variable_values_contraction(args):
-    m = args.msize
-    rc = args.cutoffradius
-    sg = args.sigmasoap
-    s = args.splitting
-    p = args.portion
-    return [m,rc,sg,s,p]
+def set_variable_values():
+  m   = conf.get_option('m'           ,  100, int  )
+  rc  = conf.get_option('cutoffradius',  4.0, float)
+  sg  = conf.get_option('sigmasoap'   ,  0.3, float)
+  s   = conf.get_option('splitting'   ,  1  , int  )
+  p   = conf.get_option('portion'     ,  1  , int  )
+  return [m,rc,sg,s,p]
 
-args = add_command_line_arguments_contraction("density regression")
-[M,rc,sigma_soap,nsplit,portion] = set_variable_values_contraction(args)
+[M,rc,sigma_soap,nsplit,portion] = set_variable_values()
+
+xyzfilename = conf.paths['xyzfile']
+refsselfilebase = conf.paths['refs_sel_file']
+specselfilebase = conf.paths['spec_sel_file']
+kernelconfbase  = conf.paths['kernel_conf_file']
+
 
 bohr2ang = 0.529177249
 #========================== system definition
-filename = "coords_1000.xyz"
-xyzfile = read(filename,":")
+xyzfile = read(xyzfilename,":")
 ndata = len(xyzfile)
 #dataset_portion = list(np.split(np.array(xrange(ndata),int),nsplit)[portion])
 #======================= system parameters
@@ -47,8 +41,8 @@ for i in xrange(len(xyzfile)):
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
     natoms[i] = int(len(atomic_symbols[i]))
 natmax = max(natoms)
-#================= SOAP PARAMETERS 
-zeta = 2.0 
+#================= SOAP PARAMETERS
+zeta = 2.0
 #==================== species array
 species = np.sort(list(set(np.array([item for sublist in atomic_valence for item in sublist]))))
 nspecies = len(species)
@@ -76,10 +70,10 @@ for iconf in xrange(ndata):
 spe_dict = {}
 spe_dict[0] = "H"
 spe_dict[1] = "O"
-#====================================== reference environments 
-fps_indexes = np.loadtxt("SELECTIONS/refs_selection_"+str(M)+".txt",int)
-fps_species = np.loadtxt("SELECTIONS/spec_selection_"+str(M)+".txt",int)
-#============== angular 
+#====================================== reference environments
+fps_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
+fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
+#============== angular
 lmax = {}
 llmax = 5
 lmax["O"] = 5
@@ -87,7 +81,7 @@ lmax["H"] = 4
 nnmax = 10
 nmax = {}
 # oxygen
-nmax[("O",0)] = 10 
+nmax[("O",0)] = 10
 nmax[("O",1)] = 7
 nmax[("O",2)] = 5
 nmax[("O",3)] = 3
@@ -110,7 +104,7 @@ for ispe in xrange(nspecies):
     for l in xrange(lmax[spe]+1):
         anmax[ispe,l] = nmax[(spe,l)]
         bsize[ispe] += nmax[(spe,l)]*(2*l+1)
-#============================================= PROBLEM DIMENSIONALITY 
+#============================================= PROBLEM DIMENSIONALITY
 collsize = np.zeros(M,int)
 for iref in xrange(1,M):
     collsize[iref] = collsize[iref-1] + bsize[fps_species[iref-1]]
@@ -165,7 +159,7 @@ for l in xrange(llmax+1):
         power_training[l] = power_per_conf
 
 # compute sparse kernel matrix
-for iconf in xrange(ndata): 
+for iconf in xrange(ndata):
 #for iconf in dataset_portion:
     start = time.time()
     atoms = atomic_symbols[iconf]
@@ -203,6 +197,6 @@ for iconf in xrange(ndata):
                         for im2 in xrange(msize):
                             ik = kernel_sparse_indexes[iref,iatspe,l,im1,im2]
                             k_NM[ik] = kern[im2,im1]
-    np.savetxt("KERNELS/kernel_conf"+str(iconf)+".dat", k_NM,fmt='%.06e')
+    np.savetxt(kernelconfbase+str(iconf)+".dat", k_NM,fmt='%.06e')
 #    print time.time()-start, "seconds"
 

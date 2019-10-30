@@ -1,24 +1,23 @@
-import sys
+#!/usr/bin/python
+
 import numpy as np
-import time
 import ase
 from ase import io
 from ase.io import read
-from random import shuffle
-import argparse
+from config import Config
 
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-m",   "--msize"  ,     type=int,   default=100, help="number of reference environments")
-    args = parser.parse_args()
-    return args
+conf = Config()
 
-def set_variable_values_contraction(args):
-    m = args.msize
+def set_variable_values():
+    m   = conf.get_option('m'           ,  100, int  )
     return [m]
 
-args = add_command_line_arguments_contraction("density regression")
-[M] = set_variable_values_contraction(args)
+[M] = set_variable_values()
+
+xyzfilename = conf.paths['xyzfile']
+ps0filename = conf.paths['psdir'] + '/' + conf.paths['ps0file']
+refsselfilebase = conf.paths['refs_sel_file']
+specselfilebase = conf.paths['spec_sel_file']
 
 def do_fps(x, d=0):
     # Code from Giulio Imbalzano
@@ -36,8 +35,7 @@ def do_fps(x, d=0):
     return iy
 
 #========================== system definition
-filename = "coords_1000.xyz"
-xyzfile = read(filename,":")
+xyzfile = read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 atomic_symbols = []
@@ -72,7 +70,7 @@ for iconf in xrange(ndata):
         for icount in xrange(atom_counting[iconf,ispe]):
             atomicindx[iconf,ispe,icount] = indexes[icount]
 #====================== environmental power spectrum
-power = np.load("PS_0.npy")
+power = np.load(ps0filename)
 nfeat = len(power[0,0])
 power_env = np.zeros((nenv,nfeat),complex)
 ienv = 0
@@ -81,14 +79,14 @@ for iconf in xrange(ndata):
     iat = 0
     for ispe in xrange(nspecies):
         for icount in xrange(atom_counting[iconf,ispe]):
-            jat = atomicindx[iconf,ispe,icount] 
+            jat = atomicindx[iconf,ispe,icount]
             power_per_conf[jat,:] = power[iconf,iat,:]
             iat+=1
     for iat in xrange(natoms[iconf]):
         power_env[ienv,:] = power_per_conf[iat,:]
-        ienv += 1 
+        ienv += 1
 
 fps_indexes = np.array(do_fps(power_env,M),int)
 fps_species = spec_array[fps_indexes]
-np.savetxt("SELECTIONS/refs_selection_"+str(M)+".txt",fps_indexes,fmt='%i')
-np.savetxt("SELECTIONS/spec_selection_"+str(M)+".txt",fps_species,fmt='%i')
+np.savetxt(refsselfilebase+str(M)+".txt",fps_indexes,fmt='%i')
+np.savetxt(specselfilebase+str(M)+".txt",fps_species,fmt='%i')
