@@ -1,13 +1,11 @@
-import sys
+#!/usr/bin/python
+
 import numpy as np
-import scipy
-from scipy import special
-import math
-import time
 import ase
 from ase import io
 from ase.io import read
 import argparse
+from basis import basis_read
 
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
@@ -43,7 +41,7 @@ ndata = len(xyzfile)
 coords = []
 atomic_symbols = []
 atomic_valence = []
-natoms = np.zeros(ndata,int) 
+natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
     coords.append(np.asarray(xyzfile[i].get_positions(),float)/bohr2ang)
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
@@ -51,34 +49,12 @@ for i in xrange(len(xyzfile)):
     natoms[i] = int(len(atomic_symbols[i]))
 natmax = max(natoms)
 
-#================== species dictionary
-spe_dict = {}
-spe_dict[0] = "H"
-spe_dict[1] = "O"
 #====================================== reference environments
 fps_indexes = np.loadtxt("SELECTIONS/refs_selection_"+str(M)+".txt",int)
 fps_species = np.loadtxt("SELECTIONS/spec_selection_"+str(M)+".txt",int)
-#============== angular
-lmax = {}
-llmax = 5
-lmax["O"] = 5
-lmax["H"] = 4
-nnmax = 10
-nmax = {}
-# oxygen
-nmax[("O",0)] = 10
-nmax[("O",1)] = 7
-nmax[("O",2)] = 5
-nmax[("O",3)] = 3
-nmax[("O",4)] = 2
-nmax[("O",5)] = 1
-# hydrogen
-nmax[("H",0)] = 4
-nmax[("H",1)] = 3
-nmax[("H",2)] = 3
-nmax[("H",3)] = 2
-nmax[("H",4)] = 1
 
+# species dictionary, max. angular momenta, number of radial channels
+(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
 
 # load predicted coefficients for test structures
 trainrangetot = np.loadtxt("SELECTIONS/training_selection.txt",int)
@@ -96,8 +72,8 @@ itest=0
 error_density = 0.0
 STD = 0.0
 for iconf in testrange:
-    print "-------------------------------"  
-    print "iconf = ", iconf 
+    print "-------------------------------"
+    print "iconf = ", iconf
     coordinates = coords[iconf]
     atoms = atomic_symbols[iconf]
     valences = atomic_valence[iconf]
@@ -119,16 +95,16 @@ for iconf in testrange:
                         coefficients[icoeff] = coeffs[itest,iat,l,n,im] + av_coefs[atoms[iat]][n]
                         averages[icoeff] = av_coefs[atoms[iat]][n]
                     else:
-                        coefficients[icoeff] = coeffs[itest,iat,l,n,im] 
+                        coefficients[icoeff] = coeffs[itest,iat,l,n,im]
                     icoeff +=1
     projections = np.dot(overl,coefficients)
     #================================================
     error = np.dot(coefficients-coeffs_ref,projections-projs_ref)
-    error_density += error 
+    error_density += error
     projs_ref -= np.dot(overl,averages)
     coeffs_ref -= averages
     norm = np.dot(coeffs_ref,projs_ref)
-    STD += norm 
+    STD += norm
     print "error =", np.sqrt(error/norm)*100, "%"
     itest+=1
 

@@ -6,6 +6,7 @@ import ase
 from ase import io
 from ase.io import read
 from config import Config
+from basis import basis_read
 
 conf = Config()
 
@@ -19,10 +20,12 @@ def set_variable_values():
 
 [M,rc,sigma_soap,nsplit,portion] = set_variable_values()
 
-xyzfilename = conf.paths['xyzfile']
-refsselfilebase = conf.paths['refs_sel_file']
-specselfilebase = conf.paths['spec_sel_file']
-kernelconfbase  = conf.paths['kernel_conf_file']
+xyzfilename     = conf.paths['xyzfile']
+basisfilename   = conf.paths['basisfile']
+refsselfilebase = conf.paths['refs_sel_base']
+specselfilebase = conf.paths['spec_sel_base']
+kernelconfbase  = conf.paths['kernel_conf_base']
+psfilebase      = conf.paths['ps_base']
 
 
 bohr2ang = 0.529177249
@@ -66,33 +69,13 @@ for iconf in xrange(ndata):
         indexes = [i for i,x in enumerate(spec_list_per_conf[iconf]) if x==ispe]
         for icount in xrange(atom_counting[iconf,ispe]):
             atomicindx[iconf,ispe,icount] = indexes[icount]
-#================== species dictionary
-spe_dict = {}
-spe_dict[0] = "H"
-spe_dict[1] = "O"
 #====================================== reference environments
 fps_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
 fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
-#============== angular
-lmax = {}
-llmax = 5
-lmax["O"] = 5
-lmax["H"] = 4
-nnmax = 10
-nmax = {}
-# oxygen
-nmax[("O",0)] = 10
-nmax[("O",1)] = 7
-nmax[("O",2)] = 5
-nmax[("O",3)] = 3
-nmax[("O",4)] = 2
-nmax[("O",5)] = 1
-# hydrogen
-nmax[("H",0)] = 4
-nmax[("H",1)] = 3
-nmax[("H",2)] = 3
-nmax[("H",3)] = 2
-nmax[("H",4)] = 1
+
+# species dictionary, max. angular momenta, number of radial channels
+(spe_dict, lmax, nmax) = basis_read(basisfilename)
+llmax = max(lmax.values())
 
 #==================================== BASIS SET SIZE ARRAYS
 bsize = np.zeros(nspecies,int)
@@ -116,7 +99,7 @@ power_ref_sparse = {}
 power_training = {}
 for l in xrange(llmax+1):
 
-    power = np.load("PS_"+str(l)+".npy")
+    power = np.load(psfilebase+str(l)+".npy")
 
     if l==0:
 

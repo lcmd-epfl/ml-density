@@ -15,9 +15,9 @@ def set_variable_values():
 [M] = set_variable_values()
 
 xyzfilename = conf.paths['xyzfile']
-ps0filename = conf.paths['psdir'] + '/' + conf.paths['ps0file']
-refsselfilebase = conf.paths['refs_sel_file']
-specselfilebase = conf.paths['spec_sel_file']
+psfilebase  = conf.paths['ps_base']
+refsselfilebase = conf.paths['refs_sel_base']
+specselfilebase = conf.paths['spec_sel_base']
 
 def do_fps(x, d=0):
     # Code from Giulio Imbalzano
@@ -70,7 +70,7 @@ for iconf in xrange(ndata):
         for icount in xrange(atom_counting[iconf,ispe]):
             atomicindx[iconf,ispe,icount] = indexes[icount]
 #====================== environmental power spectrum
-power = np.load(ps0filename)
+power = np.load(psfilebase+'0.npy')
 nfeat = len(power[0,0])
 power_env = np.zeros((nenv,nfeat),complex)
 ienv = 0

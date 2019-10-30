@@ -7,8 +7,8 @@ portion = 1
 
 [paths]
 xyzfile          = ALL.xyz
-ps0file          = PS0.npy
-psdir            = _definitely_good_ps/
-refs_sel_file    = SELECTIONS/refs_selection_
-spec_sel_file    = SELECTIONS/spec_selection_
-kernel_conf_file = KERNELS/kernel_conf
+basisfile        = cc-pvqz-jkfit.1.d2k
+ps_base          = _definitely_good_ps/PS
+refs_sel_base    = SELECTIONS/refs_selection_
+spec_sel_base    = SELECTIONS/spec_selection_
+kernel_conf_base = KERNELS/kernel_conf

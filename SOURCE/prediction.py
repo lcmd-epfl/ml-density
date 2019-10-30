@@ -10,6 +10,7 @@ from ase.io import read
 from random import shuffle
 import argparse
 import prediction
+from basis import basis_read
 
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
@@ -88,36 +89,16 @@ for iconf in xrange(ndata):
             atomicindx[icount,ispe,iconf] = indexes[icount]
 
 
-#================== species dictionary
-spe_dict = {}
-spe_dict[0] = "H"
-spe_dict[1] = "O"
-#====================================== reference environments 
+#====================================== reference environments
 fps_indexes = np.loadtxt("SELECTIONS/refs_selection_"+str(M)+".txt",int)
 fps_species = np.loadtxt("SELECTIONS/spec_selection_"+str(M)+".txt",int)
-#============== angular 
-lmax = {}
-llmax = 5
-lmax["O"] = 5
-lmax["H"] = 4
-nnmax = 10
-nmax = {}
-# oxygen
-nmax[("O",0)] = 10
-nmax[("O",1)] = 7
-nmax[("O",2)] = 5
-nmax[("O",3)] = 3
-nmax[("O",4)] = 2
-nmax[("O",5)] = 1
-# hydrogen
-nmax[("H",0)] = 4
-nmax[("H",1)] = 3
-nmax[("H",2)] = 3
-nmax[("H",3)] = 2
-nmax[("H",4)] = 1
 
+# species dictionary, max. angular momenta, number of radial channels
+(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
+llmax = max(lmax.values())
+nnmax = max(nmax.values())
 
-# basis set arrays 
+# basis set arrays
 bsize = np.zeros(nspecies,int)
 almax = np.zeros(nspecies,int)
 anmax = np.zeros((nspecies,llmax+1),int)
@@ -128,7 +109,7 @@ for ispe in xrange(nspecies):
         anmax[ispe,l] = nmax[(spe,l)]
         bsize[ispe] += nmax[(spe,l)]*(2*l+1)
 
-# problem dimensionality 
+# problem dimensionality
 collsize = np.zeros(M,int)
 for iref in xrange(1,M):
     collsize[iref] = collsize[iref-1] + bsize[fps_species[iref-1]]
@@ -146,7 +127,7 @@ natoms_test = natoms[testrange]
 print "Number of training molecules = ", ntrain
 print "Number of testing molecules = ", ntest
 
-# define testing indexes 
+# define testing indexes
 test_configs = np.array(testrange,int)
 atomicindx_test = atomicindx[:,:,testrange]
 atom_counting_test = atom_counting[testrange]
@@ -155,7 +136,7 @@ for itest in xrange(ntest):
     for iat in xrange(natoms_test[itest]):
         test_species[itest,iat] = spec_list_per_conf[testrange[itest]][iat]
 
-# sparse kernel sizes 
+# sparse kernel sizes
 kernel_sizes = np.zeros(ntest,int)
 itest = 0
 for iconf in testrange:
@@ -170,7 +151,7 @@ for iconf in testrange:
                         kernel_sizes[itest] += 1
     itest += 1
 
-# load regression weights 
+# load regression weights
 weights = np.load("weights_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 
 # unravel regression weights with explicit indexing
@@ -184,10 +165,10 @@ for ienv in xrange(M):
         anc = anmax[ispe,l]
         for n in xrange(anc):
             for im in xrange(msize):
-                ww[ienv,l,n,im] = weights[i] 
+                ww[ienv,l,n,im] = weights[i]
                 i += 1
 
-# load testing kernels and perform prediction 
+# load testing kernels and perform prediction
 coeffs = prediction.prediction(mol,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,int(rc),natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
 np.save("prediction_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",coeffs)

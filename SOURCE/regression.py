@@ -8,6 +8,7 @@ import utils
 from ase import io
 from ase.io import read
 import argparse
+from basis import basis_read
 
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
@@ -27,7 +28,7 @@ def set_variable_values_contraction(args):
     m = args.msize
     rc = args.cutoffradius
     sg = args.sigmasoap
-    r = args.regular  
+    r = args.regular
     jit = args.jitter
     return [s,f,m,rc,sg,r,jit]
 
@@ -56,35 +57,15 @@ natmax = max(natoms)
 species = np.sort(list(set(np.array([item for sublist in atomic_valence for item in sublist]))))
 nspecies = len(species)
 
-#================== species dictionary
-spe_dict = {}
-spe_dict[0] = "H"
-spe_dict[1] = "O"
-#====================================== reference environments 
+#====================================== reference environments
 fps_indexes = np.loadtxt("SELECTIONS/refs_selection_"+str(M)+".txt",int)
 fps_species = np.loadtxt("SELECTIONS/spec_selection_"+str(M)+".txt",int)
-#============== angular 
-lmax = {}
-llmax = 5
-lmax["O"] = 5
-lmax["H"] = 4
-nnmax = 10
-nmax = {}
-# oxygen
-nmax[("O",0)] = 10
-nmax[("O",1)] = 7
-nmax[("O",2)] = 5
-nmax[("O",3)] = 3
-nmax[("O",4)] = 2
-nmax[("O",5)] = 1
-# hydrogen
-nmax[("H",0)] = 4
-nmax[("H",1)] = 3
-nmax[("H",2)] = 3
-nmax[("H",3)] = 2
-nmax[("H",4)] = 1
 
-# basis set arrays 
+# species dictionary, max. angular momenta, number of radial channels
+(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
+llmax = max(lmax.values())
+
+# basis set arrays
 bsize = np.zeros(nspecies,int)
 almax = np.zeros(nspecies,int)
 anmax = np.zeros((nspecies,llmax+1),int)
@@ -95,7 +76,7 @@ for ispe in xrange(nspecies):
         anmax[ispe,l] = nmax[(spe,l)]
         bsize[ispe] += nmax[(spe,l)]*(2*l+1)
 
-# problem dimensionality 
+# problem dimensionality
 collsize = np.zeros(M,int)
 for iref in xrange(1,M):
     collsize[iref] = collsize[iref-1] + bsize[fps_species[iref-1]]
@@ -106,7 +87,7 @@ Avec = np.load("MATRICES/Avec_M"+str(M)+"_trainfrac"+str(frac)+".npy")
 Bmat = np.load("MATRICES/Bmat_M"+str(M)+"_trainfrac"+str(frac)+".npy")
 Rmat = np.load("MATRICES/KMM_"+str(M)+".npy")
 
-# solve the regularized sparse regression problem 
+# solve the regularized sparse regression problem
 weights = np.linalg.solve(Bmat + reg*Rmat + jit*np.eye(totsize),Avec)
 
 np.save("weights_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",weights)

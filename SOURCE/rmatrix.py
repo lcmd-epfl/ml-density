@@ -1,14 +1,12 @@
 #!/usr/bin/python2.7
 
-import sys
 import numpy as np
-import time
 import ase
-import utils
 from ase import io
 from ase.io import read
 import argparse
 import rmatrix
+from basis import basis_read
 
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
@@ -43,8 +41,8 @@ for i in xrange(len(xyzfile)):
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
     natoms[i] = int(len(atomic_symbols[i]))
 natmax = max(natoms)
-#================= SOAP PARAMETERS 
-zeta = 2.0 
+#================= SOAP PARAMETERS
+zeta = 2.0
 #==================== species array
 species = np.sort(list(set(np.array([item for sublist in atomic_valence for item in sublist]))))
 nspecies = len(species)
@@ -68,33 +66,15 @@ for iconf in xrange(ndata):
         indexes = [i for i,x in enumerate(spec_list_per_conf[iconf]) if x==ispe]
         for icount in xrange(atom_counting[iconf,ispe]):
             atomicindx[iconf,ispe,icount] = indexes[icount]
-#================== species dictionary
-spe_dict = {}
-spe_dict[0] = "H"
-spe_dict[1] = "O"
-#====================================== reference environments 
+#====================================== reference environments
 fps_indexes = np.loadtxt("SELECTIONS/refs_selection_"+str(M)+".txt",int)
 fps_species = np.loadtxt("SELECTIONS/spec_selection_"+str(M)+".txt",int)
-#============== angular 
-lmax = {}
-llmax = 5
-lmax["O"] = 5
-lmax["H"] = 4
-nnmax = 10
-nmax = {}
-# oxygen
-nmax[("O",0)] = 10
-nmax[("O",1)] = 7
-nmax[("O",2)] = 5
-nmax[("O",3)] = 3
-nmax[("O",4)] = 2
-nmax[("O",5)] = 1
-# hydrogen
-nmax[("H",0)] = 4
-nmax[("H",1)] = 3
-nmax[("H",2)] = 3
-nmax[("H",3)] = 2
-nmax[("H",4)] = 1
+
+# species dictionary, max. angular momenta, number of radial channels
+(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
+llmax = max(lmax.values())
+nnmax = max(nmax.values())
+
 #==================================== BASIS SET SIZE ARRAYS
 bsize = np.zeros(nspecies,int)
 almax = np.zeros(nspecies,int)
@@ -105,14 +85,14 @@ for ispe in xrange(nspecies):
     for l in xrange(lmax[spe]+1):
         anmax[ispe,l] = nmax[(spe,l)]
         bsize[ispe] += nmax[(spe,l)]*(2*l+1)
-#============================================= PROBLEM DIMENSIONALITY 
+#============================================= PROBLEM DIMENSIONALITY
 collsize = np.zeros(M,int)
 for iref in xrange(1,M):
     collsize[iref] = collsize[iref-1] + bsize[fps_species[iref-1]]
 totsize = collsize[-1] + bsize[fps_species[-1]]
 print "problem dimensionality =", totsize
-#================================================= TRAINING SETS 
-k_MM = np.zeros((llmax+1,M*(2*llmax+1),M*(2*llmax+1)),float) 
+#================================================= TRAINING SETS
+k_MM = np.zeros((llmax+1,M*(2*llmax+1),M*(2*llmax+1)),float)
 
 for l in xrange(llmax+1):
 
@@ -138,7 +118,7 @@ for l in xrange(llmax+1):
         power_ref_sparse = power_env[fps_indexes]
         for iref1 in xrange(M):
             for iref2 in xrange(M):
-                k_MM[l,iref1,iref2] = np.dot(power_ref_sparse[iref1],power_ref_sparse[iref2].T)**zeta 
+                k_MM[l,iref1,iref2] = np.dot(power_ref_sparse[iref1],power_ref_sparse[iref2].T)**zeta
 
     else:
 
@@ -161,7 +141,7 @@ for l in xrange(llmax+1):
         power_ref_sparse = power_ref_sparse.reshape(M*(2*l+1),nfeat)
         for iref1 in xrange(M):
             for iref2 in xrange(M):
-                k_MM[l,iref1*(2*l+1):iref1*(2*l+1)+2*l+1,iref2*(2*l+1):iref2*(2*l+1)+2*l+1] = np.dot(power_ref_sparse[iref1*(2*l+1):iref1*(2*l+1)+2*l+1],power_ref_sparse[iref2*(2*l+1):iref2*(2*l+1)+2*l+1].T) *  k_MM[0,iref1,iref2]**((zeta-1.0)/zeta) 
+                k_MM[l,iref1*(2*l+1):iref1*(2*l+1)+2*l+1,iref2*(2*l+1):iref2*(2*l+1)+2*l+1] = np.dot(power_ref_sparse[iref1*(2*l+1):iref1*(2*l+1)+2*l+1],power_ref_sparse[iref2*(2*l+1):iref2*(2*l+1)+2*l+1].T) *  k_MM[0,iref1,iref2]**((zeta-1.0)/zeta)
 
 Rmat = rmatrix.rmatrix(llmax,nnmax,nspecies,M,totsize,fps_species,almax,anmax,k_MM)
 

@@ -1,15 +1,11 @@
 #!/usr/bin/python
 
-import sys
 import numpy as np
-import scipy
-from scipy import special
-import time
 import ase
 from ase import io
 from ase.io import read
 import argparse
-import utils
+from basis import basis_read
 
 bohr2ang = 0.529177249
 #========================== system definition
@@ -20,7 +16,7 @@ ndata = len(xyzfile)
 coords = []
 atomic_symbols = []
 atomic_valence = []
-natoms = np.zeros(ndata,int) 
+natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
     coords.append(np.asarray(xyzfile[i].get_positions(),float)/bohr2ang)
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
@@ -43,9 +39,8 @@ for iconf in xrange(ndata):
                spec_list_per_conf[iconf].append(ispe)
 spec_array = np.asarray(spec_list,int)
 
-spe_dict = {}
-spe_dict[0] = "H" 
-spe_dict[1] = "O"
+# species dictionary, max. angular momenta, number of radial channels
+(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
 
 nenv = {}
 for ispe in xrange(nspecies):
@@ -55,26 +50,6 @@ for ispe in xrange(nspecies):
         nenv[spe] += atom_counting[iconf,ispe]
     print spe, nenv[spe]
 
-#============== angular 
-lmax = {}
-llmax = 5
-lmax["O"] = 5
-lmax["H"] = 4
-nnmax = 10
-nmax = {}
-# oxygen
-nmax[("O",0)] = 10
-nmax[("O",1)] = 7
-nmax[("O",2)] = 5
-nmax[("O",3)] = 3
-nmax[("O",4)] = 2
-nmax[("O",5)] = 1
-# hydrogen
-nmax[("H",0)] = 4
-nmax[("H",1)] = 3
-nmax[("H",2)] = 3
-nmax[("H",3)] = 2
-nmax[("H",4)] = 1
 
 av_coefs = {}
 for spe in ["H","O"]:
@@ -88,7 +63,7 @@ for iconf in xrange(ndata):
     Coef = np.linalg.solve(Over,Proj)
     i = 0
     for iat in xrange(natoms[iconf]):
-        spe = atoms[iat] 
+        spe = atoms[iat]
         for l in xrange(lmax[spe]+1):
             for n in xrange(nmax[(spe,l)]):
                 for im in xrange(2*l+1):
@@ -121,7 +96,7 @@ for iconf in xrange(ndata):
             for n in xrange(nmax[(spe,l)]):
                 for im in xrange(2*l+1):
                     if l==0:
-                       Av_coeffs[i] = av_coefs[spe][n] 
+                       Av_coeffs[i] = av_coefs[spe][n]
                     i += 1
     #==================================================
     Proj -= np.dot(Over,Av_coeffs)

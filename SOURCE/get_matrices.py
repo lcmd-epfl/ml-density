@@ -1,12 +1,13 @@
-import sys
+#!/usr/bin/python
+
 import numpy as np
 import time
 import ase
-import utils
 from ase import io
 from ase.io import read
 import argparse
-import regression 
+import regression
+from basis import basis_read
 
 def add_command_line_arguments_contraction(parsetext):
     parser = argparse.ArgumentParser(description=parsetext)
@@ -67,7 +68,7 @@ for iconf in xrange(ndata):
 spec_array = np.asarray(spec_list,int)
 nenv = len(spec_array)
 
-# atomic indexes sorted by valence 
+# atomic indexes sorted by valence
 atomicindx = np.zeros((natmax,nspecies,ndata),int)
 for iconf in xrange(ndata):
     for ispe in xrange(nspecies):
@@ -76,35 +77,16 @@ for iconf in xrange(ndata):
             atomicindx[icount,ispe,iconf] = indexes[icount]
 
 
-#================== species dictionary
-spe_dict = {}
-spe_dict[0] = "H"
-spe_dict[1] = "O"
-#====================================== reference environments 
+#====================================== reference environments
 fps_indexes = np.loadtxt("SELECTIONS/refs_selection_"+str(M)+".txt",int)
 fps_species = np.loadtxt("SELECTIONS/spec_selection_"+str(M)+".txt",int)
-#============== angular 
-lmax = {}
-llmax = 5
-lmax["O"] = 5
-lmax["H"] = 4
-nnmax = 10
-nmax = {}
-# oxygen
-nmax[("O",0)] = 10
-nmax[("O",1)] = 7
-nmax[("O",2)] = 5
-nmax[("O",3)] = 3
-nmax[("O",4)] = 2
-nmax[("O",5)] = 1
-# hydrogen
-nmax[("H",0)] = 4
-nmax[("H",1)] = 3
-nmax[("H",2)] = 3
-nmax[("H",3)] = 2
-nmax[("H",4)] = 1
 
-# basis set size 
+# species dictionary, max. angular momenta, number of radial channels
+(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
+llmax = max(lmax.values())
+nnmax = max(nmax.values())
+
+# basis set size
 bsize = np.zeros(nspecies,int)
 almax = np.zeros(nspecies,int)
 anmax = np.zeros((nspecies,llmax+1),int)
@@ -115,14 +97,14 @@ for ispe in xrange(nspecies):
         anmax[ispe,l] = nmax[(spe,l)]
         bsize[ispe] += nmax[(spe,l)]*(2*l+1)
 
-# problem dimensionality 
+# problem dimensionality
 collsize = np.zeros(M,int)
 for iref in xrange(1,M):
     collsize[iref] = collsize[iref-1] + bsize[fps_species[iref-1]]
 totsize = collsize[-1] + bsize[fps_species[-1]]
 print "problem dimensionality =", totsize
 
-# training set selection 
+# training set selection
 trainrangetot = np.loadtxt("SELECTIONS/training_selection.txt",int)
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
@@ -132,13 +114,13 @@ print "Number of training molecules = ", ntrain
 # training set arrays
 train_configs = np.array(trainrange,int)
 atomicindx_training = atomicindx[:,:,trainrange]
-atom_counting_training = atom_counting[trainrange] 
+atom_counting_training = atom_counting[trainrange]
 atomic_species = np.zeros((ntrain,natmax),int)
 for itrain in xrange(ntrain):
     for iat in xrange(natoms_train[itrain]):
         atomic_species[itrain,iat] = spec_list_per_conf[trainrange[itrain]][iat]
 
-# sparse overlap and projection indexes 
+# sparse overlap and projection indexes
 total_sizes = np.zeros(ntrain,int)
 itrain = 0
 for iconf in trainrange:
@@ -151,7 +133,7 @@ for iconf in trainrange:
                     total_sizes[itrain] += 1
     itrain += 1
 
-# sparse kernel indexes 
+# sparse kernel indexes
 kernel_sizes = np.zeros(ntrain,int)
 itrain = 0
 for iconf in trainrange:
@@ -168,7 +150,7 @@ for iconf in trainrange:
 
 # compute regression arrays
 start = time.time()
-Avec,Bmat = regression.getab(mol,train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,int(rc),totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes) 
+Avec,Bmat = regression.getab(mol,train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,int(rc),totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes)
 print "A-vector and B-matrix computed in", time.time()-start, "seconds"
 
 # save regression arrays
