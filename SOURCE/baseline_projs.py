@@ -5,12 +5,25 @@ import ase
 from ase import io
 from ase.io import read
 import argparse
+from config import Config
 from basis import basis_read
+
+conf = Config()
+
+xyzfilename      = conf.paths['xyzfile']
+basisfilename    = conf.paths['basisfile']
+coefffilebase    = conf.paths['coeff_base']
+overfilebase     = conf.paths['over_base']
+goodprojfilebase = conf.paths['goodproj_base']
+goodoverfilebase = conf.paths['goodover_base']
+avdir            = conf.paths['averages_dir']
+baselinedwbase   = conf.paths['baselined_w_base']
+overdatbase      = conf.paths['over_dat_base']
+
 
 bohr2ang = 0.529177249
 #========================== system definition
-filename = "coords_1000.xyz"
-xyzfile = read(filename,":")
+xyzfile = read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 coords = []
@@ -40,7 +53,7 @@ for iconf in xrange(ndata):
 spec_array = np.asarray(spec_list,int)
 
 # species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
+(spe_dict, lmax, nmax) = basis_read(basisfilename)
 
 nenv = {}
 for ispe in xrange(nspecies):
@@ -52,14 +65,15 @@ for ispe in xrange(nspecies):
 
 
 av_coefs = {}
-for spe in ["H","O"]:
+for spe in spe_dict.values():
     av_coefs[spe] = np.zeros(nmax[(spe,0)],float)
 
 print "computing averages..."
 for iconf in xrange(ndata):
+    print "iconf = ", iconf
     atoms = atomic_symbols[iconf]
-    Proj = np.load("PROJS_NPY/projections_conf"+str(iconf)+".npy")
-    Over = np.load("OVER_NPY/overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(goodprojfilebase+str(iconf)+".npy")
+    Over = np.load(goodoverfilebase+str(iconf)+".npy")
     Coef = np.linalg.solve(Over,Proj)
     i = 0
     for iat in xrange(natoms[iconf]):
@@ -72,12 +86,13 @@ for iconf in xrange(ndata):
                     i += 1
 
 print "saving averages..."
-for spe in ["H","O"]:
+for spe in spe_dict.values():
     av_coefs[spe] /= nenv[spe]
-    np.save("AVERAGES/"+str(spe)+".npy",av_coefs[spe])
+    np.save(avdir+str(spe)+".npy",av_coefs[spe])
 
 print "computing baselined projections..."
 for iconf in xrange(ndata):
+    print "iconf = ", iconf
     atoms = atomic_symbols[iconf]
     #==================================================
     totsize = 0
@@ -85,8 +100,8 @@ for iconf in xrange(ndata):
         for l in xrange(lmax[atoms[iat]]+1):
             totsize += nmax[(atoms[iat],l)]*(2*l+1)
     #==================================================
-    Proj = np.load("PROJS_NPY/projections_conf"+str(iconf)+".npy")
-    Over = np.load("OVER_NPY/overlap_conf"+str(iconf)+".npy")
+    Proj = np.load(goodprojfilebase+str(iconf)+".npy")
+    Over = np.load(goodoverfilebase+str(iconf)+".npy")
     #==================================================
     Av_coeffs = np.zeros(totsize,float)
     i = 0
@@ -100,7 +115,7 @@ for iconf in xrange(ndata):
                     i += 1
     #==================================================
     Proj -= np.dot(Over,Av_coeffs)
-    np.savetxt("BASELINED_PROJECTIONS/projections_conf"+str(iconf)+".dat",Proj, fmt='%.10e')
-    np.savetxt("OVER_DAT/overlap_conf"+str(iconf)+".dat", np.concatenate(Over), fmt='%.10e')
+    np.savetxt(baselinedwbase+str(iconf)+".dat",Proj, fmt='%.10e')
+    np.savetxt(overdatbase+str(iconf)+".dat", np.concatenate(Over), fmt='%.10e')
 
 

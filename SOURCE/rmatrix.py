@@ -7,28 +7,29 @@ from ase.io import read
 import argparse
 import rmatrix
 from basis import basis_read
+from config import Config
 
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-m",   "--msize"  ,     type=int,   default=100, help="number of reference environments")
-    parser.add_argument("-rc",   "--cutoffradius"  , type=float, default=4.0, help="soap cutoff")
-    parser.add_argument("-sg",   "--sigmasoap"  , type=float, default=0.3, help="soap sigma")
-    args = parser.parse_args()
-    return args
+conf = Config()
 
-def set_variable_values_contraction(args):
-    m = args.msize
-    rc = args.cutoffradius
-    sg = args.sigmasoap
-    return [m,rc,sg]
+def set_variable_values():
+  m   = conf.get_option('m'           ,  100, int  )
+  rc  = conf.get_option('cutoffradius',  4.0, float)
+  sg  = conf.get_option('sigmasoap'   ,  0.3, float)
+  return [m,rc,sg]
 
-args = add_command_line_arguments_contraction("density regression")
-[M,rc,sigma_soap] = set_variable_values_contraction(args)
+[M,rc,sigma_soap] = set_variable_values()
+
+xyzfilename     = conf.paths['xyzfile']
+basisfilename   = conf.paths['basisfile']
+refsselfilebase = conf.paths['refs_sel_base']
+specselfilebase = conf.paths['spec_sel_base']
+kmmbase         = conf.paths['kmm_base']
+psfilebase      = conf.paths['ps_base']
+
 
 bohr2ang = 0.529177249
 #========================== system definition
-filename = "coords_1000.xyz"
-xyzfile = read(filename,":")
+xyzfile = read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 coords = []
@@ -67,11 +68,11 @@ for iconf in xrange(ndata):
         for icount in xrange(atom_counting[iconf,ispe]):
             atomicindx[iconf,ispe,icount] = indexes[icount]
 #====================================== reference environments
-fps_indexes = np.loadtxt("SELECTIONS/refs_selection_"+str(M)+".txt",int)
-fps_species = np.loadtxt("SELECTIONS/spec_selection_"+str(M)+".txt",int)
+fps_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
+fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
+(spe_dict, lmax, nmax) = basis_read(basisfilename)
 llmax = max(lmax.values())
 nnmax = max(nmax.values())
 
@@ -96,7 +97,7 @@ k_MM = np.zeros((llmax+1,M*(2*llmax+1),M*(2*llmax+1)),float)
 
 for l in xrange(llmax+1):
 
-    power = np.load("PS_"+str(l)+".npy")
+    power = np.load(psfilebase+str(l)+".npy")
 
     if l==0:
 
@@ -145,4 +146,4 @@ for l in xrange(llmax+1):
 
 Rmat = rmatrix.rmatrix(llmax,nnmax,nspecies,M,totsize,fps_species,almax,anmax,k_MM)
 
-np.save("MATRICES/KMM_"+str(M)+".npy", Rmat)
+np.save(kmmbase+str(M)+".npy", Rmat)

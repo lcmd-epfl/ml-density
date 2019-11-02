@@ -7,6 +7,7 @@ from ase import io
 from ase.io import read
 from config import Config
 from basis import basis_read
+import sys
 
 conf = Config()
 
@@ -143,6 +144,12 @@ for l in xrange(llmax+1):
 
 # compute sparse kernel matrix
 for iconf in xrange(ndata):
+
+    npad = len(str(ndata))
+    strg = "Doing point %*i of %*i (%6.2f %%)"%(npad,iconf+1,npad,ndata,100 * float(iconf+1)/ndata)
+    sys.stdout.write('%s\r'%strg)
+    sys.stdout.flush()
+
 #for iconf in dataset_portion:
     start = time.time()
     atoms = atomic_symbols[iconf]

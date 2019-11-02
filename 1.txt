@@ -8,7 +8,16 @@ portion = 1
 [paths]
 xyzfile          = ALL.xyz
 basisfile        = cc-pvqz-jkfit.1.d2k
-ps_base          = _definitely_good_ps/PS
+ps_base          = _ps_sparse100mol1024feat/PS
 refs_sel_base    = SELECTIONS/refs_selection_
 spec_sel_base    = SELECTIONS/spec_selection_
 kernel_conf_base = KERNELS/kernel_conf
+kmm_base         = MATRICES/KMM_
+coeff_base       = ALL_C/mol_c_
+over_base        = ALL_S/mol_s_
+goodproj_base    = PROJS_NPY/projections_conf
+goodover_base    = OVER_NPY/overlap_conf
+averages_dir     = AVERAGES/
+baselined_w_base = BASELINED_PROJECTIONS/projections_conf
+over_dat_base    = OVER_DAT/overlap_conf
+

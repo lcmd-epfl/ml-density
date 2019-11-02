@@ -5,12 +5,22 @@ import time
 import ase
 from ase import io
 from ase.io import read
+from config import Config
 from basis import basis_read
+
+conf = Config()
+
+xyzfilename      = conf.paths['xyzfile']
+basisfilename    = conf.paths['basisfile']
+coefffilebase    = conf.paths['coeff_base']
+overfilebase     = conf.paths['over_base']
+goodprojfilebase = conf.paths['goodproj_base']
+goodoverfilebase = conf.paths['goodover_base']
+
 
 bohr2ang = 0.529177249
 #========================== system definition
-filename = "coords_1000.xyz"
-xyzfile = read(filename,":")
+xyzfile = read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 coords = []
@@ -25,7 +35,7 @@ for i in xrange(len(xyzfile)):
 natmax = max(natoms)
 
 # species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
+(spe_dict, lmax, nmax) = basis_read(basisfilename)
 
 #===================================================== start decomposition
 for iconf in xrange(ndata):
@@ -41,8 +51,8 @@ for iconf in xrange(ndata):
         for l in xrange(lmax[atoms[iat]]+1):
             totsize += nmax[(atoms[iat],l)]*(2*l+1)
     #==================================================
-    coeffs = np.loadtxt("COEFFICIENTS/coord_"+str(iconf).zfill(3)+".dat")
-    overlap = np.loadtxt("J/coord_"+str(iconf).zfill(3)+".J.dat")
+    coeffs = np.loadtxt(coefffilebase+str(iconf)+".dat")
+    overlap = np.load(overfilebase+str(iconf)+".npy")
     #==================================================
     Coef = np.zeros(totsize,float)
     Over = np.zeros((totsize,totsize),float)
@@ -93,6 +103,6 @@ for iconf in xrange(ndata):
 
     Proj = np.dot(Over,Coef)
     ########################################################################################################
-    np.save("PROJS_NPY/projections_conf"+str(iconf)+".npy",Proj)
-    np.save("OVER_NPY/overlap_conf"+str(iconf)+".npy",Over)
+    np.save(goodprojfilebase+str(iconf)+".npy",Proj)
+    np.save(goodoverfilebase+str(iconf)+".npy",Over)
     print "time =", time.time()-start
