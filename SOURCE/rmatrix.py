@@ -4,7 +4,6 @@ import numpy as np
 import ase
 from ase import io
 from ase.io import read
-import argparse
 import rmatrix
 from basis import basis_read
 from config import Config
