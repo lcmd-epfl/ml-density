@@ -38,13 +38,11 @@ def do_fps(x, d=0):
 xyzfile = read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
-atomic_symbols = []
 atomic_valence = []
 natoms = np.zeros(ndata,int)
 for i in xrange(ndata):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
-    natoms[i] = int(len(atomic_symbols[i]))
+    natoms[i] = int(len(atomic_valence[i]))
 natmax = max(natoms)
 #==================== species array
 species = np.sort(list(set(np.array([item for sublist in atomic_valence for item in sublist]))))

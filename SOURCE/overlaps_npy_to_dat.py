@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import numpy as np
+import os
 import ase
 from ase import io
 from ase.io import read
@@ -17,6 +18,7 @@ ndata = len(xyzfile)
 
 for iconf in xrange(ndata):
     print "iconf = ", iconf
-    Over = np.load(goodoverfilebase+str(iconf)+".npy")
-    np.savetxt(overdatbase+str(iconf)+".dat", np.concatenate(Over), fmt='%.10e')
+    # 7 times faster than numpy:
+    cmd = "SOURCE/npy2dat " + goodoverfilebase+str(iconf)+'.npy' + " " + overdatbase+str(iconf)+'.dat'
+    os.system(cmd)
 

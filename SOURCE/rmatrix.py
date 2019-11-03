@@ -32,14 +32,12 @@ xyzfile = read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 coords = []
-atomic_symbols = []
 atomic_valence = []
 natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
     coords.append(np.asarray(xyzfile[i].get_positions(),float)/bohr2ang)
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
-    natoms[i] = int(len(atomic_symbols[i]))
+    natoms[i] = int(len(atomic_valence[i]))
 natmax = max(natoms)
 #================= SOAP PARAMETERS
 zeta = 2.0
