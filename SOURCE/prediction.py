@@ -4,45 +4,38 @@ import numpy as np
 import ase.io
 import argparse
 import prediction
+from config import Config
 from basis import basis_read
 
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-s",   "--trainset",     type=int,   default=1,   help="training dataset selection")
-    parser.add_argument("-f",   "--trainfrac"  , type=float, default=1.0, help="training set fraction")
-    parser.add_argument("-m",   "--msize"  ,     type=int,   default=100, help="number of reference environments")
-    parser.add_argument("-rc",  "--cutoffradius"  , type=float, default=4.0, help="soap cutoff")
-    parser.add_argument("-sg",  "--sigmasoap"  , type=float, default=0.3, help="soap sigma")
-    parser.add_argument("-r",   "--regular"  , type=float, default=1e-06, help="regularization")
-    parser.add_argument("-jit", "--jitter"  , type=float, default=1e-10, help="jitter")
-    parser.add_argument("-mol", "--molecule", type=str,required=True,help="molecule name")
-    parser.add_argument("-ts", "--testset", type=str,required=False,help="-full- if the full test set need to be selected")
-    args = parser.parse_args()
-    return args
+conf = Config()
 
-def set_variable_values_contraction(args):
-    s = args.trainset
-    f = args.trainfrac
-    m = args.msize
-    rc = args.cutoffradius
-    sg = args.sigmasoap
-    r = args.regular
-    jit = args.jitter
-    mol = args.molecule
-    ts = args.testset
-    return [s,f,m,rc,sg,r,jit,mol,ts]
+def set_variable_values():
+    s   = conf.get_option('testset'     ,  1,     int  )
+    f   = conf.get_option('trainfrac'   ,  1.0,   float)
+    m   = conf.get_option('m'           ,  100,   int  )
+    rc  = conf.get_option('cutoffradius',  4.0,   float)
+    sg  = conf.get_option('sigmasoap'   ,  0.3,   float)
+    r   = conf.get_option('regular'     ,  1e-6,  float)
+    j   = conf.get_option('jitter'      ,  1e-10, float)
+    mol = conf.get_option('molecule'    ,  '',    str  )
+    ts  = conf.get_option('testset_str' ,  '',    str  )
+    return [s,f,m,rc,sg,r,j,mol,ts]
 
-args = add_command_line_arguments_contraction("density regression")
-[nset,frac,M,rc,sigma_soap,reg,jit,mol,tset] = set_variable_values_contraction(args)
+[nset,frac,M,rc,sigma_soap,reg,jit,mol,tset] = set_variable_values()
+
+xyzfilename     = conf.paths['xyzfile']
+basisfilename   = conf.paths['basisfile']
+trainfilename   = conf.paths['trainingselfile']
+refsselfilebase = conf.paths['refs_sel_base']
+specselfilebase = conf.paths['spec_sel_base']
+weightsfilebase = conf.paths['weights_base']
+predictfilebase = conf.paths['predict_base']
 
 # coversion factors
 bohr2ang = 0.529177249
 
-mol = "water"
-
 # system definition
-filename = "coords_1000.xyz"
-xyzfile = ase.io.read(filename,":")
+xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 
 # system parameters
@@ -84,11 +77,11 @@ for iconf in xrange(ndata):
 
 
 #====================================== reference environments
-fps_indexes = np.loadtxt("SELECTIONS/refs_selection_"+str(M)+".txt",int)
-fps_species = np.loadtxt("SELECTIONS/spec_selection_"+str(M)+".txt",int)
+fps_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
+fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
+(spe_dict, lmax, nmax) = basis_read(basisfilename)
 llmax = max(lmax.values())
 nnmax = max(nmax.values())
 
@@ -111,7 +104,7 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 print "problem dimensionality =", totsize
 
 # dataset partitioning
-trainrangetot = np.loadtxt("SELECTIONS/training_selection.txt",int)
+trainrangetot = np.loadtxt(trainfilename,int)
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 natoms_train = natoms[trainrange]
@@ -146,7 +139,7 @@ for iconf in testrange:
     itest += 1
 
 # load regression weights
-weights = np.load("weights_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
+weights = np.load(weightsfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 
 # unravel regression weights with explicit indexing
 ww = np.zeros((M,llmax+1,nnmax,2*llmax+1),float)
@@ -165,5 +158,5 @@ for ienv in xrange(M):
 # load testing kernels and perform prediction
 coeffs = prediction.prediction(mol,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,int(rc),natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
-np.save("prediction_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",coeffs)
+np.save(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",coeffs)
 

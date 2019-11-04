@@ -3,38 +3,36 @@
 import numpy as np
 import time
 import ase.io
-import argparse
 import regression
+from config import Config
 from basis import basis_read
 
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-s",   "--testset",     type=int,   default=1,   help="test dataset selection")
-    parser.add_argument("-f",   "--trainfrac"  , type=float, default=1.0, help="training set fraction")
-    parser.add_argument("-m",   "--msize"  ,     type=int,   default=100, help="number of reference environments")
-    parser.add_argument("-rc",   "--cutoffradius"  , type=float, default=4.0, help="soap cutoff")
-    parser.add_argument("-sg",   "--sigmasoap"  , type=float, default=0.3, help="soap sigma")
-    args = parser.parse_args()
-    return args
+conf = Config()
 
-def set_variable_values_contraction(args):
-    s = args.testset
-    f = args.trainfrac
-    m = args.msize
-    rc = args.cutoffradius
-    sg = args.sigmasoap
+def set_variable_values():
+    s  = conf.get_option('testset'     ,  1  ,  int  )
+    f  = conf.get_option('trainfrac'   ,  1.0,  float)
+    m  = conf.get_option('m'           ,  100,  int  )
+    rc = conf.get_option('cutoffradius',  4.0,  float)
+    sg = conf.get_option('sigmasoap'   ,  0.3,  float)
     return [s,f,m,rc,sg]
 
-args = add_command_line_arguments_contraction("density regression")
-[nset,frac,M,rc,sigma_soap] = set_variable_values_contraction(args)
+[nset,frac,M,rc,sigma_soap] = set_variable_values()
+
+xyzfilename     = conf.paths['xyzfile']
+basisfilename   = conf.paths['basisfile']
+trainfilename   = conf.paths['trainingselfile']
+refsselfilebase = conf.paths['refs_sel_base']
+specselfilebase = conf.paths['spec_sel_base']
+avecfilebase    = conf.paths['avec_base']
+bmatfilebase    = conf.paths['bmat_base']
 
 # conversion constants
 bohr2ang = 0.529177249
 
 # system definition
 mol = "water"
-filename = "coords_1000.xyz"
-xyzfile = ase.io.read(filename,":")
+xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 
 # system parameters
@@ -76,11 +74,11 @@ for iconf in xrange(ndata):
 
 
 #====================================== reference environments
-fps_indexes = np.loadtxt("SELECTIONS/refs_selection_"+str(M)+".txt",int)
-fps_species = np.loadtxt("SELECTIONS/spec_selection_"+str(M)+".txt",int)
+fps_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
+fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
+(spe_dict, lmax, nmax) = basis_read(basisfilename)
 llmax = max(lmax.values())
 nnmax = max(nmax.values())
 
@@ -103,7 +101,7 @@ totsize = collsize[-1] + bsize[fps_species[-1]]
 print "problem dimensionality =", totsize
 
 # training set selection
-trainrangetot = np.loadtxt("SELECTIONS/training_selection.txt",int)
+trainrangetot = np.loadtxt(trainfilename,int)
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 natoms_train = natoms[trainrange]
@@ -125,10 +123,7 @@ for iconf in trainrange:
     atoms = atomic_symbols[iconf]
     for iat in xrange(natoms[iconf]):
         for l in xrange(lmax[atoms[iat]]+1):
-            msize = 2*l+1
-            for n in xrange(nmax[(atoms[iat],l)]):
-                for im in xrange(msize):
-                    total_sizes[itrain] += 1
+            total_sizes[itrain] += (2*l+1) * nmax[(atoms[iat],l)]
     itrain += 1
 
 # sparse kernel indexes
@@ -138,12 +133,11 @@ for iconf in trainrange:
     for iref in xrange(M):
         ispe = fps_species[iref]
         spe = spe_dict[ispe]
+        temp = 0
         for l in xrange(lmax[spe]+1):
             msize = 2*l+1
-            for im in xrange(msize):
-                for iat in xrange(atom_counting_training[itrain,ispe]):
-                    for imm in xrange(msize):
-                        kernel_sizes[itrain] += 1
+            temp += msize*msize
+        kernel_sizes[itrain] += temp * atom_counting_training[itrain,ispe]
     itrain += 1
 
 # compute regression arrays
@@ -152,5 +146,6 @@ Avec,Bmat = regression.getab(mol,train_configs,atomic_species,llmax,nnmax,nspeci
 print "A-vector and B-matrix computed in", time.time()-start, "seconds"
 
 # save regression arrays
-np.save("MATRICES/Avec_M"+str(M)+"_trainfrac"+str(frac)+".npy", Avec)
-np.save("MATRICES/Bmat_M"+str(M)+"_trainfrac"+str(frac)+".npy", Bmat)
+np.save(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".npy", Avec)
+np.save(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".npy", Bmat)
+

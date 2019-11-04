@@ -3,37 +3,38 @@
 import numpy as np
 import ase.io
 import argparse
+from config import Config
 from basis import basis_read
 
-def add_command_line_arguments_contraction(parsetext):
-    parser = argparse.ArgumentParser(description=parsetext)
-    parser.add_argument("-s",   "--testset",     type=int, default=1, help="test dataset selection")
-    parser.add_argument("-f",   "--trainfrac"  , type=float, default=1.0, help="training set fraction")
-    parser.add_argument("-r",   "--regular"  , type=float, default=1e-06, help="regularization")
-    parser.add_argument("-m",   "--msize"  ,     type=int, default=100, help="number of reference environments")
-    parser.add_argument("-rc",   "--cutoffradius"  , type=float, default=4.0, help="soap cutoff")
-    parser.add_argument("-sg",   "--sigmasoap"  , type=float, default=0.3, help="soap sigma")
-    parser.add_argument("-jit",   "--jitter"  , type=float, default=1e-10, help="jitter")
-    args = parser.parse_args()
-    return args
+conf = Config()
 
-def set_variable_values_contraction(args):
-    s = args.testset
-    f = args.trainfrac
-    r = args.regular
-    m = args.msize
-    rc = args.cutoffradius
-    sg = args.sigmasoap
-    jit = args.jitter
-    return [s,f,r,m,rc,sg,jit]
+def set_variable_values():
+    s   = conf.get_option('testset'     ,  1,     int  )
+    f   = conf.get_option('trainfrac'   ,  1.0,   float)
+    m   = conf.get_option('m'           ,  100,   int  )
+    rc  = conf.get_option('cutoffradius',  4.0,   float)
+    sg  = conf.get_option('sigmasoap'   ,  0.3,   float)
+    r   = conf.get_option('regular'     ,  1e-6,  float)
+    j   = conf.get_option('jitter'      ,  1e-10, float)
+    mol = conf.get_option('molecule'    ,  '',    str  )
+    ts  = conf.get_option('testset_str' ,  '',    str  )
+    return [s,f,m,rc,sg,r,j,mol,ts]
 
-args = add_command_line_arguments_contraction("predict density")
-[nset,frac,reg,M,rc,sigma_soap,jit] = set_variable_values_contraction(args)
+[nset,frac,M,rc,sigma_soap,reg,jit] = set_variable_values()
+
+xyzfilename      = conf.paths['xyzfile']
+basisfilename    = conf.paths['basisfile']
+trainfilename    = conf.paths['trainingselfile']
+refsselfilebase  = conf.paths['refs_sel_base']
+specselfilebase  = conf.paths['spec_sel_base']
+predictfilebase  = conf.paths['predict_base']
+goodcoeffilebase = conf.paths['goodcoef_base']
+goodoverfilebase = conf.paths['goodover_base']
+avdir            = conf.paths['averages_dir']
 
 bohr2ang = 0.529177249
 #========================== system definition
-filename = "coords_1000.xyz"
-xyzfile = ase.io.read(filename,":")
+xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 coords = []
@@ -48,23 +49,23 @@ for i in xrange(len(xyzfile)):
 natmax = max(natoms)
 
 #====================================== reference environments
-fps_indexes = np.loadtxt("SELECTIONS/refs_selection_"+str(M)+".txt",int)
-fps_species = np.loadtxt("SELECTIONS/spec_selection_"+str(M)+".txt",int)
+fps_indexes = np.loadtxt(refsselfilebase+str(m)+".txt",int)
+fps_species = np.loadtxt(specselfilebase+str(m)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read('cc-pvqz-jkfit.1.d2k')
+(spe_dict, lmax, nmax) = basis_read(basisfilename)
 
 # load predicted coefficients for test structures
-trainrangetot = np.loadtxt("SELECTIONS/training_selection.txt",int)
+trainrangetot = np.loadtxt(trainfilename,int)
 testrange = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(testrange)
 natoms_test = natoms[testrange]
 
-coeffs = np.load("PREDICTIONS/prediction_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
+coeffs = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 
 av_coefs = {}
-for spe in ["H","O"]:
-    av_coefs[spe] = np.load("AVERAGES/"+str(spe)+".npy")
+for spe in spe_dict.values():
+    av_coefs[spe] = np.load(avdir+str(spe)+".npy")
 
 itest=0
 error_density = 0.0
@@ -77,9 +78,11 @@ for iconf in testrange:
     valences = atomic_valence[iconf]
     nele = np.sum(valences)
     #================================================
-    projs_ref = np.load("PROJS_NPY/projections_conf"+str(iconf)+".npy")
-    overl = np.load("OVER_NPY/overlap_conf"+str(iconf)+".npy")
-    coeffs_ref = np.linalg.solve(overl,projs_ref)
+
+    overl      = np.load(goodoverfilebase+str(iconf)+".npy")
+    coeffs_ref = np.load(goodcoeffilebase+str(iconf)+".npy")
+    projs_ref  = np.dot(overl,coeffs_ref)
+
     size_coeffs = coeffs_ref.shape
     #================================================
     coefficients = np.zeros(size_coeffs,float)
