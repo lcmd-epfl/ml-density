@@ -81,29 +81,25 @@ for iconf in testrange:
 
     overl      = np.load(goodoverfilebase+str(iconf)+".npy")
     coeffs_ref = np.load(goodcoeffilebase+str(iconf)+".npy")
-    projs_ref  = np.dot(overl,coeffs_ref)
 
     size_coeffs = coeffs_ref.shape
-    #================================================
-    coefficients = np.zeros(size_coeffs,float)
     averages = np.zeros(size_coeffs,float)
     icoeff = 0
     for iat in xrange(natoms[iconf]):
-        for l in xrange(lmax[atoms[iat]]+1):
-            for n in xrange(nmax[(atoms[iat],l)]):
-                for im in xrange(2*l+1):
-                    if l==0:
-                        coefficients[icoeff] = coeffs[itest,iat,l,n,im] + av_coefs[atoms[iat]][n]
-                        averages[icoeff] = av_coefs[atoms[iat]][n]
-                    else:
-                        coefficients[icoeff] = coeffs[itest,iat,l,n,im]
-                    icoeff +=1
-    projections = np.dot(overl,coefficients)
+        for n in xrange(nmax[(atoms[iat],0)]):
+            averages[icoeff] = av_coefs[atoms[iat]][n]
+            icoeff +=1
+        for l in xrange(1, lmax[atoms[iat]]+1):
+            icoeff += (2*l+1) * nmax[(atoms[iat],l)]
+
+    coeffs_ref  -= averages
+    projs_ref    = np.dot(overl,coeffs_ref)
+    delta_coeffs = coeffs-coeffs_ref
+    delta_proj   = np.dot(overl,delta_coeffs)
+
     #================================================
-    error = np.dot(coefficients-coeffs_ref,projections-projs_ref)
+    error = np.dot(delta_coeffs, delta_proj)
     error_density += error
-    projs_ref -= np.dot(overl,averages)
-    coeffs_ref -= averages
     norm = np.dot(coeffs_ref,projs_ref)
     STD += norm
     print "error =", np.sqrt(error/norm)*100, "%"
