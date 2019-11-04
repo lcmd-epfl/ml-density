@@ -4,6 +4,8 @@ cutoffradius = 4.0
 sigmasoap = 0.3
 splitting = 1
 portion = 1
+seed = 1
+train_size = 2000
 
 [paths]
 xyzfile          = ALL.xyz
@@ -20,4 +22,5 @@ goodover_base    = OVER_NPY/overlap_conf
 averages_dir     = AVERAGES/
 baselined_w_base = BASELINED_PROJECTIONS/projections_conf
 over_dat_base    = OVER_DAT/overlap_conf
+trainingselfile  = SELECTIONS/training_selection.txt
 
