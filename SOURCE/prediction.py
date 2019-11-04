@@ -1,13 +1,7 @@
 #!/usr/bin/python
 
-import sys
 import numpy as np
-import time
-import ase
-import utils
-from ase import io
-from ase.io import read
-from random import shuffle
+import ase.io
 import argparse
 import prediction
 from basis import basis_read
@@ -48,7 +42,7 @@ mol = "water"
 
 # system definition
 filename = "coords_1000.xyz"
-xyzfile = read(filename,":")
+xyzfile = ase.io.read(filename,":")
 ndata = len(xyzfile)
 
 # system parameters

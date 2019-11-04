@@ -1,9 +1,7 @@
 #!/usr/bin/python2.7
 
 import numpy as np
-import ase
-from ase import io
-from ase.io import read
+import ase.io
 import rmatrix
 from basis import basis_read
 from config import Config
@@ -28,7 +26,7 @@ psfilebase      = conf.paths['ps_base']
 
 bohr2ang = 0.529177249
 #========================== system definition
-xyzfile = read(xyzfilename,":")
+xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 coords = []

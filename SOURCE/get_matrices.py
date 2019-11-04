@@ -2,9 +2,7 @@
 
 import numpy as np
 import time
-import ase
-from ase import io
-from ase.io import read
+import ase.io
 import argparse
 import regression
 from basis import basis_read
@@ -36,7 +34,7 @@ bohr2ang = 0.529177249
 # system definition
 mol = "water"
 filename = "coords_1000.xyz"
-xyzfile = read(filename,":")
+xyzfile = ase.io.read(filename,":")
 ndata = len(xyzfile)
 
 # system parameters

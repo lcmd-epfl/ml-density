@@ -1,9 +1,7 @@
 #!/usr/bin/python
 
 import numpy as np
-import ase
-from ase import io
-from ase.io import read
+import ase.io
 import argparse
 from basis import basis_read
 
@@ -35,7 +33,7 @@ args = add_command_line_arguments_contraction("predict density")
 bohr2ang = 0.529177249
 #========================== system definition
 filename = "coords_1000.xyz"
-xyzfile = read(filename,":")
+xyzfile = ase.io.read(filename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 coords = []

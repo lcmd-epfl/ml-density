@@ -1,9 +1,7 @@
 #!/usr/bin/python
 
 import numpy as np
-import ase
-from ase import io
-from ase.io import read
+import ase.io
 from config import Config
 
 conf = Config()
@@ -35,7 +33,7 @@ def do_fps(x, d=0):
     return iy
 
 #========================== system definition
-xyzfile = read(xyzfilename,":")
+xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 atomic_valence = []

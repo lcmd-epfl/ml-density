@@ -2,9 +2,7 @@
 
 import numpy as np
 import time
-import ase
-from ase import io
-from ase.io import read
+import ase.io
 from config import Config
 from basis import basis_read
 
@@ -19,7 +17,7 @@ goodoverfilebase = conf.paths['goodover_base']
 
 
 #========================== system definition
-xyzfile = read(xyzfilename,":")
+xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 atomic_symbols = []

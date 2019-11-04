@@ -2,9 +2,7 @@
 
 import numpy as np
 import os
-import ase
-from ase import io
-from ase.io import read
+import ase.io
 from config import Config
 
 conf = Config()
@@ -13,7 +11,7 @@ xyzfilename      = conf.paths['xyzfile']
 goodoverfilebase = conf.paths['goodover_base']
 overdatbase      = conf.paths['over_dat_base']
 
-xyzfile = read(xyzfilename,":")
+xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 
 for iconf in xrange(ndata):
