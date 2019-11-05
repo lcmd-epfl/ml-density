@@ -12,6 +12,7 @@ int main(int argc, char ** argv){
   }
 
   char * fname = argv[1];
+  char * foname = argv[2];
   struct stat st;
   stat(fname, &st);
   size_t size = st.st_size;
@@ -26,7 +27,13 @@ int main(int argc, char ** argv){
   fread(alldata, size, 1, f);
   fclose(f);
 
-  FILE * fo = fopen(argv[2], "w");
+  FILE * fo = fopen(foname, "w");
+  if(!fo){
+    fprintf(stderr, "file ? %s\n", foname);
+    return 2;
+  }
+
+
   double * data = alldata + HEADER_SIZE/sizeof(data[0]);
   for(int i=0; i<(size-HEADER_SIZE)/sizeof(data[0]); i++){
     fprintf(fo, "%.10e\n", i, data[i]);

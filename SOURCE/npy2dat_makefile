@@ -1,7 +1,7 @@
 all: npy2dat
 
 npy2dat: npy2dat.c
-	gcc --std=gnu11 npy2dat.c -o npy2dat
+	gcc --std=gnu11 -O3 npy2dat.c -o npy2dat
 
 clean:
 	rm -vf npy2dat
