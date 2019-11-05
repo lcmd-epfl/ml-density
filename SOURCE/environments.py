@@ -86,3 +86,8 @@ fps_indexes = np.array(do_fps(power_env,M),int)
 fps_species = spec_array[fps_indexes]
 np.savetxt(refsselfilebase+str(M)+".txt",fps_indexes,fmt='%i')
 np.savetxt(specselfilebase+str(M)+".txt",fps_species,fmt='%i')
+
+nuniq = len(np.unique(fps_indexes))
+if nuniq != len(fps_indexes):
+    print 'warning: i have found only ', nuniq, 'unique environments'
+
