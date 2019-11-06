@@ -1,12 +1,10 @@
 [options]
 M = 1000
-cutoffradius = 4.0
 seed = 1
 train_size = 2000
 trainfrac = 1.0
 regular = 1e-6
 jitter = 1e-8
-molecule = water
 
 
 [paths]

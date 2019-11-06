@@ -12,19 +12,17 @@ conf = Config()
 def set_variable_values():
     f   = conf.get_option('trainfrac'   ,  1.0,   float)
     m   = conf.get_option('m'           ,  100,   int  )
-    rc  = conf.get_option('cutoffradius',  4.0,   float)
     r   = conf.get_option('regular'     ,  1e-6,  float)
     j   = conf.get_option('jitter'      ,  1e-10, float)
-    mol = conf.get_option('molecule'    ,  '',    str  )
-    return [f,m,rc,r,j,mol]
+    return [f,m,r,j]
 
-[frac,M,rc,reg,jit,mol] = set_variable_values()
+[frac,M,reg,jit] = set_variable_values()
 
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
 trainfilename   = conf.paths['trainingselfile']
-refsselfilebase = conf.paths['refs_sel_base']
 specselfilebase = conf.paths['spec_sel_base']
+kernelconfbase  = conf.paths['kernel_conf_base']
 weightsfilebase = conf.paths['weights_base']
 predictfilebase = conf.paths['predict_base']
 
@@ -65,7 +63,6 @@ for iconf in xrange(ndata):
 
 
 #====================================== reference environments
-fps_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
 fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
@@ -143,7 +140,9 @@ for ienv in xrange(M):
                 i += 1
 
 # load testing kernels and perform prediction
-coeffs = prediction.prediction(mol,kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,int(rc),natmax,llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
+coeffs = prediction.prediction(kernelconfbase,
+                               kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,natmax,
+                               llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,ww)
 
 np.save(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",coeffs)
 

@@ -12,13 +12,12 @@ REAL*8,DIMENSION(totsize,totsize):: Rmat
 ! allocate internal variables
 INTEGER:: iat,jat,l1,l2,n1,n2,im1,im2,i1,i2,a1,a2,al1,al2,anc1,anc2,conf,if1,if2
 INTEGER:: iref1,iref2,msize1,msize2,ik1,ik2
-CHARACTER*32:: conf_str 
 
 !f2py intent(in) llmax,nnmax,nspecies,M,totsize,specarray,almax,ancut,kMM
-!f2py intent(out) Rmat 
-!f2py depend(totsize) Rmat 
+!f2py intent(out) Rmat
+!f2py depend(totsize) Rmat
 !f2py depend(nspecies) almax,ancut
-!f2py depend(M) specarray,kMM 
+!f2py depend(M) specarray,kMM
 !f2py depend(llmax) ancut,kMM
 
 Rmat(:,:) = 0.d0
@@ -36,7 +35,7 @@ do iref1=1,M
             ! Loop over 2nd dimension
             i2 = 1
             do iref2=1,M
-               a2 = specarray(iref2) + 1 
+               a2 = specarray(iref2) + 1
                al2 = almax(a2)
                do l2=1,al2
                   msize2 = 2*(l2-1)+1
@@ -45,7 +44,7 @@ do iref1=1,M
                      do im2=1,msize2
                         ik2 = (iref2-1)*msize2+im2
                         if (a1==a2.and.l1==l2.and.n1==n2) then
-                           Rmat(i1,i2) = kMM(l1,ik1,ik2) 
+                           Rmat(i1,i2) = kMM(l1,ik1,ik2)
                         endif
                         i2 = i2 + 1
                      enddo
@@ -59,4 +58,4 @@ do iref1=1,M
 enddo
 
 return
-END 
+END

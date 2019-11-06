@@ -12,22 +12,22 @@ conf = Config()
 def set_variable_values():
     f  = conf.get_option('trainfrac'   ,  1.0,  float)
     m  = conf.get_option('m'           ,  100,  int  )
-    rc = conf.get_option('cutoffradius',  4.0,  float)
-    return [f,m,rc]
+    return [f,m]
 
-[frac,M,rc] = set_variable_values()
+[frac,M] = set_variable_values()
 
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
 trainfilename   = conf.paths['trainingselfile']
-refsselfilebase = conf.paths['refs_sel_base']
 specselfilebase = conf.paths['spec_sel_base']
+kernelconfbase  = conf.paths['kernel_conf_base']
+baselinedwbase  = conf.paths['baselined_w_base']
+overdatbase     = conf.paths['over_dat_base']
 avecfilebase    = conf.paths['avec_base']
 bmatfilebase    = conf.paths['bmat_base']
 
 
 # system definition
-mol = "water"
 xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 
@@ -68,7 +68,6 @@ for iconf in xrange(ndata):
 
 
 #====================================== reference environments
-fps_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
 fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
@@ -136,7 +135,9 @@ for iconf in trainrange:
 
 # compute regression arrays
 start = time.time()
-Avec,Bmat = regression.getab(mol,train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,int(rc),totsize,atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes)
+Avec,Bmat = regression.getab(baselinedwbase, overdatbase, kernelconfbase,
+                             train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,
+                             atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes)
 print "A-vector and B-matrix computed in", time.time()-start, "seconds"
 
 # save regression arrays

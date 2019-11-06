@@ -17,7 +17,6 @@ def set_variable_values():
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
 refsselfilebase = conf.paths['refs_sel_base']
-specselfilebase = conf.paths['spec_sel_base']
 kmmbase         = conf.paths['kmm_base']
 psfilebase      = conf.paths['ps_base']
 
@@ -59,7 +58,6 @@ for iconf in xrange(ndata):
             atomicindx[iconf,ispe,icount] = indexes[icount]
 #====================================== reference environments
 fps_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
-fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)

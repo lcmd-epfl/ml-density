@@ -1,41 +1,43 @@
-SUBROUTINE prediction(mol,kernsizes,specarray,atomcount,atomicindx,nspecies,ntest,cutoff,natmax,&
+SUBROUTINE prediction(path,kernsizes,specarray,atomcount,atomicindx,nspecies,ntest,natmax,&
                       llmax,nnmax,natoms,testrange,test_species,almax,anmax,M,ww,coeffs)
 
 use omp_lib
 IMPLICIT NONE
 ! allocate I/O variables
-INTEGER:: ntest,natmax,llmax,nnmax,M,nspecies,cutoff
-INTEGER,DIMENSION(ntest)::natoms,testrange,kernsizes 
-INTEGER,DIMENSION(ntest,natmax)::test_species 
+INTEGER:: ntest,natmax,llmax,nnmax,M,nspecies
+INTEGER,DIMENSION(ntest)::natoms,testrange,kernsizes
+INTEGER,DIMENSION(ntest,natmax)::test_species
 INTEGER,DIMENSION(nspecies)::almax
 INTEGER,DIMENSION(nspecies,llmax+1)::anmax
 INTEGER,DIMENSION(M)::specarray
 INTEGER,DIMENSION(ntest,nspecies)::atomcount
 INTEGER,DIMENSION(natmax,nspecies,ntest)::atomicindx
-REAL*8,DIMENSION(M,llmax+1,nnmax,2*llmax+1):: ww 
-REAL*8,DIMENSION(ntest,natmax,llmax+1,nnmax,2*llmax+1):: coeffs 
+REAL*8,DIMENSION(M,llmax+1,nnmax,2*llmax+1):: ww
+REAL*8,DIMENSION(ntest,natmax,llmax+1,nnmax,2*llmax+1):: coeffs
+CHARACTER*512:: path
 ! allocate internal variables
 INTEGER,DIMENSION(:,:,:,:,:), ALLOCATABLE :: kernsparseindexes
 REAL*8,DIMENSION(:), ALLOCATABLE :: kernels
 REAL*8:: kern
 INTEGER:: itest,iat,ispe,al,l,msize,n,im,iref,imm,conf,ik,a1,sk,ifk,icspe
-CHARACTER*16:: conf_str,mol,ref_str,cut_str
+CHARACTER*16:: conf_str
 
-!f2py intent(in) mol,kernsizes,specarray,atomcount,atomicindx,nspecies,ntest,cutoff
+!f2py intent(in) path,kernsizes,specarray,atomcount,atomicindx,nspecies,ntest
 !f2py intent(in) natmax,llmax,nnmax,natoms,testrange,test_species,almax,anmax,M,ww
-!f2py intent(out) coeffs 
-!f2py depend(ntest) coeffs,natoms,test_species,testrange,atomcount,atomicindx,kernsizes 
+!f2py intent(out) coeffs
+!f2py depend(ntest) coeffs,natoms,test_species,testrange,atomcount,atomicindx,kernsizes
 !f2py depend(M) ww,specarray
 !f2py depend(llmax) coeffs,anmax,ww
 !f2py depend(natmax) coeffs,test_species,atomicindx
-!f2py depend(nnmax) coeffs,ww 
-!f2py depend(nspecies) almax,anmax,atomcount,atomicindx 
+!f2py depend(nnmax) coeffs,ww
+!f2py depend(nspecies) almax,anmax,atomcount,atomicindx
 
-coeffs(:,:,:,:,:) = 0.d0 
+coeffs(:,:,:,:,:) = 0.d0
 
 !$OMP PARALLEL DEFAULT(private) &
-!$OMP FIRSTPRIVATE(mol,specarray,atomcount,atomicindx,nspecies,ntest,natmax,llmax,nnmax,natoms) &
-!$OMP FIRSTPRIVATE(testrange,test_species,almax,anmax,M,kernsparseindexes,kernels,kernsizes,cutoff) &
+!$OMP FIRSTPRIVATE(specarray,atomcount,atomicindx,nspecies,ntest,natmax,llmax,nnmax,natoms) &
+!$OMP FIRSTPRIVATE(testrange,test_species,almax,anmax,M,kernsparseindexes,kernels,kernsizes) &
+!$OMP FIRSTPRIVATE(path) &
 !$OMP SHARED(coeffs,ww)
 !$OMP DO SCHEDULE(dynamic)
 do itest=1,ntest
@@ -45,10 +47,8 @@ do itest=1,ntest
    kernsparseindexes(:,:,:,:,:) = 0
    conf = testrange(itest)
    write(conf_str,*) conf
-   write(ref_str,*) M
-   write(cut_str,*) cutoff
    ifk = itest + 1000
-   open(unit=ifk,file='KERNELS/kernel_conf'//trim(adjustl(conf_str))//'.dat',action='read',status='old')
+   open(unit=ifk,file=trim(path)//trim(adjustl(conf_str))//'.dat',action='read',status='old')
    ik = 1
    do iref=1,M
       ispe = specarray(iref) + 1
@@ -91,4 +91,4 @@ enddo
 !$OMP END PARALLEL
 
 return
-END 
+END
