@@ -16,9 +16,7 @@ def set_variable_values():
     sg  = conf.get_option('sigmasoap'   ,  0.3,   float)
     r   = conf.get_option('regular'     ,  1e-6,  float)
     j   = conf.get_option('jitter'      ,  1e-10, float)
-    mol = conf.get_option('molecule'    ,  '',    str  )
-    ts  = conf.get_option('testset_str' ,  '',    str  )
-    return [s,f,m,rc,sg,r,j,mol,ts]
+    return [s,f,m,rc,sg,r,j]
 
 [nset,frac,M,rc,sigma_soap,reg,jit] = set_variable_values()
 
@@ -49,8 +47,8 @@ for i in xrange(len(xyzfile)):
 natmax = max(natoms)
 
 #====================================== reference environments
-fps_indexes = np.loadtxt(refsselfilebase+str(m)+".txt",int)
-fps_species = np.loadtxt(specselfilebase+str(m)+".txt",int)
+fps_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
+fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
@@ -81,8 +79,8 @@ for iconf in testrange:
 
     overl      = np.load(goodoverfilebase+str(iconf)+".npy")
     coeffs_ref = np.load(goodcoeffilebase+str(iconf)+".npy")
-
     size_coeffs = coeffs_ref.shape
+
     averages = np.zeros(size_coeffs,float)
     icoeff = 0
     for iat in xrange(natoms[iconf]):
@@ -94,7 +92,15 @@ for iconf in testrange:
 
     coeffs_ref  -= averages
     projs_ref    = np.dot(overl,coeffs_ref)
-    delta_coeffs = coeffs-coeffs_ref
+
+    delta_coeffs = np.zeros(size_coeffs,float)
+    icoeff = 0
+    for iat in xrange(natoms[iconf]):
+        for l in xrange(lmax[atoms[iat]]+1):
+            for n in xrange(nmax[(atoms[iat],l)]):
+                for im in xrange(2*l+1):
+                    delta_coeffs[icoeff] = coeffs[itest,iat,l,n,im] - coeffs_ref[icoeff]
+                    icoeff +=1
     delta_proj   = np.dot(overl,delta_coeffs)
 
     #================================================
