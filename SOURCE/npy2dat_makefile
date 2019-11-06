@@ -1,7 +1,7 @@
-all: npy2dat
+BUILDDIR=npy2dat_build
 
-npy2dat: npy2dat.c
-	gcc --std=gnu11 -O3 npy2dat.c -o npy2dat
+all: npy2dat.c npy2dat_setup.py
+	python npy2dat_setup.py build_ext --inplace --build-temp=$(BUILDDIR)
 
 clean:
-	rm -vf npy2dat
+	rm -rf npy2dat.so $(BUILDDIR)
