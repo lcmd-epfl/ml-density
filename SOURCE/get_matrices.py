@@ -3,7 +3,7 @@
 import numpy as np
 import time
 import ase.io
-import regression
+import get_matrices
 from config import Config
 from basis import basis_read
 
@@ -135,9 +135,9 @@ for iconf in trainrange:
 
 # compute regression arrays
 start = time.time()
-Avec,Bmat = regression.getab(baselinedwbase, overdatbase, kernelconfbase,
-                             train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,
-                             atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes)
+Avec,Bmat = get_matrices.getab(baselinedwbase, overdatbase, kernelconfbase,
+                               train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,
+                               atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes)
 print "A-vector and B-matrix computed in", time.time()-start, "seconds"
 
 # save regression arrays

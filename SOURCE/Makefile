@@ -10,18 +10,12 @@ F2PYOPT='-O3'
 LIBS='-lgomp'
 #LIBS='-liomp5 -lpthread' # omp libraries with ifort
 
-f2py: rmatrix.so regression.so prediction.so 
+MODULES=rmatrix.so get_matrices.so prediction.so
 
-rmatrix.so: rmatrix.f90
-	$(F2PY) -c --opt=$(F2PYOPT) rmatrix.f90    -m rmatrix --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS) 
+all: $(MODULES)
 
-regression.so: regression.f90
-	$(F2PY) -c --opt=$(F2PYOPT) regression.f90 -m regression --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS)  $(LIBS)
-
-prediction.so: prediction.f90
-	$(F2PY) -c --opt=$(F2PYOPT) prediction.f90 -m prediction --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS)
-
-all: f2py
+%.so: %.f90
+	$(F2PY) -c --opt=$(F2PYOPT) $^ -m $(@:%.so=%) --fcompiler=$(FCOMPILER) --f90flags=$(F90FLAGS) $(LIBS)
 
 clean:
-	rm -fv *.o *.so
+	rm -fv $(MODULES)
