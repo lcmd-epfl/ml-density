@@ -10,14 +10,12 @@ from basis import basis_read
 conf = Config()
 
 def set_variable_values():
-    s  = conf.get_option('testset'     ,  1  ,  int  )
     f  = conf.get_option('trainfrac'   ,  1.0,  float)
     m  = conf.get_option('m'           ,  100,  int  )
     rc = conf.get_option('cutoffradius',  4.0,  float)
-    sg = conf.get_option('sigmasoap'   ,  0.3,  float)
-    return [s,f,m,rc,sg]
+    return [f,m,rc]
 
-[nset,frac,M,rc,sigma_soap] = set_variable_values()
+[frac,M,rc] = set_variable_values()
 
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
@@ -27,8 +25,6 @@ specselfilebase = conf.paths['spec_sel_base']
 avecfilebase    = conf.paths['avec_base']
 bmatfilebase    = conf.paths['bmat_base']
 
-# conversion constants
-bohr2ang = 0.529177249
 
 # system definition
 mol = "water"
@@ -36,12 +32,10 @@ xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 
 # system parameters
-coords = []
 atomic_symbols = []
 atomic_valence = []
 natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
-    coords.append(np.asarray(xyzfile[i].get_positions(),float)/bohr2ang)
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
     natoms[i] = int(len(atomic_symbols[i]))

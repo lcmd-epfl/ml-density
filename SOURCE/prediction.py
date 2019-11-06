@@ -10,18 +10,15 @@ from basis import basis_read
 conf = Config()
 
 def set_variable_values():
-    s   = conf.get_option('testset'     ,  1,     int  )
     f   = conf.get_option('trainfrac'   ,  1.0,   float)
     m   = conf.get_option('m'           ,  100,   int  )
     rc  = conf.get_option('cutoffradius',  4.0,   float)
-    sg  = conf.get_option('sigmasoap'   ,  0.3,   float)
     r   = conf.get_option('regular'     ,  1e-6,  float)
     j   = conf.get_option('jitter'      ,  1e-10, float)
     mol = conf.get_option('molecule'    ,  '',    str  )
-    ts  = conf.get_option('testset_str' ,  '',    str  )
-    return [s,f,m,rc,sg,r,j,mol,ts]
+    return [f,m,rc,r,j,mol]
 
-[nset,frac,M,rc,sigma_soap,reg,jit,mol,tset] = set_variable_values()
+[frac,M,rc,reg,jit,mol] = set_variable_values()
 
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
@@ -31,20 +28,15 @@ specselfilebase = conf.paths['spec_sel_base']
 weightsfilebase = conf.paths['weights_base']
 predictfilebase = conf.paths['predict_base']
 
-# coversion factors
-bohr2ang = 0.529177249
-
 # system definition
 xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 
 # system parameters
-coords = []
 atomic_symbols = []
 atomic_valence = []
 natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
-    coords.append(np.asarray(xyzfile[i].get_positions(),float)/bohr2ang)
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
     natoms[i] = int(len(atomic_symbols[i]))
@@ -53,7 +45,6 @@ natmax = max(natoms)
 # atomic species arrays
 species = np.sort(list(set(np.array([item for sublist in atomic_valence for item in sublist]))))
 nspecies = len(species)
-spec_list = []
 spec_list_per_conf = {}
 atom_counting = np.zeros((ndata,nspecies),int)
 for iconf in xrange(ndata):
@@ -62,10 +53,7 @@ for iconf in xrange(ndata):
         for ispe in xrange(nspecies):
             if atomic_valence[iconf][iat] == species[ispe]:
                atom_counting[iconf,ispe] += 1
-               spec_list.append(ispe)
                spec_list_per_conf[iconf].append(ispe)
-spec_array = np.asarray(spec_list,int)
-nenv = len(spec_array)
 
 # atomic indexes sorted by valence
 atomicindx = np.zeros((natmax,nspecies,ndata),int)
@@ -130,12 +118,11 @@ for iconf in testrange:
     for iref in xrange(M):
         ispe = fps_species[iref]
         spe = spe_dict[ispe]
+        temp = 0
         for l in xrange(lmax[spe]+1):
             msize = 2*l+1
-            for im in xrange(msize):
-                for iat in xrange(atom_counting_test[itest,ispe]):
-                    for imm in xrange(msize):
-                        kernel_sizes[itest] += 1
+            temp += msize*msize
+        kernel_sizes[itest] += temp * atom_counting_test[itest,ispe]
     itest += 1
 
 # load regression weights

@@ -11,13 +11,9 @@ conf = Config()
 
 def set_variable_values():
   m   = conf.get_option('m'           ,  100, int  )
-  rc  = conf.get_option('cutoffradius',  4.0, float)
-  sg  = conf.get_option('sigmasoap'   ,  0.3, float)
-  s   = conf.get_option('splitting'   ,  1  , int  )
-  p   = conf.get_option('portion'     ,  1  , int  )
-  return [m,rc,sg,s,p]
+  return [m]
 
-[M,rc,sigma_soap,nsplit,portion] = set_variable_values()
+[M] = set_variable_values()
 
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
@@ -27,18 +23,14 @@ kernelconfbase  = conf.paths['kernel_conf_base']
 psfilebase      = conf.paths['ps_base']
 
 
-bohr2ang = 0.529177249
 #========================== system definition
 xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
-#dataset_portion = list(np.split(np.array(xrange(ndata),int),nsplit)[portion])
 #======================= system parameters
-coords = []
 atomic_symbols = []
 atomic_valence = []
 natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
-    coords.append(np.asarray(xyzfile[i].get_positions(),float)/bohr2ang)
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
     natoms[i] = int(len(atomic_symbols[i]))
@@ -148,7 +140,6 @@ for iconf in xrange(ndata):
     sys.stdout.write('%s\r'%strg)
     sys.stdout.flush()
 
-#for iconf in dataset_portion:
     start = time.time()
     atoms = atomic_symbols[iconf]
     # define sparse indexes

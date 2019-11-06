@@ -25,7 +25,6 @@ natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     natoms[i] = int(len(atomic_symbols[i]))
-natmax = max(natoms)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
@@ -44,23 +43,23 @@ for iconf in xrange(ndata):
 
     idx = np.arange(totsize, dtype=int)
 
-    i1 = 0
+    i = 0
     for iat in xrange(natoms[iconf]):
-        spe1 = atoms[iat]
+        spe = atoms[iat]
 
-        i1 += nmax[(spe1,0)]
+        i += nmax[(spe,0)]
 
-        if(lmax[spe1]<1):
+        if(lmax[spe]<1):
           continue
 
-        for n1 in xrange(nmax[(spe1,1)]):
-            idx[i1  ] = i1+1
-            idx[i1+1] = i1+2
-            idx[i1+2] = i1
-            i1 += 3
+        for n1 in xrange(nmax[(spe,1)]):
+            idx[i  ] = i+1
+            idx[i+1] = i+2
+            idx[i+2] = i
+            i += 3
 
-        for l1 in xrange(2, lmax[spe1]+1):
-            i1 += (2*l1+1)*nmax[(spe1,l1)]
+        for l in xrange(2, lmax[spe]+1):
+            i += (2*l+1)*nmax[(spe,l)]
 
     idx = idx.tolist()
 
@@ -68,11 +67,11 @@ for iconf in xrange(ndata):
     coeffs = np.loadtxt(coefffilebase+str(iconf)+".dat")
     overlap = np.load(overfilebase+str(iconf)+".npy")
 
-    Coef  = coeffs[idx]
-    Over1 = (np.transpose(overlap)) [idx]
-    Over  = (np.transpose(Over1))   [idx]
+    coef  = coeffs[idx]
+    over1 = (np.transpose(overlap)) [idx]
+    over  = (np.transpose(over1))   [idx]
 
-    np.save(goodcoeffilebase+str(iconf)+".npy",Coef)
-    np.save(goodoverfilebase+str(iconf)+".npy",Over)
+    np.save(goodcoeffilebase+str(iconf)+".npy",coef)
+    np.save(goodoverfilebase+str(iconf)+".npy",over)
     print "time =", time.time()-start
 

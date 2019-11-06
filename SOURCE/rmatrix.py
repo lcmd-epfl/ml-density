@@ -10,11 +10,9 @@ conf = Config()
 
 def set_variable_values():
   m   = conf.get_option('m'           ,  100, int  )
-  rc  = conf.get_option('cutoffradius',  4.0, float)
-  sg  = conf.get_option('sigmasoap'   ,  0.3, float)
-  return [m,rc,sg]
+  return [m]
 
-[M,rc,sigma_soap] = set_variable_values()
+[M] = set_variable_values()
 
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
@@ -24,16 +22,13 @@ kmmbase         = conf.paths['kmm_base']
 psfilebase      = conf.paths['ps_base']
 
 
-bohr2ang = 0.529177249
 #========================== system definition
 xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
-coords = []
 atomic_valence = []
 natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
-    coords.append(np.asarray(xyzfile[i].get_positions(),float)/bohr2ang)
     atomic_valence.append(xyzfile[i].get_atomic_numbers())
     natoms[i] = int(len(atomic_valence[i]))
 natmax = max(natoms)

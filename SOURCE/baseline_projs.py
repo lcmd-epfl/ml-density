@@ -20,16 +20,14 @@ xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 #======================= system parameters
 atomic_symbols = []
-atomic_symbols_joined = []
 natoms = np.zeros(ndata,int)
 for i in xrange(len(xyzfile)):
     atomic_symbols.append(xyzfile[i].get_chemical_symbols())
     natoms[i] = len(atomic_symbols[i])
-    atomic_symbols_joined += atomic_symbols[i]
-natmax = max(natoms)
 
 # how many atoms of each element we have
 nenv = {}
+atomic_symbols_joined = [item for sublist in atomic_symbols for item in sublist]
 elements_in_set = list(set(atomic_symbols_joined))
 for q in elements_in_set:
     nenv[q] = atomic_symbols_joined.count(q)
@@ -47,12 +45,12 @@ print "computing averages..."
 for iconf in xrange(ndata):
     print "iconf = ", iconf
     atoms = atomic_symbols[iconf]
-    Coef = np.load(goodcoeffilebase+str(iconf)+".npy")
+    coef = np.load(goodcoeffilebase+str(iconf)+".npy")
     i = 0
     for iat in xrange(natoms[iconf]):
         spe = atoms[iat]
         for n in xrange(nmax[(spe,0)]):
-            av_coefs[spe][n] += Coef[i]
+            av_coefs[spe][n] += coef[i]
             i += 1
         for l in xrange(1,lmax[spe]+1):
             i += (2*l+1)*nmax[(spe,l)]
@@ -68,23 +66,18 @@ for iconf in xrange(ndata):
     print "iconf = ", iconf
     atoms = atomic_symbols[iconf]
     #==================================================
-    totsize = 0
-    for iat in xrange(natoms[iconf]):
-        for l in xrange(lmax[atoms[iat]]+1):
-            totsize += nmax[(atoms[iat],l)]*(2*l+1)
-    #==================================================
-    Coef = np.load(goodcoeffilebase+str(iconf)+".npy")
-    Over = np.load(goodoverfilebase+str(iconf)+".npy")
+    coef = np.load(goodcoeffilebase+str(iconf)+".npy")
+    over = np.load(goodoverfilebase+str(iconf)+".npy")
     #==================================================
     i = 0
     for iat in xrange(natoms[iconf]):
         spe = atoms[iat]
         for n in xrange(nmax[(spe,0)]):
-            Coef[i] -= av_coefs[spe][n]
+            coef[i] -= av_coefs[spe][n]
             i += 1
         for l in xrange(1,lmax[spe]+1):
             i += (2*l+1)*nmax[(spe,l)]
 
-    Proj = np.dot(Over,Coef)
-    np.savetxt(baselinedwbase+str(iconf)+".dat",Proj, fmt='%.10e')
+    proj = np.dot(over,coef)
+    np.savetxt(baselinedwbase+str(iconf)+".dat",proj, fmt='%.10e')
 
