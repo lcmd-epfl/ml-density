@@ -79,6 +79,27 @@ int main(int argc, char ** argv){
   int * almax      = ivec_read(nspecies                ,  "almax.dat"                  );
   int * ancut      = ivec_read(nspecies*(llmax+1)      ,  "anmax.dat"                  );
 
+/////////////////
+
+  size_t size1 = totsize*(totsize+1)*sizeof(double);
+  size_t size2 = 0;
+  size_t size3 = 0;
+  for(int itrain=0; itrain<ntrain; itrain++){
+    size_t t2 = totalsizes[itrain]*(totalsizes[itrain]+1)+kernsizes[itrain];
+    if(t2>size2) size2 = t2;
+    size_t t3 = natoms[itrain];
+    if(t3>size3) size3 = t3;
+  }
+  size2 *= sizeof(double);
+  size3 *= sizeof(int) * (llmax+1)*(nnmax+(2*llmax+1)* M);
+  fprintf(stderr, "\
+      output: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
+      input : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
+      inner : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n",
+      size1, size1/1048576.0, size1/1048576.0/1048576.0,
+      size2, size2/1048576.0, size2/1048576.0/1048576.0,
+      size3, size3/1048576.0, size3/1048576.0/1048576.0
+      );
 
   double * Avec = calloc(sizeof(double)*totsize, 1);
   double * Bmat = calloc(sizeof(double)*totsize*totsize, 1);
