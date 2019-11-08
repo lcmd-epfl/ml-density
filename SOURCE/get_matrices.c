@@ -20,21 +20,21 @@ const char path_proj[] = "BASELINED_PROJECTIONS/projections_conf";
 const char path_over[] = "OVER_DAT/overlap_conf";
 const char path_kern[] = "KERNELS/kernel_conf";
 
-static inline int sparseind(int i, int j, int k, int l, int natoms) {
+static inline int sparseind(int l, int n, int iat, int im, int natoms) {
   return
-    i * natoms*nnmax*(llmax+1) +
-    j * nnmax*(llmax+1) +
-    k * (llmax+1) +
-    l;
+    l * nnmax * natoms * (2*llmax+1) +
+    n * natoms * (2*llmax+1) +
+    iat * (2*llmax+1) +
+    im;
 }
 
-static inline int ksparseind(int i, int j, int k, int l, int m, int natoms) {
+static inline int ksparseind(int iref, int l, int m, int icspe, int mm, int natoms) {
   return
-    i * natoms * (2*llmax+1) * (llmax+1) * M +
-    j * (2*llmax+1) * (llmax+1) * M +
-    k * (llmax+1) * M +
-    l * M +
-    m;
+    iref *(llmax+1) *(2*llmax+1) *natoms * (2*llmax+1) +
+    l *(2*llmax+1) *natoms * (2*llmax+1) +
+    m *natoms * (2*llmax+1) +
+    icspe * (2*llmax+1) +
+    mm;
 }
 
 void vec_print(int n, double * v, const char * s, FILE * f){
@@ -105,8 +105,8 @@ int main(int argc, char ** argv){
     double * projections = vec_read(totalsizes[itrain], file_proj);
     double * overlaps    = vec_read(totalsizes[itrain]*totalsizes[itrain], file_over);
     double * kernels     = vec_read(kernsizes[itrain], file_kern);
-    int * sparseindexes = calloc(sizeof(int) * (2*llmax+1)*natoms[itrain]*nnmax*(llmax+1), 1);
-    int * kernsparseindexes = calloc(sizeof(int) * (2*llmax+1)*natoms[itrain]*(2*llmax+1)*(llmax+1)*M, 1);
+    int * sparseindexes = calloc(sizeof(int) * (llmax+1) * nnmax * natoms[itrain] * (2*llmax+1) , 1);
+    int * kernsparseindexes = calloc(sizeof(int) *M *(llmax+1) *(2*llmax+1) *natoms[itrain] * (2*llmax+1) , 1);
 
 
     int it1 = 0;
@@ -118,7 +118,7 @@ int main(int argc, char ** argv){
         int anc1   = ancut[ a1 * (llmax+1) + l1 ];
         for(int n1=0; n1<anc1; n1++){
           for(int im1=0; im1<msize1; im1++){
-            sparseindexes[ sparseind(im1,iat,n1,l1, natoms[itrain])] = it1++;
+            sparseindexes[ sparseind( l1,n1,iat,im1, natoms[itrain])] = it1++;
           }
         }
       }
@@ -137,7 +137,7 @@ int main(int argc, char ** argv){
         for(int im1=0; im1<msize1; im1++){
           for(int iat=0; iat<atomcount[ itrain*nspecies+a1 ]; iat++){
             for(int imm1=0; imm1<msize1; imm1++){
-              kernsparseindexes[ ksparseind(imm1,iat,im1,l1,iref1, natoms[itrain])] = ik1++;
+              kernsparseindexes[ksparseind(iref1,l1,im1,iat,imm1, natoms[itrain])] = ik1++;
             }
           }
         }
@@ -147,7 +147,6 @@ int main(int argc, char ** argv){
     //   ! Loop over 1st dimension
     int i1 = 0;
     for(int iref1=0; iref1<M; iref1++){
-      printf("%d / %d \n", iref1, M);
       int a1 = specarray[iref1];
       int al1 = almax[a1];
       for(int l1=0; l1<al1; l1++){
@@ -159,13 +158,26 @@ int main(int argc, char ** argv){
             for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
               int iat = atomicindx[icspe1*nspecies*ntrain + a1*ntrain + itrain];
               for(int imm1=0; imm1<msize1; imm1++){
-                int sp1 = sparseindexes    [ sparseind (imm1,iat,n1,l1, natoms[itrain])];
-                int sk1 = kernsparseindexes[ ksparseind(imm1,icspe1,im1,l1,iref1, natoms[itrain])];
+                int sp1 = sparseindexes    [ sparseind (l1,n1,iat,imm1, natoms[itrain])];
+                int sk1 = kernsparseindexes[ ksparseind(iref1,l1,im1,icspe1,imm1, natoms[itrain])];
                 Avec[i1] += projections[sp1] * kernels[sk1];
               }
             }
+            i1++;
+          }
+        }
+      }
+    }
 
-            //                   ! Loop over 2nd dimension
+    i1 = 0;
+    for(int iref1=0; iref1<M; iref1++){
+      int a1 = specarray[iref1];
+      int al1 = almax[a1];
+      for(int l1=0; l1<al1; l1++){
+        int msize1 = 2*l1+1;
+        int anc1   = ancut[ a1 * (llmax+1) + l1 ];
+        for(int n1=0; n1<anc1; n1++){
+          for(int im1=0; im1<msize1; im1++){
             int i2 = 0;
             for(int iref2=0; iref2<=iref1; iref2++){
               int a2 = specarray[iref2];
@@ -175,20 +187,18 @@ int main(int argc, char ** argv){
                 int anc2   = ancut[ a2 * (llmax+1) + l2 ];
                 for(int n2=0; n2<anc2; n2++){
                   for(int im2=0; im2<msize2; im2++){
-                    // ! Collect contributions for 1st dimension
                     double contrB = 0.0;
                     for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
                       int iat = atomicindx[icspe1*nspecies*ntrain + a1*ntrain + itrain];
                       for(int imm1=0; imm1<msize1; imm1++){
-                        int sp1 = sparseindexes    [ sparseind (imm1,iat,n1,l1, natoms[itrain])];
-                        int sk1 = kernsparseindexes[ ksparseind(imm1,icspe1,im1,l1,iref1, natoms[itrain])];
-                        //  ! Collect contributions for 2nd dimension
+                        int sp1 = sparseindexes    [ sparseind (l1,n1,iat,imm1, natoms[itrain])];
+                        int sk1 = kernsparseindexes[ ksparseind( iref1, l1, im1, icspe1, imm1, natoms[itrain])];
                         double Btemp = 0.0;
                         for(int icspe2=0; icspe2<atomcount[itrain*nspecies+a2]; icspe2++){
                           int jat = atomicindx[icspe2*nspecies*ntrain + a2*ntrain + itrain];
                           for(int imm2=0; imm2<msize2; imm2++){
-                            int sp2 = sparseindexes    [ sparseind (imm2,jat,n2,l2, natoms[itrain])];
-                            int sk2 = kernsparseindexes[ ksparseind(imm2,icspe2,im2,l2,iref2, natoms[itrain])];
+                            int sp2 = sparseindexes    [ sparseind (l2,n2,jat,imm2, natoms[itrain])];
+                            int sk2 = kernsparseindexes[ ksparseind( iref2, l2, im2, icspe2, imm2, natoms[itrain])];
                             Btemp += overlaps[sp2*totalsizes[itrain]+sp1] * kernels[sk2];
                           }
                         }
