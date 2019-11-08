@@ -1,12 +1,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <mpi.h>
 
 #define printalive printf("alive @ %s:%d\n", __FILE__, __LINE__)
 #define GOTOHELL { \
   fprintf(stderr, "%s:%d %s() -- ", \
       __FILE__, __LINE__, __FUNCTION__); \
   abort(); }
+
+int Nproc;
+int nproc;
 
 int llmax    =    5;
 int nnmax    =   10;
@@ -65,51 +69,24 @@ double * vec_read(int n, char * fname){
 }
 
 
+void do_work(
+    int from, int to,
+    int * atomicindx,
+    int * atomcount ,
+    int * trrange   ,
+    int * natoms    ,
+    int * totalsizes,
+    int * kernsizes ,
+    int * atomspe   ,
+    int * specarray ,
+    int * almax     ,
+    int * ancut     ,
+    double * Avec, double * Bmat){
 
-int main(int argc, char ** argv){
-
-  int * atomicindx = ivec_read(natmax*nspecies*ntrain  ,  "atomicindx_training.dat"    );
-  int * atomcount  = ivec_read(ntrain*nspecies         ,  "atom_counting_training.dat" );
-  int * trrange    = ivec_read(ntrain                  ,  "train_configs.dat"          );
-  int * natoms     = ivec_read(ntrain                  ,  "natoms_train.dat"           );
-  int * totalsizes = ivec_read(ntrain                  ,  "total_sizes.dat"            );
-  int * kernsizes  = ivec_read(ntrain                  ,  "kernel_sizes.dat"           );
-  int * atomspe    = ivec_read(ntrain*natmax           ,  "atomic_species.dat"         );
-  int * specarray  = ivec_read(M                       ,  "fps_species.dat"            );
-  int * almax      = ivec_read(nspecies                ,  "almax.dat"                  );
-  int * ancut      = ivec_read(nspecies*(llmax+1)      ,  "anmax.dat"                  );
-
-/////////////////
-
-  size_t size1 = totsize*(totsize+1)*sizeof(double);
-  size_t size2 = 0;
-  size_t size3 = 0;
-  for(int itrain=0; itrain<ntrain; itrain++){
-    size_t t2 = totalsizes[itrain]*(totalsizes[itrain]+1)+kernsizes[itrain];
-    if(t2>size2) size2 = t2;
-    size_t t3 = natoms[itrain];
-    if(t3>size3) size3 = t3;
-  }
-  size2 *= sizeof(double);
-  size3 *= sizeof(int) * (llmax+1)*(nnmax+(2*llmax+1)* M);
-  fprintf(stderr, "\
-      output: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
-      input : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
-      inner : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n",
-      size1, size1/1048576.0, size1/1048576.0/1048576.0,
-      size2, size2/1048576.0, size2/1048576.0/1048576.0,
-      size3, size3/1048576.0, size3/1048576.0/1048576.0
-      );
-
-  double * Avec = calloc(sizeof(double)*totsize, 1);
-  double * Bmat = calloc(sizeof(double)*totsize*totsize, 1);
-
-  for(int itrain=0; itrain<ntrain; itrain++){
+  for(int itrain=from; itrain<to; itrain++){
 
     int nat = natoms[itrain];
     int nao = totalsizes[itrain];
-
-    printf("%d\n", itrain);
 
     //   ! read projections, overlaps and kernels for each training molecule
     int conf = trrange[itrain];
@@ -222,10 +199,125 @@ int main(int argc, char ** argv){
     free(overlaps);
     free(kernels);
   }
+  return;
+}
 
-  vec_print(totsize, Avec, "\n", stdout);
-  vec_print(totsize*totsize, Bmat, "\n", stdout);
 
+int main(int argc, char ** argv){
+
+  MPI_Init (&argc, &argv);
+  MPI_Comm_size (MPI_COMM_WORLD, &Nproc);
+  MPI_Comm_rank (MPI_COMM_WORLD, &nproc);
+
+  int * atomicindx;
+  int * atomcount ;
+  int * trrange   ;
+  int * natoms    ;
+  int * totalsizes;
+  int * kernsizes ;
+  int * atomspe   ;
+  int * specarray ;
+  int * almax     ;
+  int * ancut     ;
+  if(nproc == 0){
+    atomicindx = ivec_read(natmax*nspecies*ntrain  ,  "atomicindx_training.dat"    );
+    atomcount  = ivec_read(ntrain*nspecies         ,  "atom_counting_training.dat" );
+    trrange    = ivec_read(ntrain                  ,  "train_configs.dat"          );
+    natoms     = ivec_read(ntrain                  ,  "natoms_train.dat"           );
+    totalsizes = ivec_read(ntrain                  ,  "total_sizes.dat"            );
+    kernsizes  = ivec_read(ntrain                  ,  "kernel_sizes.dat"           );
+    atomspe    = ivec_read(ntrain*natmax           ,  "atomic_species.dat"         );
+    specarray  = ivec_read(M                       ,  "fps_species.dat"            );
+    almax      = ivec_read(nspecies                ,  "almax.dat"                  );
+    ancut      = ivec_read(nspecies*(llmax+1)      ,  "anmax.dat"                  );
+  }
+  else{
+    atomicindx = calloc(sizeof(int)*natmax*nspecies*ntrain  ,  1 );
+    atomcount  = calloc(sizeof(int)*ntrain*nspecies         ,  1 );
+    trrange    = calloc(sizeof(int)*ntrain                  ,  1 );
+    natoms     = calloc(sizeof(int)*ntrain                  ,  1 );
+    totalsizes = calloc(sizeof(int)*ntrain                  ,  1 );
+    kernsizes  = calloc(sizeof(int)*ntrain                  ,  1 );
+    atomspe    = calloc(sizeof(int)*ntrain*natmax           ,  1 );
+    specarray  = calloc(sizeof(int)*M                       ,  1 );
+    almax      = calloc(sizeof(int)*nspecies                ,  1 );
+    ancut      = calloc(sizeof(int)*nspecies*(llmax+1)      ,  1 );
+  }
+  MPI_Bcast(atomicindx , natmax*nspecies*ntrain, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(atomcount  , ntrain*nspecies       , MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(trrange    , ntrain                , MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(natoms     , ntrain                , MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(totalsizes , ntrain                , MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(kernsizes  , ntrain                , MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(atomspe    , ntrain*natmax         , MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(specarray  , M                     , MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(almax      , nspecies              , MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(ancut      , nspecies*(llmax+1)    , MPI_INT, 0, MPI_COMM_WORLD);
+
+/////////////////
+
+  if (nproc == 0) {
+    size_t size1 = totsize*(totsize+1)*sizeof(double);
+    size_t size2 = 0;
+    size_t size3 = 0;
+    for(int itrain=0; itrain<ntrain; itrain++){
+      size_t t2 = totalsizes[itrain]*(totalsizes[itrain]+1)+kernsizes[itrain];
+      if(t2>size2) size2 = t2;
+      size_t t3 = natoms[itrain];
+      if(t3>size3) size3 = t3;
+    }
+    size2 *= sizeof(double);
+    size3 *= sizeof(int) * (llmax+1)*(nnmax+(2*llmax+1)* M);
+    fprintf(stderr, "\
+        output: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
+        input : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
+        inner : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n",
+        size1, size1/1048576.0, size1/1048576.0/1048576.0,
+        size2, size2/1048576.0, size2/1048576.0/1048576.0,
+        size3, size3/1048576.0, size3/1048576.0/1048576.0
+        );
+  }
+
+  double t;
+  if (nproc == 0) {
+    t = MPI_Wtime ();
+  }
+
+  double * AVEC = calloc(sizeof(double)*totsize, 1);
+  double * BMAT = calloc(sizeof(double)*totsize*totsize, 1);
+
+  double * Avec = calloc(sizeof(double)*totsize, 1);
+  double * Bmat = calloc(sizeof(double)*totsize*totsize, 1);
+
+  int div = ntrain/Nproc;
+  int rem = ntrain%Nproc;
+  int start[Nproc+1];
+  start[0] = 0;
+  for(int i=0; i<Nproc; i++){
+    start[i+1] = start[i] + ((i<rem)?div+1:div);
+  }
+#if 0
+  if (nproc == 0) {
+    for(int i=0; i<Nproc; i++){
+      printf("%d %d %d\n", start[i], start[i+1], start[i+1]-start[i]);
+    }
+  }
+#endif
+
+  do_work(start[nproc], start[nproc+1], atomicindx, atomcount, trrange, natoms, totalsizes, kernsizes , atomspe   , specarray , almax     , ancut     , Avec, Bmat);
+
+  MPI_Reduce (Avec, AVEC, totsize,         MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce (Bmat, BMAT, totsize*totsize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+  if(nproc == 0){
+    t = MPI_Wtime () - t;
+    fprintf(stderr, "t=%4.2lf\n", t);
+    vec_print(totsize, AVEC, "\n", stdout);
+    vec_print(totsize*totsize, BMAT, "\n", stdout);
+  }
+
+  free(AVEC);
+  free(BMAT);
   free(Avec);
   free(Bmat);
 
@@ -240,5 +332,6 @@ int main(int argc, char ** argv){
   free( almax     );
   free( ancut     );
 
+  MPI_Finalize ();
   return 0;
 }
