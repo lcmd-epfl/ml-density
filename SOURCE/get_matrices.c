@@ -20,21 +20,12 @@ const char path_proj[] = "BASELINED_PROJECTIONS/projections_conf";
 const char path_over[] = "OVER_DAT/overlap_conf";
 const char path_kern[] = "KERNELS/kernel_conf";
 
-static inline int sparseind(int l, int n, int iat, int im, int natoms) {
-  return
-    l * nnmax * natoms * (2*llmax+1) +
-    n * natoms * (2*llmax+1) +
-    iat * (2*llmax+1) +
-    im;
+static inline int sparseind(int l, int n, int iat, int natoms) {
+  return (l * nnmax + n) * natoms + iat;
 }
 
-static inline int ksparseind(int iref, int l, int m, int icspe, int mm, int natoms) {
-  return
-    iref *(llmax+1) *(2*llmax+1) *natoms * (2*llmax+1) +
-    l *(2*llmax+1) *natoms * (2*llmax+1) +
-    m *natoms * (2*llmax+1) +
-    icspe * (2*llmax+1) +
-    mm;
+static inline int ksparseind(int iref, int l, int m, int icspe, int natoms) {
+  return ((iref * (llmax+1) + l) *(2*llmax+1) + m) * natoms + icspe;
 }
 
 void vec_print(int n, double * v, const char * s, FILE * f){
@@ -93,6 +84,10 @@ int main(int argc, char ** argv){
   double * Bmat = calloc(sizeof(double)*totsize*totsize, 1);
 
   for(int itrain=0; itrain<ntrain; itrain++){
+
+    int nat = natoms[itrain];
+    int nao = totalsizes[itrain];
+
     printf("%d\n", itrain);
 
     //   ! read projections, overlaps and kernels for each training molecule
@@ -102,30 +97,26 @@ int main(int argc, char ** argv){
     sprintf(file_over, "%s%d.dat", path_over, conf);
     sprintf(file_kern, "%s%d.dat", path_kern, conf);
 
-    double * projections = vec_read(totalsizes[itrain], file_proj);
-    double * overlaps    = vec_read(totalsizes[itrain]*totalsizes[itrain], file_over);
-    double * kernels     = vec_read(kernsizes[itrain], file_kern);
-    int * sparseindexes = calloc(sizeof(int) * (llmax+1) * nnmax * natoms[itrain] * (2*llmax+1) , 1);
-    int * kernsparseindexes = calloc(sizeof(int) *M *(llmax+1) *(2*llmax+1) *natoms[itrain] * (2*llmax+1) , 1);
+    double * projections = vec_read(nao,     file_proj);
+    double * overlaps    = vec_read(nao*nao, file_over);
+    double * kernels     = vec_read( kernsizes[itrain], file_kern);
+    int * sparseindexes = calloc(sizeof(int) * (llmax+1) * nnmax * nat, 1);
+    int * kernsparseindexes = calloc(sizeof(int) *M *(llmax+1) *(2*llmax+1) * nat, 1);
 
 
     int it1 = 0;
-    for(int iat=0; iat<natoms[itrain]; iat++){
+    for(int iat=0; iat<nat; iat++){
       int a1 = atomspe[itrain*natmax+iat];
       int al1 = almax[a1];
       for(int l1=0; l1<al1; l1++){
         int msize1 = 2*l1+1;
         int anc1   = ancut[ a1 * (llmax+1) + l1 ];
         for(int n1=0; n1<anc1; n1++){
-          for(int im1=0; im1<msize1; im1++){
-            sparseindexes[ sparseind( l1,n1,iat,im1, natoms[itrain])] = it1++;
-          }
+          sparseindexes[ sparseind( l1,n1,iat, nat)] = it1;
+          it1 += msize1;
         }
       }
     }
-
-    //vec_print(totalsizes[itrain]*totalsizes[itrain], overlaps, "\n", stdout);
-    //vec_print(totalsizes[itrain], projections, "\n", stdout);
 
     int ik1 = 0;
     for(int iref1=0; iref1<M; iref1++){
@@ -136,9 +127,8 @@ int main(int argc, char ** argv){
         int msize1 = 2*l1+1;
         for(int im1=0; im1<msize1; im1++){
           for(int iat=0; iat<atomcount[ itrain*nspecies+a1 ]; iat++){
-            for(int imm1=0; imm1<msize1; imm1++){
-              kernsparseindexes[ksparseind(iref1,l1,im1,iat,imm1, natoms[itrain])] = ik1++;
-            }
+            kernsparseindexes[ksparseind(iref1,l1,im1,iat, nat)] = ik1;
+            ik1 += msize1;
           }
         }
       }
@@ -157,27 +147,13 @@ int main(int argc, char ** argv){
             // ! Collect contributions for 1st dimension
             for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
               int iat = atomicindx[icspe1*nspecies*ntrain + a1*ntrain + itrain];
+              int sk1 = kernsparseindexes[ ksparseind(iref1,l1,im1,icspe1, nat)];
+              int sp1 = sparseindexes    [ sparseind (l1,n1,iat, nat)];
               for(int imm1=0; imm1<msize1; imm1++){
-                int sp1 = sparseindexes    [ sparseind (l1,n1,iat,imm1, natoms[itrain])];
-                int sk1 = kernsparseindexes[ ksparseind(iref1,l1,im1,icspe1,imm1, natoms[itrain])];
-                Avec[i1] += projections[sp1] * kernels[sk1];
+                Avec[i1] += projections[sp1+imm1] * kernels[sk1+imm1];
               }
             }
-            i1++;
-          }
-        }
-      }
-    }
 
-    i1 = 0;
-    for(int iref1=0; iref1<M; iref1++){
-      int a1 = specarray[iref1];
-      int al1 = almax[a1];
-      for(int l1=0; l1<al1; l1++){
-        int msize1 = 2*l1+1;
-        int anc1   = ancut[ a1 * (llmax+1) + l1 ];
-        for(int n1=0; n1<anc1; n1++){
-          for(int im1=0; im1<msize1; im1++){
             int i2 = 0;
             for(int iref2=0; iref2<=iref1; iref2++){
               int a2 = specarray[iref2];
@@ -190,19 +166,19 @@ int main(int argc, char ** argv){
                     double contrB = 0.0;
                     for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
                       int iat = atomicindx[icspe1*nspecies*ntrain + a1*ntrain + itrain];
+                      int sk1 = kernsparseindexes[ ksparseind( iref1, l1, im1, icspe1, nat)];
+                      int sp1 = sparseindexes    [ sparseind (l1,n1,iat, nat)];
                       for(int imm1=0; imm1<msize1; imm1++){
-                        int sp1 = sparseindexes    [ sparseind (l1,n1,iat,imm1, natoms[itrain])];
-                        int sk1 = kernsparseindexes[ ksparseind( iref1, l1, im1, icspe1, imm1, natoms[itrain])];
                         double Btemp = 0.0;
                         for(int icspe2=0; icspe2<atomcount[itrain*nspecies+a2]; icspe2++){
                           int jat = atomicindx[icspe2*nspecies*ntrain + a2*ntrain + itrain];
+                          int sk2 = kernsparseindexes[ ksparseind( iref2, l2, im2, icspe2, nat)];
+                          int sp2 = sparseindexes    [ sparseind (l2,n2,jat, nat)];
                           for(int imm2=0; imm2<msize2; imm2++){
-                            int sp2 = sparseindexes    [ sparseind (l2,n2,jat,imm2, natoms[itrain])];
-                            int sk2 = kernsparseindexes[ ksparseind( iref2, l2, im2, icspe2, imm2, natoms[itrain])];
-                            Btemp += overlaps[sp2*totalsizes[itrain]+sp1] * kernels[sk2];
+                            Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2+imm2];
                           }
                         }
-                        contrB += Btemp * kernels[sk1];
+                        contrB += Btemp * kernels[sk1+imm1];
                       }
                     }
                     Bmat[i1*totsize+i2] += contrB;
@@ -226,7 +202,7 @@ int main(int argc, char ** argv){
     free(kernels);
   }
 
-  //vec_print(totsize, Avec, "\n", stdout);
+  vec_print(totsize, Avec, "\n", stdout);
   vec_print(totsize*totsize, Bmat, "\n", stdout);
 
   free(Avec);
