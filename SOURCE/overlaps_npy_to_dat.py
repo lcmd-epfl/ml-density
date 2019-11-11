@@ -3,7 +3,14 @@
 import numpy as np
 import ase.io
 from config import Config
-import npy2dat
+
+import ctypes
+import os
+import sys
+
+npy2dat = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/npy2dat.so")
+npy2dat.convert.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+npy2dat.convert.restype = ctypes.c_int
 
 conf = Config()
 

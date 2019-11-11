@@ -1,10 +1,10 @@
 #!/usr/bin/python
 
 import numpy as np
-import ase.io
-import argparse
 from config import Config
 from basis import basis_read
+from ase.data import chemical_symbols
+from functions import moldata_read
 
 conf = Config()
 
@@ -25,17 +25,8 @@ goodcoeffilebase = conf.paths['goodcoef_base']
 goodoverfilebase = conf.paths['goodover_base']
 avdir            = conf.paths['averages_dir']
 
-#========================== system definition
-xyzfile = ase.io.read(xyzfilename,":")
-ndata = len(xyzfile)
-#======================= system parameters
-atomic_symbols = []
-natoms = np.zeros(ndata,int)
-for i in xrange(len(xyzfile)):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-    natoms[i] = len(atomic_symbols[i])
-
-#====================================== reference environments
+# number of molecules, number of atoms in each molecule, atomic numbers
+(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
@@ -48,7 +39,7 @@ coeffs = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str
 
 av_coefs = {}
 for spe in spe_dict.values():
-    av_coefs[spe] = np.load(avdir+str(spe)+".npy")
+    av_coefs[spe] = np.load(avdir+chemical_symbols[spe]+".npy")
 
 itest=0
 error_density = 0.0
@@ -56,7 +47,7 @@ STD = 0.0
 for iconf in testrange:
     print "-------------------------------"
     print "iconf = ", iconf
-    atoms = atomic_symbols[iconf]
+    atoms = atomic_numbers[iconf]
     #================================================
 
     overl      = np.load(goodoverfilebase+str(iconf)+".npy")

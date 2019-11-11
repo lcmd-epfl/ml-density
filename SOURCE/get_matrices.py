@@ -2,40 +2,11 @@
 
 import numpy as np
 import time
-import ase.io
 import get_matrices
 from config import Config
-from basis import basis_read_num
+from basis import basis_read
+from functions import *
 
-
-def basis_info(spe_dict, lmax, nmax):
-    nspecies = len(spe_dict)
-    llmax = max(lmax.values())
-    bsize = np.zeros(nspecies,int)
-    almax = np.zeros(nspecies,int)
-    anmax = np.zeros((nspecies,llmax+1),int)
-    for ispe in xrange(nspecies):
-        spe = spe_dict[ispe]
-        almax[ispe] = lmax[spe]+1
-        for l in xrange(lmax[spe]+1):
-            anmax[ispe,l] = nmax[(spe,l)]
-            bsize[ispe] += nmax[(spe,l)]*(2*l+1)
-    return [bsize, almax, anmax]
-
-def get_kernel_sizes( trainrange, fps_species, spe_dict, M, lmax, atom_counting_training ):
-    kernel_sizes = np.zeros(len(trainrange),int)
-    itrain = 0
-    for iconf in trainrange:
-        for iref in xrange(M):
-            ispe = fps_species[iref]
-            spe = spe_dict[ispe]
-            temp = 0
-            for l in xrange(lmax[spe]+1):
-                msize = 2*l+1
-                temp += msize*msize
-            kernel_sizes[itrain] += temp * atom_counting_training[itrain,ispe]
-        itrain += 1
-    return kernel_sizes
 
 conf = Config()
 
@@ -57,51 +28,25 @@ avecfilebase    = conf.paths['avec_base']
 bmatfilebase    = conf.paths['bmat_base']
 
 
-# system definition
-xyzfile = ase.io.read(xyzfilename,":")
-ndata = len(xyzfile)
-
-# system parameters
-atomic_numbers = []
-natoms = np.zeros(ndata,int)
-for i in xrange(len(xyzfile)):
-    atomic_numbers.append(xyzfile[i].get_atomic_numbers())
-    natoms[i] = int(len(atomic_numbers[i]))
+(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
 natmax = max(natoms)
-
-# atomic species arrays
-species = np.sort(list(set(np.array([item for sublist in atomic_numbers for item in sublist]))))
-nspecies = len(species)
-
-spec_list_per_conf = {}
-atom_counting = np.zeros((ndata,nspecies),int)
-for iconf in xrange(ndata):
-    spec_list_per_conf[iconf] = []
-    for iat in xrange(natoms[iconf]):
-        for ispe in xrange(nspecies):
-            if atomic_numbers[iconf][iat] == species[ispe]:
-               atom_counting[iconf,ispe] += 1
-               spec_list_per_conf[iconf].append(ispe)
 nenv = sum(natoms)
 
-# atomic indexes sorted by number
-atomicindx = np.zeros((natmax,nspecies,ndata),int)
-for iconf in xrange(ndata):
-    for ispe in xrange(nspecies):
-        indexes = [i for i,x in enumerate(spec_list_per_conf[iconf]) if x==ispe]
-        for icount in xrange(atom_counting[iconf,ispe]):
-            atomicindx[icount,ispe,iconf] = indexes[icount]
+# atomic species arrays
+(nspecies, atom_counting, spec_list_per_conf) = get_spec_list_per_conf(ndata, natoms, atomic_numbers)
 
+# atomic indices sorted by number
+atomicindx = get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf)
+atomicindx = atomicindx.T
 
 #====================================== reference environments
 fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read_num(basisfilename)
-
+(spe_dict, lmax, nmax) = basis_read(basisfilename)
 if len(spe_dict) != nspecies:
     print "different number of elements in the molecules and in the basis"
-    exit(0)
+    exit(1)
 
 # basis set size
 llmax = max(lmax.values())
@@ -109,11 +54,7 @@ nnmax = max(nmax.values())
 [bsize, almax, anmax] = basis_info(spe_dict, lmax, nmax);
 
 # problem dimensionality
-totsize = 0
-for iref in xrange(0,M):
-    totsize += bsize[fps_species[iref]]
-
-
+totsize = sum(bsize[fps_species])
 print "problem dimensionality =", totsize
 
 # training set selection
@@ -143,7 +84,6 @@ for iconf in trainrange:
     itrain += 1
 
 # sparse kernel indexes
-
 kernel_sizes = get_kernel_sizes(trainrange, fps_species, spe_dict, M, lmax, atom_counting_training)
 
 np.savetxt('train_configs.dat',          train_configs, fmt='%i')
