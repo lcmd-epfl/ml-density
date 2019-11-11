@@ -1,15 +1,10 @@
-#include <Python.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
 
 #define HEADER_SIZE 128
 
-static PyObject * convert(PyObject * self, PyObject * args)
-{
-  const char * fname, * foname;
-
-  if (!PyArg_ParseTuple(args, "ss", &fname, &foname)) return NULL;
+int convert(const char * fname, const char * foname){
 
   struct stat st;
   stat(fname, &st);
@@ -18,7 +13,7 @@ static PyObject * convert(PyObject * self, PyObject * args)
   FILE * f = fopen(fname, "r");
   if(!f){
     fprintf(stderr, "file ? %s\n", fname);
-    return Py_BuildValue("i", 1);
+    return 1;
   }
 
   double * alldata = malloc(size);
@@ -28,7 +23,7 @@ static PyObject * convert(PyObject * self, PyObject * args)
   FILE * fo = fopen(foname, "w");
   if(!fo){
     fprintf(stderr, "file ? %s\n", foname);
-    return Py_BuildValue("i", 2);
+    return 2;
   }
 
   double * data = alldata + HEADER_SIZE/sizeof(data[0]);
@@ -38,19 +33,6 @@ static PyObject * convert(PyObject * self, PyObject * args)
   fclose(fo);
 
   free(alldata);
-  return Py_BuildValue("i", 0);
-}
-
-static PyMethodDef npy2dat_methods[] =
-{
-  {"convert", convert, METH_VARARGS, "convert simple .npy files to text"},
-  {NULL, NULL, 0, NULL}
-};
-
-/* module initialization --- Python version 2 */
-  PyMODINIT_FUNC
-initnpy2dat(void)
-{
-  (void) Py_InitModule("npy2dat", npy2dat_methods);
+  return 0;
 }
 
