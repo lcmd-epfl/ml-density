@@ -1,9 +1,10 @@
 #!/usr/bin/python
 
 import numpy as np
-import ase.io
 from config import Config
 from basis import basis_read
+from ase.data import chemical_symbols
+from functions import moldata_read
 
 conf = Config()
 
@@ -15,27 +16,18 @@ avdir            = conf.paths['averages_dir']
 baselinedwbase   = conf.paths['baselined_w_base']
 
 
-#========================== system definition
-xyzfile = ase.io.read(xyzfilename,":")
-ndata = len(xyzfile)
-#======================= system parameters
-atomic_symbols = []
-natoms = np.zeros(ndata,int)
-for i in xrange(len(xyzfile)):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-    natoms[i] = len(atomic_symbols[i])
+(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
 
 # how many atoms of each element we have
 nenv = {}
-atomic_symbols_joined = [item for sublist in atomic_symbols for item in sublist]
-elements_in_set = list(set(atomic_symbols_joined))
+atomic_numbers_joined = [item for sublist in atomic_numbers for item in sublist]
+elements_in_set = list(set(atomic_numbers_joined))
 for q in elements_in_set:
-    nenv[q] = atomic_symbols_joined.count(q)
-    print q, nenv[q]
+    nenv[q] = atomic_numbers_joined.count(q)
+    print chemical_symbols[q], nenv[q]
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
-
 
 av_coefs = {}
 for spe in spe_dict.values():
@@ -44,7 +36,7 @@ for spe in spe_dict.values():
 print "computing averages..."
 for iconf in xrange(ndata):
     print "iconf = ", iconf
-    atoms = atomic_symbols[iconf]
+    atoms = atomic_numbers[iconf]
     coef = np.load(goodcoeffilebase+str(iconf)+".npy")
     i = 0
     for iat in xrange(natoms[iconf]):
@@ -58,13 +50,13 @@ for iconf in xrange(ndata):
 print "saving averages..."
 for spe in spe_dict.values():
     av_coefs[spe] /= nenv[spe]
-    np.save(avdir+str(spe)+".npy",av_coefs[spe])
+    np.save(avdir+chemical_symbols[spe]+".npy",av_coefs[spe])
 
 
 print "computing baselined projections..."
 for iconf in xrange(ndata):
     print "iconf = ", iconf
-    atoms = atomic_symbols[iconf]
+    atoms = atomic_numbers[iconf]
     #==================================================
     coef = np.load(goodcoeffilebase+str(iconf)+".npy")
     over = np.load(goodoverfilebase+str(iconf)+".npy")

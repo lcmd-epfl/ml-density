@@ -2,9 +2,9 @@
 
 import numpy as np
 import time
-import ase.io
 from config import Config
 from basis import basis_read
+from functions import moldata_read
 
 conf = Config()
 
@@ -16,15 +16,7 @@ goodcoeffilebase = conf.paths['goodcoef_base']
 goodoverfilebase = conf.paths['goodover_base']
 
 
-#========================== system definition
-xyzfile = ase.io.read(xyzfilename,":")
-ndata = len(xyzfile)
-#======================= system parameters
-atomic_symbols = []
-natoms = np.zeros(ndata,int)
-for i in xrange(len(xyzfile)):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-    natoms[i] = int(len(atomic_symbols[i]))
+(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
@@ -34,7 +26,7 @@ for iconf in xrange(ndata):
     start = time.time()
     print "-------------------------------"
     print "iconf = ", iconf
-    atoms = atomic_symbols[iconf]
+    atoms = atomic_numbers[iconf]
     #==================================================
     totsize = 0
     for iat in xrange(natoms[iconf]):

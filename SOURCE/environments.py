@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
 import numpy as np
-import ase.io
 from config import Config
+from functions import *
 
 conf = Config()
 
@@ -32,39 +32,22 @@ def do_fps(x, d=0):
         dl = np.minimum(dl,nd)
     return iy
 
-#========================== system definition
-xyzfile = ase.io.read(xyzfilename,":")
-ndata = len(xyzfile)
-#======================= system parameters
-atomic_valence = []
-natoms = np.zeros(ndata,int)
-for i in xrange(ndata):
-    atomic_valence.append(xyzfile[i].get_atomic_numbers())
-    natoms[i] = int(len(atomic_valence[i]))
+# number of molecules, number of atoms in each molecule, atomic numbers
+(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
 natmax = max(natoms)
+nenv = sum(natoms)
+
 #==================== species array
-species = np.sort(list(set(np.array([item for sublist in atomic_valence for item in sublist]))))
-nspecies = len(species)
+(nspecies, atom_counting, spec_list_per_conf) = get_spec_list_per_conf(ndata, natoms, atomic_numbers)
+
 spec_list = []
-spec_list_per_conf = {}
-atom_counting = np.zeros((ndata,nspecies),int)
-for iconf in xrange(ndata):
-    spec_list_per_conf[iconf] = []
-    for iat in xrange(natoms[iconf]):
-        for ispe in xrange(nspecies):
-            if atomic_valence[iconf][iat] == species[ispe]:
-               atom_counting[iconf,ispe] += 1
-               spec_list.append(ispe)
-               spec_list_per_conf[iconf].append(ispe)
+for i in spec_list_per_conf.values():
+  spec_list += i
 spec_array = np.asarray(spec_list,int)
-nenv = len(spec_array)
+
 #===================== atomic indexes sorted by species
-atomicindx = np.zeros((ndata,nspecies,natmax),int)
-for iconf in xrange(ndata):
-    for ispe in xrange(nspecies):
-        indexes = [i for i,x in enumerate(spec_list_per_conf[iconf]) if x==ispe]
-        for icount in xrange(atom_counting[iconf,ispe]):
-            atomicindx[iconf,ispe,icount] = indexes[icount]
+atomicindx = get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf)
+
 #====================== environmental power spectrum
 power = np.load(psfilebase+'0.npy')
 nfeat = len(power[0,0])

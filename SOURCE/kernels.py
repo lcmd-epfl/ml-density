@@ -1,11 +1,10 @@
 #!/usr/bin/python
 
 import numpy as np
-import time
-import ase.io
 from config import Config
 from basis import basis_read
 import sys
+from functions import *
 
 conf = Config()
 
@@ -23,67 +22,31 @@ kernelconfbase  = conf.paths['kernel_conf_base']
 psfilebase      = conf.paths['ps_base']
 
 
-#========================== system definition
-xyzfile = ase.io.read(xyzfilename,":")
-ndata = len(xyzfile)
-#======================= system parameters
-atomic_symbols = []
-atomic_valence = []
-natoms = np.zeros(ndata,int)
-for i in xrange(len(xyzfile)):
-    atomic_symbols.append(xyzfile[i].get_chemical_symbols())
-    atomic_valence.append(xyzfile[i].get_atomic_numbers())
-    natoms[i] = int(len(atomic_symbols[i]))
+(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
 natmax = max(natoms)
+nenv = sum(natoms)
+
 #================= SOAP PARAMETERS
 zeta = 2.0
+
 #==================== species array
-species = np.sort(list(set(np.array([item for sublist in atomic_valence for item in sublist]))))
-nspecies = len(species)
-spec_list = []
-spec_list_per_conf = {}
-atom_counting = np.zeros((ndata,nspecies),int)
-for iconf in xrange(ndata):
-    spec_list_per_conf[iconf] = []
-    for iat in xrange(natoms[iconf]):
-        for ispe in xrange(nspecies):
-            if atomic_valence[iconf][iat] == species[ispe]:
-               atom_counting[iconf,ispe] += 1
-               spec_list.append(ispe)
-               spec_list_per_conf[iconf].append(ispe)
-spec_array = np.asarray(spec_list,int)
-nenv = len(spec_array)
-#===================== atomic indexes sorted by species
-atomicindx = np.zeros((ndata,nspecies,natmax),int)
-for iconf in xrange(ndata):
-    for ispe in xrange(nspecies):
-        indexes = [i for i,x in enumerate(spec_list_per_conf[iconf]) if x==ispe]
-        for icount in xrange(atom_counting[iconf,ispe]):
-            atomicindx[iconf,ispe,icount] = indexes[icount]
+(nspecies, atom_counting, spec_list_per_conf) = get_spec_list_per_conf(ndata, natoms, atomic_numbers)
+
+#===================== atomic indices sorted by species
+atomicindx = get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf)
+
 #====================================== reference environments
 fps_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
 fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
+if len(spe_dict) != nspecies:
+    print "different number of elements in the molecules and in the basis"
+    exit(1)
 llmax = max(lmax.values())
 
-#==================================== BASIS SET SIZE ARRAYS
-bsize = np.zeros(nspecies,int)
-almax = np.zeros(nspecies,int)
-anmax = np.zeros((nspecies,llmax+1),int)
-for ispe in xrange(nspecies):
-    spe = spe_dict[ispe]
-    almax[ispe] = lmax[spe]+1
-    for l in xrange(lmax[spe]+1):
-        anmax[ispe,l] = nmax[(spe,l)]
-        bsize[ispe] += nmax[(spe,l)]*(2*l+1)
 #============================================= PROBLEM DIMENSIONALITY
-collsize = np.zeros(M,int)
-for iref in xrange(1,M):
-    collsize[iref] = collsize[iref-1] + bsize[fps_species[iref-1]]
-totsize = collsize[-1] + bsize[fps_species[-1]]
-print "problem dimensionality =", totsize
 
 # load power spectra
 power_ref_sparse = {}
@@ -93,44 +56,28 @@ for l in xrange(llmax+1):
     power = np.load(psfilebase+str(l)+".npy")
 
     if l==0:
-
-        # power spectrum
         nfeat = len(power[0,0])
         power_env = np.zeros((nenv,nfeat),float)
         power_per_conf = np.zeros((ndata,natmax,nfeat),float)
-        ienv = 0
-        for iconf in xrange(ndata):
-            iat = 0
-            for ispe in xrange(nspecies):
-                for icount in xrange(atom_counting[iconf,ispe]):
-                    jat = atomicindx[iconf,ispe,icount]
-                    power_per_conf[iconf,jat] = power[iconf,iat]
-                    iat+=1
-            for iat in xrange(natoms[iconf]):
-                power_env[ienv] = power_per_conf[iconf,iat]
-                ienv += 1
-        power_ref_sparse[l] = power_env[fps_indexes]
-        power_training[l] = power_per_conf
-
     else:
-
-        # power spectrum
         nfeat = len(power[0,0,0])
         power_env = np.zeros((nenv,2*l+1,nfeat),float)
         power_per_conf = np.zeros((ndata,natmax,2*l+1,nfeat),float)
-        ienv = 0
-        for iconf in xrange(ndata):
-            iat = 0
-            for ispe in xrange(nspecies):
-                for icount in xrange(atom_counting[iconf,ispe]):
-                    jat = atomicindx[iconf,ispe,icount]
-                    power_per_conf[iconf,jat] = power[iconf,iat]
-                    iat+=1
-            for iat in xrange(natoms[iconf]):
-                power_env[ienv] = power_per_conf[iconf,iat]
-                ienv += 1
-        power_ref_sparse[l] = power_env[fps_indexes]
-        power_training[l] = power_per_conf
+
+    # power spectrum
+    ienv = 0
+    for iconf in xrange(ndata):
+        iat = 0
+        for ispe in xrange(nspecies):
+            for icount in xrange(atom_counting[iconf,ispe]):
+                jat = atomicindx[iconf,ispe,icount]
+                power_per_conf[iconf,jat] = power[iconf,iat]
+                iat+=1
+        for iat in xrange(natoms[iconf]):
+            power_env[ienv] = power_per_conf[iconf,iat]
+            ienv += 1
+    power_ref_sparse[l] = power_env[fps_indexes]
+    power_training[l] = power_per_conf
 
 # compute sparse kernel matrix
 for iconf in xrange(ndata):
@@ -140,8 +87,7 @@ for iconf in xrange(ndata):
     sys.stdout.write('%s\r'%strg)
     sys.stdout.flush()
 
-    start = time.time()
-    atoms = atomic_symbols[iconf]
+    atoms = atomic_numbers[iconf]
     # define sparse indexes
     kernel_size = 0
     kernel_sparse_indexes = np.zeros((M,natoms[iconf],llmax+1,2*llmax+1,2*llmax+1),int)
@@ -177,5 +123,4 @@ for iconf in xrange(ndata):
                             ik = kernel_sparse_indexes[iref,iatspe,l,im1,im2]
                             k_NM[ik] = kern[im2,im1]
     np.savetxt(kernelconfbase+str(iconf)+".dat", k_NM,fmt='%.06e')
-#    print time.time()-start, "seconds"
 
