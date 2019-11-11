@@ -3,7 +3,7 @@
 F2PY='/software/anaconda/5.2/python-2.7/bin/f2py'
 FCOMPILER='gfortran'
 #FCOMPILER='intelem' # gfortran
-F90FLAGS='-fopenmp'
+#F90FLAGS='-fopenmp'
 #F90FLAGS='-qopenmp' # -fopenmp
 F2PYOPT='-O3'
 #F2PYOPT='-O3 -unroll-aggressive -qopt-prefetch -qopt-reportr5'

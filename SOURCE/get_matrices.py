@@ -146,6 +146,18 @@ for iconf in trainrange:
 
 kernel_sizes = get_kernel_sizes(trainrange, fps_species, spe_dict, M, lmax, atom_counting_training)
 
+np.savetxt('train_configs.dat',          train_configs, fmt='%i')
+np.savetxt('atomic_species.dat',         atomic_species, fmt='%i')
+np.savetxt('natoms_train.dat',           natoms_train, fmt='%i')
+np.savetxt('atom_counting_training.dat', atom_counting_training, fmt='%i')
+np.savetxt('fps_species.dat',            fps_species, fmt='%i')
+np.savetxt('almax.dat',                  almax, fmt='%i')
+np.savetxt('anmax.dat',                  anmax, fmt='%i')
+np.savetxt('total_sizes.dat',            total_sizes, fmt='%i')
+np.savetxt('kernel_sizes.dat',           kernel_sizes, fmt='%i')
+np.savetxt('atomicindx_training.dat',    np.concatenate(atomicindx_training), fmt='%i')
+
+
 # compute regression arrays
 start = time.time()
 Avec,Bmat = get_matrices.getab(baselinedwbase, overdatbase, kernelconfbase,
@@ -156,4 +168,6 @@ print "A-vector and B-matrix computed in", time.time()-start, "seconds"
 # save regression arrays
 np.save(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".npy", Avec)
 np.save(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".npy", Bmat)
+np.savetxt(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt", Avec)
+np.savetxt(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt", Bmat)
 
