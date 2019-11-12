@@ -10,7 +10,7 @@ F2PYOPT='-O3'
 LIBS='-lgomp'
 #LIBS='-liomp5 -lpthread' # omp libraries with ifort
 
-MODULES=rmatrix.so get_matrices.so prediction.so
+MODULES=rmatrix.so prediction.so
 
 all: $(MODULES)
 

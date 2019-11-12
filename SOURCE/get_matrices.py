@@ -1,12 +1,15 @@
 #!/usr/bin/python
 
+from __future__ import print_function
 import numpy as np
-import time
-import get_matrices
 from config import Config
 from basis import basis_read
 from functions import *
 
+import os
+import sys
+import ctypes
+import numpy.ctypeslib as npct
 
 conf = Config()
 
@@ -45,7 +48,7 @@ fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
 if len(spe_dict) != nspecies:
-    print "different number of elements in the molecules and in the basis"
+    print("different number of elements in the molecules and in the basis", file=sys.stderr)
     exit(1)
 
 # basis set size
@@ -55,14 +58,12 @@ nnmax = max(nmax.values())
 
 # problem dimensionality
 totsize = sum(bsize[fps_species])
-print "problem dimensionality =", totsize
 
 # training set selection
 trainrangetot = np.loadtxt(trainfilename,int)
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
 natoms_train = natoms[trainrange]
-print "Number of training molecules = ", ntrain
 
 # training set arrays
 train_configs = np.array(trainrange,int)
@@ -86,28 +87,55 @@ for iconf in trainrange:
 # sparse kernel indexes
 kernel_sizes = get_kernel_sizes(trainrange, fps_species, spe_dict, M, lmax, atom_counting_training)
 
-np.savetxt('train_configs.dat',          train_configs, fmt='%i')
-np.savetxt('atomic_species.dat',         atomic_species, fmt='%i')
-np.savetxt('natoms_train.dat',           natoms_train, fmt='%i')
-np.savetxt('atom_counting_training.dat', atom_counting_training, fmt='%i')
-np.savetxt('fps_species.dat',            fps_species, fmt='%i')
-np.savetxt('almax.dat',                  almax, fmt='%i')
-np.savetxt('anmax.dat',                  anmax, fmt='%i')
-np.savetxt('total_sizes.dat',            total_sizes, fmt='%i')
-np.savetxt('kernel_sizes.dat',           kernel_sizes, fmt='%i')
-np.savetxt('atomicindx_training.dat',    np.concatenate(atomicindx_training), fmt='%i')
+################################################################################
 
+array_1d_int = npct.ndpointer(dtype=np.uint32, ndim=1, flags='CONTIGUOUS')
 
-# compute regression arrays
-start = time.time()
-Avec,Bmat = get_matrices.getab(baselinedwbase, overdatbase, kernelconfbase,
-                               train_configs,atomic_species,llmax,nnmax,nspecies,ntrain,M,natmax,natoms_train,totsize,
-                               atomicindx_training,atom_counting_training,fps_species,almax,anmax,total_sizes,kernel_sizes)
-print "A-vector and B-matrix computed in", time.time()-start, "seconds"
+get_matrices = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/get_matrices.so")
+get_matrices.get_matrices.restype = ctypes.c_int
+get_matrices.get_matrices.argtypes = [
+  ctypes.c_int,
+  ctypes.c_int,
+  ctypes.c_int,
+  ctypes.c_int,
+  ctypes.c_int,
+  ctypes.c_int,
+  ctypes.c_int,
+  array_1d_int,
+  array_1d_int,
+  array_1d_int,
+  array_1d_int,
+  array_1d_int,
+  array_1d_int,
+  array_1d_int,
+  array_1d_int,
+  array_1d_int,
+  array_1d_int,
+  ctypes.c_char_p,
+  ctypes.c_char_p,
+  ctypes.c_char_p,
+  ctypes.c_char_p,
+  ctypes.c_char_p ]
 
-# save regression arrays
-np.save(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".npy", Avec)
-np.save(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".npy", Bmat)
-np.savetxt(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt", Avec)
-np.savetxt(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt", Bmat)
+ret = get_matrices.get_matrices(
+    totsize ,
+    nspecies,
+    llmax   ,
+    nnmax   ,
+    M       ,
+    ntrain  ,
+    natmax  ,
+    atomicindx_training.flatten().astype(np.uint32)   ,
+    atom_counting_training.flatten().astype(np.uint32),
+    train_configs.astype(np.uint32)                   ,
+    natoms_train.astype(np.uint32)                    ,
+    total_sizes.astype(np.uint32)                     ,
+    kernel_sizes.astype(np.uint32)                    ,
+    atomic_species.flatten().astype(np.uint32)        ,
+    fps_species.astype(np.uint32)                     ,
+    almax.astype(np.uint32)                           ,
+    anmax.flatten().astype(np.uint32)                 ,
+    baselinedwbase, overdatbase, kernelconfbase,
+    avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt",
+    bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
 

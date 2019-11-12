@@ -1,7 +1,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#ifdef USE_MPI
 #include <mpi.h>
+#endif
+
+int Nproc;
+int nproc;
 
 #define printalive printf("alive @ %s:%d\n", __FILE__, __LINE__)
 #define GOTOHELL { \
@@ -9,52 +14,35 @@
       __FILE__, __LINE__, __FUNCTION__); \
   abort(); }
 
-int Nproc;
-int nproc;
+#define SPARSEIND(L,N,IAT) ( ((L) * nnmax + (N)) * nat + (IAT) )
+#define KSPARSEIND(IREF,L,M,ICSPE) ( (((IREF) * (llmax+1) + (L)) *(2*llmax+1) + (M)) * nat + (ICSPE) )
 
-int llmax    =    5;
-int nnmax    =   10;
-int nspecies =    4;
-int ntrain   =    8;
-int M        =   32;
-int natmax   =   24;
-int totsize  = 2677;
+static void vec_print(int n, double * v, const char * fname){
 
-const char path_proj[] = "BASELINED_PROJECTIONS/projections_conf";
-const char path_over[] = "OVER_DAT/overlap_conf";
-const char path_kern[] = "KERNELS/kernel_conf";
-
-static inline int sparseind(int l, int n, int iat, int natoms) {
-  return (l * nnmax + n) * natoms + iat;
-}
-
-static inline int ksparseind(int iref, int l, int m, int icspe, int natoms) {
-  return ((iref * (llmax+1) + l) *(2*llmax+1) + m) * natoms + icspe;
-}
-
-void vec_print(int n, double * v, const char * s, FILE * f){
+  FILE * f = fopen(fname, "w");
   for(int i=0; i<n; i++){
-    fprintf(f, "% 20.15lf %s", v[i], s);
+    fprintf(f, "% 18.15e\n", v[i]);
   }
   fprintf(f, "\n");
+  fclose(f);
   return;
 }
 
-int * ivec_read(int n, char * fname){
+static void mx_print(int n, double * a, const char * fname){
 
-  int  * v = malloc(sizeof(int)*n);
-  FILE * f = fopen(fname, "r");
-
+  FILE * f = fopen(fname, "w");
   for(int i=0; i<n; i++){
-    if(fscanf(f, "%d", v+i)!=1){
-      GOTOHELL;
+    for(int j=0; j<n; j++){
+      fprintf(f, "% 21.18e   ", a[i*n+j]);
     }
+    fprintf(f, "\n");
   }
+  fprintf(f, "\n");
   fclose(f);
-  return v;
+  return;
 }
 
-double * vec_read(int n, char * fname){
+static double * vec_read(int n, char * fname){
 
   double * v = malloc(sizeof(double)*n);
   FILE   * f = fopen(fname, "r");
@@ -68,28 +56,37 @@ double * vec_read(int n, char * fname){
   return v;
 }
 
-
-void do_work(
-    int from, int to,
-    int * atomicindx,
-    int * atomcount ,
-    int * trrange   ,
-    int * natoms    ,
-    int * totalsizes,
-    int * kernsizes ,
-    int * atomspe   ,
-    int * specarray ,
-    int * almax     ,
-    int * ancut     ,
+static void do_work(
+    const int from, const int to,
+    const int totsize  ,
+    const int nspecies ,
+    const int llmax    ,
+    const int nnmax    ,
+    const int M        ,
+    const int ntrain   ,
+    const int natmax   ,
+    const int * const atomicindx,
+    const int * const atomcount ,
+    const int * const trrange   ,
+    const int * const natoms    ,
+    const int * const totalsizes,
+    const int * const kernsizes ,
+    const int * const atomspe   ,
+    const int * const specarray ,
+    const int * const almax     ,
+    const int * const ancut     ,
+    const char * const path_proj,
+    const char * const path_over,
+    const char * const path_kern,
     double * Avec, double * Bmat){
 
   for(int itrain=from; itrain<to; itrain++){
 
-    int nat = natoms[itrain];
-    int nao = totalsizes[itrain];
+    const int nat = natoms[itrain];
+    const int nao = totalsizes[itrain];
 
     //   ! read projections, overlaps and kernels for each training molecule
-    int conf = trrange[itrain];
+    const int conf = trrange[itrain];
     char file_proj[512], file_over[512], file_kern[512];
     sprintf(file_proj, "%s%d.dat", path_proj, conf);
     sprintf(file_over, "%s%d.dat", path_over, conf);
@@ -110,7 +107,7 @@ void do_work(
         int msize1 = 2*l1+1;
         int anc1   = ancut[ a1 * (llmax+1) + l1 ];
         for(int n1=0; n1<anc1; n1++){
-          sparseindexes[ sparseind( l1,n1,iat, nat)] = it1;
+          sparseindexes[ SPARSEIND(l1,n1,iat)] = it1;
           it1 += msize1;
         }
       }
@@ -125,7 +122,7 @@ void do_work(
         int msize1 = 2*l1+1;
         for(int im1=0; im1<msize1; im1++){
           for(int iat=0; iat<atomcount[ itrain*nspecies+a1 ]; iat++){
-            kernsparseindexes[ksparseind(iref1,l1,im1,iat, nat)] = ik1;
+            kernsparseindexes[KSPARSEIND(iref1,l1,im1,iat)] = ik1;
             ik1 += msize1;
           }
         }
@@ -145,8 +142,8 @@ void do_work(
             // ! Collect contributions for 1st dimension
             for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
               int iat = atomicindx[icspe1*nspecies*ntrain + a1*ntrain + itrain];
-              int sk1 = kernsparseindexes[ ksparseind(iref1,l1,im1,icspe1, nat)];
-              int sp1 = sparseindexes    [ sparseind (l1,n1,iat, nat)];
+              int sk1 = kernsparseindexes[KSPARSEIND(iref1,l1,im1,icspe1)];
+              int sp1 = sparseindexes    [SPARSEIND(l1,n1,iat)];
               for(int imm1=0; imm1<msize1; imm1++){
                 Avec[i1] += projections[sp1+imm1] * kernels[sk1+imm1];
               }
@@ -164,14 +161,14 @@ void do_work(
                     double contrB = 0.0;
                     for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
                       int iat = atomicindx[icspe1*nspecies*ntrain + a1*ntrain + itrain];
-                      int sk1 = kernsparseindexes[ ksparseind( iref1, l1, im1, icspe1, nat)];
-                      int sp1 = sparseindexes    [ sparseind (l1,n1,iat, nat)];
+                      int sk1 = kernsparseindexes[KSPARSEIND(iref1, l1, im1, icspe1)];
+                      int sp1 = sparseindexes    [SPARSEIND(l1,n1,iat)];
                       for(int imm1=0; imm1<msize1; imm1++){
                         double Btemp = 0.0;
                         for(int icspe2=0; icspe2<atomcount[itrain*nspecies+a2]; icspe2++){
                           int jat = atomicindx[icspe2*nspecies*ntrain + a2*ntrain + itrain];
-                          int sk2 = kernsparseindexes[ ksparseind( iref2, l2, im2, icspe2, nat)];
-                          int sp2 = sparseindexes    [ sparseind (l2,n2,jat, nat)];
+                          int sk2 = kernsparseindexes[KSPARSEIND(iref2, l2, im2, icspe2)];
+                          int sp2 = sparseindexes    [SPARSEIND(l2,n2,jat)];
                           for(int imm2=0; imm2<msize2; imm2++){
                             Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2+imm2];
                           }
@@ -203,59 +200,42 @@ void do_work(
 }
 
 
-int main(int argc, char ** argv){
+int get_matrices(
+    const int totsize  ,
+    const int nspecies ,
+    const int llmax    ,
+    const int nnmax    ,
+    const int M        ,
+    const int ntrain   ,
+    const int natmax   ,
+    const int * const atomicindx,
+    const int * const atomcount ,
+    const int * const trrange   ,
+    const int * const natoms    ,
+    const int * const totalsizes,
+    const int * const kernsizes ,
+    const int * const atomspe   ,
+    const int * const specarray ,
+    const int * const almax     ,
+    const int * const ancut     ,
+    const char * const path_proj,
+    const char * const path_over,
+    const char * const path_kern,
+    const char * const path_avec,
+    const char * const path_bmat
+){
 
+#ifdef USE_MPI
+  int argc = 1;
+  char * argv0 = "get_matrices";
+  char ** argv = &argv0;
   MPI_Init (&argc, &argv);
   MPI_Comm_size (MPI_COMM_WORLD, &Nproc);
   MPI_Comm_rank (MPI_COMM_WORLD, &nproc);
-
-  int * atomicindx;
-  int * atomcount ;
-  int * trrange   ;
-  int * natoms    ;
-  int * totalsizes;
-  int * kernsizes ;
-  int * atomspe   ;
-  int * specarray ;
-  int * almax     ;
-  int * ancut     ;
-  if(nproc == 0){
-    atomicindx = ivec_read(natmax*nspecies*ntrain  ,  "atomicindx_training.dat"    );
-    atomcount  = ivec_read(ntrain*nspecies         ,  "atom_counting_training.dat" );
-    trrange    = ivec_read(ntrain                  ,  "train_configs.dat"          );
-    natoms     = ivec_read(ntrain                  ,  "natoms_train.dat"           );
-    totalsizes = ivec_read(ntrain                  ,  "total_sizes.dat"            );
-    kernsizes  = ivec_read(ntrain                  ,  "kernel_sizes.dat"           );
-    atomspe    = ivec_read(ntrain*natmax           ,  "atomic_species.dat"         );
-    specarray  = ivec_read(M                       ,  "fps_species.dat"            );
-    almax      = ivec_read(nspecies                ,  "almax.dat"                  );
-    ancut      = ivec_read(nspecies*(llmax+1)      ,  "anmax.dat"                  );
-  }
-  else{
-    atomicindx = calloc(sizeof(int)*natmax*nspecies*ntrain  ,  1 );
-    atomcount  = calloc(sizeof(int)*ntrain*nspecies         ,  1 );
-    trrange    = calloc(sizeof(int)*ntrain                  ,  1 );
-    natoms     = calloc(sizeof(int)*ntrain                  ,  1 );
-    totalsizes = calloc(sizeof(int)*ntrain                  ,  1 );
-    kernsizes  = calloc(sizeof(int)*ntrain                  ,  1 );
-    atomspe    = calloc(sizeof(int)*ntrain*natmax           ,  1 );
-    specarray  = calloc(sizeof(int)*M                       ,  1 );
-    almax      = calloc(sizeof(int)*nspecies                ,  1 );
-    ancut      = calloc(sizeof(int)*nspecies*(llmax+1)      ,  1 );
-  }
-  MPI_Bcast(atomicindx , natmax*nspecies*ntrain, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(atomcount  , ntrain*nspecies       , MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(trrange    , ntrain                , MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(natoms     , ntrain                , MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(totalsizes , ntrain                , MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(kernsizes  , ntrain                , MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(atomspe    , ntrain*natmax         , MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(specarray  , M                     , MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(almax      , nspecies              , MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(ancut      , nspecies*(llmax+1)    , MPI_INT, 0, MPI_COMM_WORLD);
-
-/////////////////
-
+#else
+  nproc = 0;
+  Nproc = 1;
+#endif
   if (nproc == 0) {
     size_t size1 = totsize*(totsize+1)*sizeof(double);
     size_t size2 = 0;
@@ -268,6 +248,8 @@ int main(int argc, char ** argv){
     }
     size2 *= sizeof(double);
     size3 *= sizeof(int) * (llmax+1)*(nnmax+(2*llmax+1)* M);
+
+    fprintf(stderr, "Problem dimensionality = %d\nNumber of training molecules = %d\n\n", totsize, ntrain);
     fprintf(stderr, "\
         output: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
         input : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
@@ -279,13 +261,16 @@ int main(int argc, char ** argv){
   }
 
   double t;
+#ifdef USE_MPI
   if (nproc == 0) {
     t = MPI_Wtime ();
   }
+#endif
 
+#ifdef USE_MPI
   double * AVEC = calloc(sizeof(double)*totsize, 1);
   double * BMAT = calloc(sizeof(double)*totsize*totsize, 1);
-
+#endif
   double * Avec = calloc(sizeof(double)*totsize, 1);
   double * Bmat = calloc(sizeof(double)*totsize*totsize, 1);
 
@@ -296,42 +281,55 @@ int main(int argc, char ** argv){
   for(int i=0; i<Nproc; i++){
     start[i+1] = start[i] + ((i<rem)?div+1:div);
   }
-#if 0
-  if (nproc == 0) {
-    for(int i=0; i<Nproc; i++){
-      printf("%d %d %d\n", start[i], start[i+1], start[i+1]-start[i]);
-    }
-  }
-#endif
 
-  do_work(start[nproc], start[nproc+1], atomicindx, atomcount, trrange, natoms, totalsizes, kernsizes , atomspe   , specarray , almax     , ancut     , Avec, Bmat);
+  do_work(start[nproc], start[nproc+1],
+      totsize ,
+      nspecies,
+      llmax   ,
+      nnmax   ,
+      M       ,
+      ntrain  ,
+      natmax  ,
+      atomicindx,
+      atomcount ,
+      trrange   ,
+      natoms    ,
+      totalsizes,
+      kernsizes ,
+      atomspe   ,
+      specarray ,
+      almax     ,
+      ancut     ,
+      path_proj,
+      path_over,
+      path_kern,
+      Avec, Bmat);
 
+#ifdef USE_MPI
   MPI_Reduce (Avec, AVEC, totsize,         MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   MPI_Reduce (Bmat, BMAT, totsize*totsize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+#endif
 
+#ifdef USE_MPI
   if(nproc == 0){
     t = MPI_Wtime () - t;
     fprintf(stderr, "t=%4.2lf\n", t);
-    vec_print(totsize, AVEC, "\n", stdout);
-    vec_print(totsize*totsize, BMAT, "\n", stdout);
+    vec_print(totsize, AVEC, path_avec);
+    mx_print(totsize, BMAT, path_bmat);
   }
+#else
+    vec_print(totsize, Avec, path_avec);
+    mx_print(totsize, Bmat, path_bmat);
+#endif
 
-  free(AVEC);
-  free(BMAT);
   free(Avec);
   free(Bmat);
 
-  free( atomicindx);
-  free( atomcount );
-  free( trrange   );
-  free( natoms    );
-  free( totalsizes);
-  free( kernsizes );
-  free( atomspe   );
-  free( specarray );
-  free( almax     );
-  free( ancut     );
-
+#ifdef USE_MPI
+  free(AVEC);
+  free(BMAT);
   MPI_Finalize ();
+#endif
   return 0;
 }
+
