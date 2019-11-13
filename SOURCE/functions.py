@@ -65,3 +65,18 @@ def get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf):
                 atomicindx[iconf,ispe,icount] = indexes[icount]
     return atomicindx
 
+def unravel_weights(M, llmax, nnmax, fps_species, anmax, almax, weights):
+    w = np.zeros((M,llmax+1,nnmax,2*llmax+1),float)
+    i = 0
+    for ienv in xrange(M):
+        ispe = fps_species[ienv]
+        al = almax[ispe]
+        for l in xrange(al):
+            msize = 2*l+1
+            anc = anmax[ispe,l]
+            for n in xrange(anc):
+                for im in xrange(msize):
+                    w[ienv,l,n,im] = weights[i]
+                    i += 1
+    return w
+

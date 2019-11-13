@@ -23,20 +23,23 @@ trainfilename   = conf.paths['trainingselfile']
 specselfilebase = conf.paths['spec_sel_base']
 kernelconfbase  = conf.paths['kernel_conf_base']
 weightsfilebase = conf.paths['weights_base']
-predictfilebase = conf.paths['predict_base']
+xyzexfilename   = conf.paths['ex_xyzfile']
+kernelexbase    = conf.paths['ex_kernel_base']
+predictfilebase = conf.paths['ex_predict_base']
 
 (ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
-natmax = max(natoms)
+(ndata_ex, natoms_ex, atomic_numbers_ex) = moldata_read(xyzexfilename)
+natmax_ex = max(natoms_ex)
 
 #==================== species array
 species = get_species_list(atomic_numbers)
 nspecies = len(species)
 
-(atom_counting, spec_list_per_conf) = get_spec_list_per_conf(species, ndata, natoms, atomic_numbers)
+(atom_counting_ex, spec_list_per_conf_ex) = get_spec_list_per_conf(species, ndata_ex, natoms_ex, atomic_numbers_ex)
 
 # atomic indices sorted by number
-atomicindx = get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf)
-atomicindx = atomicindx.T
+atomicindx_ex = get_atomicindx(ndata_ex, nspecies, natmax_ex, atom_counting_ex, spec_list_per_conf_ex)
+atomicindx_ex = atomicindx_ex.T
 
 #====================================== reference environments
 fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
@@ -52,34 +55,21 @@ llmax = max(lmax.values())
 nnmax = max(nmax.values())
 [bsize, almax, anmax] = basis_info(spe_dict, lmax, nmax);
 
-# dataset partitioning
-trainrangetot = np.loadtxt(trainfilename,int)
-ntrain = int(frac*len(trainrangetot))
-test_configs = np.setdiff1d(range(ndata),trainrangetot)
-ntest = len(test_configs)
-natoms_test = natoms[test_configs]
-print "Number of training molecules = ", ntrain
-print "Number of testing molecules = ", ntest
-
-# define testing indexes
-atomicindx_test = atomicindx[:,:,test_configs]
-atom_counting_test = atom_counting[test_configs]
-test_species = np.zeros((ntest,natmax),int)
-for itest in xrange(ntest):
-    for iat in xrange(natoms_test[itest]):
-        test_species[itest,iat] = spec_list_per_conf[test_configs[itest]][iat]
+test_configs = np.arange(ndata_ex)
+test_species = np.zeros((ndata_ex,natmax_ex),int)
+for itest in xrange(ndata_ex):
+    test_species[itest] = spec_list_per_conf_ex[itest]
 
 # sparse kernel sizes
-kernel_sizes = get_kernel_sizes(test_configs, fps_species, spe_dict, M, lmax, atom_counting_test)
+kernel_sizes = get_kernel_sizes(test_configs, fps_species, spe_dict, M, lmax, atom_counting_ex)
 
 # load regression weights
 weights = np.load(weightsfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 w = unravel_weights(M, llmax, nnmax, fps_species, anmax, almax, weights)
 
 # load testing kernels and perform prediction
-coeffs = prediction.prediction(kernelconfbase,
-                               kernel_sizes,fps_species,atom_counting_test,atomicindx_test,nspecies,ntest,natmax,
-                               llmax,nnmax,natoms_test,test_configs,test_species,almax,anmax,M,w)
-
+coeffs = prediction.prediction(kernelexbase,
+                               kernel_sizes,fps_species,atom_counting_ex,atomicindx_ex,nspecies,ndata_ex,natmax_ex,
+                               llmax,nnmax,natoms_ex,test_configs,test_species,almax,anmax,M,w)
 np.save(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",coeffs)
 
