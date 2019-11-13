@@ -28,4 +28,7 @@ avec_base        = MATRICES/Avec
 bmat_base        = MATRICES/Bmat
 weights_base     = weights
 predict_base     = PREDICTIONS/prediction
+ex_xyzfile     = molecule.xyz
+ex_kernel_base = molecule_kernel
+ex_ps_base     = power_spectra_ex/PS
 

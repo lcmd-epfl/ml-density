@@ -66,3 +66,21 @@ def get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf):
                 atomicindx[iconf,ispe,icount] = indexes[icount]
     return atomicindx
 
+
+
+def get_species_list(atomic_numbers):
+    return np.sort(list(set(np.array([item for sublist in atomic_numbers for item in sublist]))))
+
+def get_spec_list_per_conf_new(species, ndata, natoms, atomic_numbers):
+    nspecies = len(species)
+    spec_list_per_conf = {}
+    atom_counting = np.zeros((ndata,nspecies),int)
+    for iconf in xrange(ndata):
+        spec_list_per_conf[iconf] = []
+        for iat in xrange(natoms[iconf]):
+            for ispe in xrange(nspecies):
+                if atomic_numbers[iconf][iat] == species[ispe]:
+                   atom_counting[iconf,ispe] += 1
+                   spec_list_per_conf[iconf].append(ispe)
+    return (atom_counting, spec_list_per_conf)
+
