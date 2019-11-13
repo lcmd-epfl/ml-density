@@ -1,9 +1,11 @@
+CC=gcc
+
 all: npy2dat.so
 
-npy2dat.so: npy2dat.o
-	gcc -shared -Wl,-soname,npy2dat.so -o npy2dat.so npy2dat.o
-npy2dat.o: npy2dat.c
-	gcc --std=gnu11 -c -fPIC npy2dat.c -o npy2dat.o
+%.so: %.o
+	$(CC) $^ -shared -Wl,-soname,$@ -o $@
+%.o: %.c
+	$(CC) $^ -c --std=gnu11 -fPIC -O2 -o $@
 
 clean:
-	rm -rf npy2dat.{o,so}
+	rm -rf npy2dat.so
