@@ -28,7 +28,11 @@ predictfilebase = conf.paths['predict_base']
 (ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
 natmax = max(natoms)
 
-(nspecies, atom_counting, spec_list_per_conf) = get_spec_list_per_conf(ndata, natoms, atomic_numbers)
+#==================== species array
+species = get_species_list(atomic_numbers)
+nspecies = len(species)
+
+(atom_counting, spec_list_per_conf) = get_spec_list_per_conf(species, ndata, natoms, atomic_numbers)
 
 # atomic indices sorted by number
 atomicindx = get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf)
@@ -39,8 +43,8 @@ fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
-if len(spe_dict) != nspecies:
-    print "different number of elements in the molecules and in the basis"
+if list(species) != spe_dict.values():
+    print "different elements in the molecules and in the basis"
     exit(1)
 
 # basis set size

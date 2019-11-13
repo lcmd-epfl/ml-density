@@ -19,8 +19,8 @@ avecfilebase    = conf.paths['avec_base']
 bmatfilebase    = conf.paths['bmat_base']
 weightsfilebase = conf.paths['weights_base']
 
-Avec = np.load(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".npy")
-Bmat = np.load(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".npy")
+Avec = np.loadtxt(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
+Bmat = np.loadtxt(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
 Rmat = np.load(kmmbase+str(M)+".npy")
 
 # problem dimensionality

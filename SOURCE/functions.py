@@ -40,38 +40,10 @@ def get_kernel_sizes(myrange, fps_species, spe_dict, M, lmax, atom_counting):
         i += 1
     return kernel_sizes
 
-
-def get_spec_list_per_conf(ndata, natoms, atomic_numbers):
-
-    species = np.sort(list(set(np.array([item for sublist in atomic_numbers for item in sublist]))))
-    nspecies = len(species)
-
-    spec_list_per_conf = {}
-    atom_counting = np.zeros((ndata,nspecies),int)
-    for iconf in xrange(ndata):
-        spec_list_per_conf[iconf] = []
-        for iat in xrange(natoms[iconf]):
-            for ispe in xrange(nspecies):
-                if atomic_numbers[iconf][iat] == species[ispe]:
-                   atom_counting[iconf,ispe] += 1
-                   spec_list_per_conf[iconf].append(ispe)
-    return (nspecies, atom_counting, spec_list_per_conf)
-
-def get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf):
-    atomicindx = np.zeros((ndata,nspecies,natmax),int)
-    for iconf in xrange(ndata):
-        for ispe in xrange(nspecies):
-            indexes = [i for i,x in enumerate(spec_list_per_conf[iconf]) if x==ispe]
-            for icount in xrange(atom_counting[iconf,ispe]):
-                atomicindx[iconf,ispe,icount] = indexes[icount]
-    return atomicindx
-
-
-
 def get_species_list(atomic_numbers):
     return np.sort(list(set(np.array([item for sublist in atomic_numbers for item in sublist]))))
 
-def get_spec_list_per_conf_new(species, ndata, natoms, atomic_numbers):
+def get_spec_list_per_conf(species, ndata, natoms, atomic_numbers):
     nspecies = len(species)
     spec_list_per_conf = {}
     atom_counting = np.zeros((ndata,nspecies),int)
@@ -83,4 +55,13 @@ def get_spec_list_per_conf_new(species, ndata, natoms, atomic_numbers):
                    atom_counting[iconf,ispe] += 1
                    spec_list_per_conf[iconf].append(ispe)
     return (atom_counting, spec_list_per_conf)
+
+def get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf):
+    atomicindx = np.zeros((ndata,nspecies,natmax),int)
+    for iconf in xrange(ndata):
+        for ispe in xrange(nspecies):
+            indexes = [i for i,x in enumerate(spec_list_per_conf[iconf]) if x==ispe]
+            for icount in xrange(atom_counting[iconf,ispe]):
+                atomicindx[iconf,ispe,icount] = indexes[icount]
+    return atomicindx
 

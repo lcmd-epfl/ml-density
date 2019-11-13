@@ -33,7 +33,9 @@ natmax = max(natoms)
 nenv = sum(natoms)
 
 # atomic species arrays
-(nspecies, atom_counting, spec_list_per_conf) = get_spec_list_per_conf(ndata, natoms, atomic_numbers)
+species = get_species_list(atomic_numbers)
+nspecies = len(species)
+(atom_counting, spec_list_per_conf) = get_spec_list_per_conf(species, ndata, natoms, atomic_numbers)
 
 # atomic indices sorted by number
 atomicindx = get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf)
@@ -44,8 +46,8 @@ fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
-if len(spe_dict) != nspecies:
-    print "different number of elements in the molecules and in the basis"
+if list(species) != spe_dict.values():
+    print "different elements in the molecules and in the basis"
     exit(1)
 
 # basis set size
@@ -94,6 +96,6 @@ Avec,Bmat = get_matrices.getab(baselinedwbase, overdatbase, kernelconfbase,
 print "A-vector and B-matrix computed in", time.time()-start, "seconds"
 
 # save regression arrays
-np.save(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".npy", Avec)
-np.save(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".npy", Bmat)
+np.savetxt(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt", Avec)
+np.savetxt(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt", Bmat)
 

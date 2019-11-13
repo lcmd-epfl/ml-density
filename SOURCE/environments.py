@@ -38,7 +38,9 @@ natmax = max(natoms)
 nenv = sum(natoms)
 
 #==================== species array
-(nspecies, atom_counting, spec_list_per_conf) = get_spec_list_per_conf(ndata, natoms, atomic_numbers)
+species = get_species_list(atomic_numbers)
+nspecies = len(species)
+(atom_counting, spec_list_per_conf) = get_spec_list_per_conf(species, ndata, natoms, atomic_numbers)
 
 spec_list = []
 for i in spec_list_per_conf.values():

@@ -27,15 +27,17 @@ powerrefbase    = conf.paths['ps_ref_base']
 zeta = 2.0
 
 #==================== species array
-(nspecies, atom_counting, spec_list_per_conf) = get_spec_list_per_conf(ndata, natoms, atomic_numbers)
+species = get_species_list(atomic_numbers)
+nspecies = len(species)
+(atom_counting, spec_list_per_conf) = get_spec_list_per_conf(species, ndata, natoms, atomic_numbers)
 
 #====================================== reference environments
 fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
-if len(spe_dict) != nspecies:
-    print "different number of elements in the molecules and in the basis"
+if list(species) != spe_dict.values():
+    print "different elements in the molecules and in the basis"
     exit(1)
 
 # basis set size

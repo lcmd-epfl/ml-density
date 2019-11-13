@@ -37,8 +37,8 @@ zeta = 2.0
 species = get_species_list(atomic_numbers)
 nspecies = len(species)
 
-(atom_counting,    spec_list_per_conf   ) = get_spec_list_per_conf_new(species, ndata,    natoms,    atomic_numbers   )
-(atom_counting_ex, spec_list_per_conf_ex) = get_spec_list_per_conf_new(species, ndata_ex, natoms_ex, atomic_numbers_ex)
+(atom_counting,    spec_list_per_conf   ) = get_spec_list_per_conf(species, ndata,    natoms,    atomic_numbers   )
+(atom_counting_ex, spec_list_per_conf_ex) = get_spec_list_per_conf(species, ndata_ex, natoms_ex, atomic_numbers_ex)
 
 #===================== atomic indices sorted by species
 atomicindx    = get_atomicindx(ndata,    nspecies, natmax,    atom_counting,    spec_list_per_conf   )
