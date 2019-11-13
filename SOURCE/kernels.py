@@ -5,6 +5,7 @@ from config import Config
 from basis import basis_read
 import sys
 from functions import *
+from power_spectra import read_ps
 
 conf = Config()
 
@@ -20,6 +21,7 @@ refsselfilebase = conf.paths['refs_sel_base']
 specselfilebase = conf.paths['spec_sel_base']
 kernelconfbase  = conf.paths['kernel_conf_base']
 psfilebase      = conf.paths['ps_base']
+powerrefbase    = conf.paths['ps_ref_base']
 
 
 (ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
@@ -51,33 +53,26 @@ llmax = max(lmax.values())
 # load power spectra
 power_ref_sparse = {}
 power_training = {}
+fps_indexes = list(fps_indexes)
+
 for l in xrange(llmax+1):
 
-    power = np.load(psfilebase+str(l)+".npy")
+    # power spectrum
+    (nfeat, power_training[l]) = read_ps(psfilebase+str(l)+".npy", l, ndata, natmax, nspecies, atom_counting, atomicindx)
 
     if l==0:
-        nfeat = len(power[0,0])
-        power_env = np.zeros((nenv,nfeat),float)
-        power_per_conf = np.zeros((ndata,natmax,nfeat),float)
+        power_ref_sparse[l] = np.zeros((M,nfeat),float)
     else:
-        nfeat = len(power[0,0,0])
-        power_env = np.zeros((nenv,2*l+1,nfeat),float)
-        power_per_conf = np.zeros((ndata,natmax,2*l+1,nfeat),float)
+        power_ref_sparse[l] = np.zeros((M,2*l+1,nfeat),float)
 
-    # power spectrum
     ienv = 0
     for iconf in xrange(ndata):
-        iat = 0
-        for ispe in xrange(nspecies):
-            for icount in xrange(atom_counting[iconf,ispe]):
-                jat = atomicindx[iconf,ispe,icount]
-                power_per_conf[iconf,jat] = power[iconf,iat]
-                iat+=1
         for iat in xrange(natoms[iconf]):
-            power_env[ienv] = power_per_conf[iconf,iat]
+            if ienv in fps_indexes:
+                 ind = fps_indexes.index(ienv)
+                 power_ref_sparse[l][ind] = power_training[l][iconf,iat]
             ienv += 1
-    power_ref_sparse[l] = power_env[fps_indexes]
-    power_training[l] = power_per_conf
+    np.save(powerrefbase+str(l)+"_"+str(M)+".npy", power_ref_sparse[l]);
 
 # compute sparse kernel matrix
 for iconf in xrange(ndata):
