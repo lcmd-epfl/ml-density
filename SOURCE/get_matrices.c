@@ -17,10 +17,13 @@ int nproc;
 #define SPARSEIND(L,N,IAT) ( ((L) * nnmax + (N)) * nat + (IAT) )
 #define KSPARSEIND(IREF,L,M,ICSPE) ( (((IREF) * (llmax+1) + (L)) *(2*llmax+1) + (M)) * nat + (ICSPE) )
 
-#define symsize(M) (((M)*(M)+(M))/2)
-static inline unsigned int mpos(unsigned int i, unsigned int j){
+static inline size_t symsize(size_t M){
+  return (M*(M+1))>>1;
+}
+
+static inline size_t mpos(size_t i, size_t j){
   /* A[i+j*(j+1)/2], i <= j, 0 <= j < N */
-    return (i)+(((j)*((j)+1))>>1);
+  return (i)+(((j)*((j)+1))>>1);
 }
 #define MPOSIF(i,j)   ((i)<=(j)? mpos((i),(j)):mpos((j),(i)))
 
@@ -71,6 +74,9 @@ static void print_mem(
 static void vec_print(int n, double * v, const char * fname){
 
   FILE * f = fopen(fname, "w");
+  if(!f){
+    GOTOHELL;
+  }
   for(int i=0; i<n; i++){
     fprintf(f, "% 18.15e\n", v[i]);
   }
@@ -79,15 +85,18 @@ static void vec_print(int n, double * v, const char * fname){
   return;
 }
 
-static void mx_nosym_print(int n, double * a, const char * fname){
+static void mx_nosym_print(size_t n, double * a, const char * fname){
 
   FILE * f = fopen(fname, "w");
-  for(int i=0; i<n; i++){
-    for(int j=0; j<=i; j++){
-      fprintf(f, "% 21.18e   ", a[mpos(j,i)]);
+  if(!f){
+    GOTOHELL;
+  }
+  for(size_t i=0; i<n; i++){
+    for(size_t j=0; j<=i; j++){
+      fprintf(f, "% 18.15e   ", a[mpos(j,i)]);
     }
-    for(int j=i+1; j<n; j++){
-      fprintf(f, "% 21.18e   ", a[mpos(i,j)]);
+    for(size_t j=i+1; j<n; j++){
+      fprintf(f, "% 18.15e   ", a[mpos(i,j)]);
     }
     fprintf(f, "\n");
   }
@@ -156,6 +165,8 @@ static void do_work(
   }
 
   for(int itrain=from; itrain<to; itrain++){
+
+    printf("%4d %4d\n", nproc, itrain-from);
 
     const int nat = natoms[itrain];
     const int nao = totalsizes[itrain];
@@ -342,8 +353,15 @@ int get_matrices(
       Avec, Bmat);
 
 #ifdef USE_MPI
-  MPI_Reduce (Avec, AVEC, totsize,          MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-  MPI_Reduce (Bmat, BMAT, symsize(totsize), MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce (Avec, AVEC, totsize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+  size_t chunk = 1073741824; // 2^30
+  size_t div_ = symsize(totsize)/chunk;
+  size_t rem_ = symsize(totsize)%chunk;
+  for(size_t i=0; i<div_; i++){
+    MPI_Reduce (Bmat+i*chunk, BMAT+i*chunk, chunk, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  }
+  MPI_Reduce (Bmat+div_*chunk, BMAT+div_*chunk, rem_, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 #endif
 
 #ifdef USE_MPI
@@ -354,8 +372,8 @@ int get_matrices(
     mx_nosym_print(totsize, BMAT, path_bmat);
   }
 #else
-    vec_print(totsize, Avec, path_avec);
-    mx_nosym_print(totsize, Bmat, path_bmat);
+  vec_print(totsize, Avec, path_avec);
+  mx_nosym_print(totsize, Bmat, path_bmat);
 #endif
 
   free(Avec);
