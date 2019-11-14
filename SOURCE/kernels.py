@@ -1,9 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import numpy as np
 from config import Config
 from basis import basis_read
-import sys
 from functions import *
 from power_spectra import read_ps
 
@@ -45,8 +44,8 @@ fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
-if list(species) != spe_dict.values():
-    print "different elements in the molecules and in the basis"
+if list(species) != list(spe_dict.values()):
+    print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
     exit(1)
 llmax = max(lmax.values())
 
@@ -57,7 +56,7 @@ power_ref_sparse = {}
 power_training = {}
 fps_indexes = list(fps_indexes)
 
-for l in xrange(llmax+1):
+for l in range(llmax+1):
 
     # power spectrum
     (nfeat, power_training[l]) = read_ps(psfilebase+str(l)+".npy", l, ndata, natmax, nspecies, atom_counting, atomicindx)
@@ -68,8 +67,8 @@ for l in xrange(llmax+1):
         power_ref_sparse[l] = np.zeros((M,2*l+1,nfeat),float)
 
     ienv = 0
-    for iconf in xrange(ndata):
-        for iat in xrange(natoms[iconf]):
+    for iconf in range(ndata):
+        for iat in range(natoms[iconf]):
             if ienv in fps_indexes:
                  ind = fps_indexes.index(ienv)
                  power_ref_sparse[l][ind] = power_training[l][iconf,iat]
@@ -77,36 +76,33 @@ for l in xrange(llmax+1):
     np.save(powerrefbase+str(l)+"_"+str(M)+".npy", power_ref_sparse[l]);
 
 # compute sparse kernel matrix
-for iconf in xrange(ndata):
+for iconf in range(ndata):
 
-    npad = len(str(ndata))
-    strg = "Doing point %*i of %*i (%6.2f %%)"%(npad,iconf+1,npad,ndata,100 * float(iconf+1)/ndata)
-    sys.stdout.write('%s\r'%strg)
-    sys.stdout.flush()
+    print_progress(iconf, ndata)
 
     atoms = atomic_numbers[iconf]
     # define sparse indexes
     kernel_size = 0
     kernel_sparse_indexes = np.zeros((M,natoms[iconf],llmax+1,2*llmax+1,2*llmax+1),int)
-    for iref in xrange(M):
+    for iref in range(M):
         ispe = fps_species[iref]
         spe = spe_dict[ispe]
-        for l in xrange(lmax[spe]+1):
+        for l in range(lmax[spe]+1):
             msize = 2*l+1
-            for im in xrange(msize):
-                for iat in xrange(atom_counting[iconf,ispe]):
-                    for imm in xrange(msize):
+            for im in range(msize):
+                for iat in range(atom_counting[iconf,ispe]):
+                    for imm in range(msize):
                         kernel_sparse_indexes[iref,iat,l,im,imm] = kernel_size
                         kernel_size += 1
     # compute kernels
     k_NM = np.zeros(kernel_size,float)
-    for iref in xrange(M):
+    for iref in range(M):
         ispe = fps_species[iref]
         spe = spe_dict[ispe]
-        for iatspe in xrange(atom_counting[iconf,ispe]):
+        for iatspe in range(atom_counting[iconf,ispe]):
             iat = atomicindx[iconf,ispe,iatspe]
             ik0 = kernel_sparse_indexes[iref,iatspe,0,0,0]
-            for l in xrange(lmax[spe]+1):
+            for l in range(lmax[spe]+1):
                 msize = 2*l+1
                 powert = power_training[l][iconf,iat]
                 powerr = power_ref_sparse[l][iref]
@@ -115,8 +111,8 @@ for iconf in xrange(ndata):
                     k_NM[ik] = np.dot(powert,powerr)**zeta
                 else:
                     kern = np.dot(powert,powerr.T) * k_NM[ik0]**(float(zeta-1)/zeta)
-                    for im1 in xrange(msize):
-                        for im2 in xrange(msize):
+                    for im1 in range(msize):
+                        for im2 in range(msize):
                             ik = kernel_sparse_indexes[iref,iatspe,l,im1,im2]
                             k_NM[ik] = kern[im2,im1]
     np.savetxt(kernelconfbase+str(iconf)+".dat", k_NM,fmt='%.06e')

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import numpy as np
 from config import Config
@@ -47,8 +47,8 @@ fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
-if list(species) != spe_dict.values():
-    print "different elements in the molecules and in the basis"
+if list(species) != list(spe_dict.values()):
+    print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
     exit(1)
 
 # basis set size
@@ -71,8 +71,8 @@ atomicindx_training = atomicindx[trainrange,:,:]
 
 atom_counting_training = atom_counting[trainrange]
 atomic_species = np.zeros((ntrain,natmax),int)
-for itrain in xrange(ntrain):
-    for iat in xrange(natoms_train[itrain]):
+for itrain in range(ntrain):
+    for iat in range(natoms_train[itrain]):
         atomic_species[itrain,iat] = spec_list_per_conf[trainrange[itrain]][iat]
 
 # sparse overlap and projection indexes
@@ -80,8 +80,8 @@ total_sizes = np.zeros(ntrain,int)
 itrain = 0
 for iconf in trainrange:
     atoms = atomic_numbers[iconf]
-    for iat in xrange(natoms[iconf]):
-        for l in xrange(lmax[atoms[iat]]+1):
+    for iat in range(natoms[iconf]):
+        for l in range(lmax[atoms[iat]]+1):
             total_sizes[itrain] += (2*l+1) * nmax[(atoms[iat],l)]
     itrain += 1
 
@@ -136,7 +136,9 @@ ret = get_matrices.get_matrices(
     fps_species.astype(np.uint32)                     ,
     almax.astype(np.uint32)                           ,
     anmax.flatten().astype(np.uint32)                 ,
-    baselinedwbase, overdatbase, kernelconfbase,
-    avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt",
-    bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
+    baselinedwbase.encode('ascii'),
+    overdatbase.encode('ascii'),
+    kernelconfbase.encode('ascii'),
+    (avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt").encode('ascii'),
+    (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt").encode('ascii'))
 

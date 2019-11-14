@@ -1,8 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import numpy as np
 import ase.io
 from config import Config
+from functions import print_progress
 
 import ctypes
 import os
@@ -21,10 +22,11 @@ overdatbase      = conf.paths['over_dat_base']
 xyzfile = ase.io.read(xyzfilename,":")
 ndata = len(xyzfile)
 
-for iconf in xrange(ndata):
-    print "iconf = ", iconf
-    # 7 times faster than numpy:
-    ret = npy2dat.convert(goodoverfilebase+str(iconf)+'.npy', overdatbase+str(iconf)+'.dat')
+for iconf in range(ndata):
+    print_progress(iconf, ndata)
+    fname1 = goodoverfilebase+str(iconf)+'.npy'
+    fname2 = overdatbase+str(iconf)+'.dat'
+    ret = npy2dat.convert(fname1.encode('ascii'), fname2.encode('ascii'))
     if ret:
-        print "warning: returned", ret
+        print("warning: returned", ret)
 

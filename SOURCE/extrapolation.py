@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import numpy as np
 import prediction
@@ -46,8 +46,8 @@ fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
-if list(species) != spe_dict.values():
-    print "different elements in the molecules and in the basis"
+if list(species) != list(spe_dict.values()):
+    print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
     exit(1)
 
 # basis set size
@@ -57,7 +57,7 @@ nnmax = max(nmax.values())
 
 test_configs = np.arange(ndata_ex)
 test_species = np.zeros((ndata_ex,natmax_ex),int)
-for itest in xrange(ndata_ex):
+for itest in range(ndata_ex):
     test_species[itest] = spec_list_per_conf_ex[itest]
 
 # sparse kernel sizes

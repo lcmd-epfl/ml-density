@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import numpy as np
 import prediction
@@ -43,8 +43,8 @@ fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
-if list(species) != spe_dict.values():
-    print "different elements in the molecules and in the basis"
+if list(species) != list(spe_dict.values()):
+    print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
     exit(1)
 
 # basis set size
@@ -58,15 +58,15 @@ ntrain = int(frac*len(trainrangetot))
 test_configs = np.setdiff1d(range(ndata),trainrangetot)
 ntest = len(test_configs)
 natoms_test = natoms[test_configs]
-print "Number of training molecules = ", ntrain
-print "Number of testing molecules = ", ntest
+print("Number of training molecules =", ntrain)
+print("Number of testing molecules =", ntest)
 
 # define testing indexes
 atomicindx_test = atomicindx[:,:,test_configs]
 atom_counting_test = atom_counting[test_configs]
 test_species = np.zeros((ntest,natmax),int)
-for itest in xrange(ntest):
-    for iat in xrange(natoms_test[itest]):
+for itest in range(ntest):
+    for iat in range(natoms_test[itest]):
         test_species[itest,iat] = spec_list_per_conf[test_configs[itest]][iat]
 
 # sparse kernel sizes

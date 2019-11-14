@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+#!/usr/bin/python3
 
 import numpy as np
 import rmatrix
@@ -36,8 +36,8 @@ fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
-if list(species) != spe_dict.values():
-    print "different elements in the molecules and in the basis"
+if list(species) != list(spe_dict.values()):
+    print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
     exit(1)
 
 # basis set size
@@ -46,24 +46,24 @@ nnmax = max(nmax.values())
 [bsize, almax, anmax] = basis_info(spe_dict, lmax, nmax);
 
 totsize = sum(bsize[fps_species])
-print "problem dimensionality =", totsize
+print("problem dimensionality =", totsize)
 
 k_MM = np.zeros((llmax+1,M*(2*llmax+1),M*(2*llmax+1)),float)
 
-for l in xrange(llmax+1):
+for l in range(llmax+1):
 
     power_ref_sparse = np.load(powerrefbase+str(l)+"_"+str(M)+".npy");
 
     if l==0:
-        for iref1 in xrange(M):
-            for iref2 in xrange(M):
+        for iref1 in range(M):
+            for iref2 in range(M):
                 k_MM[l,iref1,iref2] = np.dot(power_ref_sparse[iref1],power_ref_sparse[iref2].T)**zeta
     else:
         nfeat = power_ref_sparse.shape[2]
         power_ref_sparse = power_ref_sparse.reshape(M*(2*l+1),nfeat)
         ms = 2*l+1
-        for iref1 in xrange(M):
-            for iref2 in xrange(M):
+        for iref1 in range(M):
+            for iref2 in range(M):
                 k_MM[l, iref1*ms:(iref1+1)*ms, iref2*ms:(iref2+1)*ms] = np.dot(power_ref_sparse[iref1*ms:(iref1+1)*ms], power_ref_sparse[iref2*ms:(iref2+1)*ms].T) *  k_MM[0,iref1,iref2]**((zeta-1.0)/zeta)
 
 Rmat = rmatrix.rmatrix(llmax,nnmax,nspecies,M,totsize,fps_species,almax,anmax,k_MM)

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import numpy as np
 from config import Config
@@ -23,12 +23,9 @@ Avec = np.loadtxt(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
 Bmat = np.loadtxt(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
 Rmat = np.load(kmmbase+str(M)+".npy")
 
-# problem dimensionality
 totsize = Avec.shape[0]
-print "problem dimensionality =", totsize
+print("problem dimensionality =", totsize)
 
-# solve the regularized sparse regression problem
 weights = np.linalg.solve(Bmat + reg*Rmat + jit*np.eye(totsize),Avec)
-
 np.save(weightsfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",weights)
 

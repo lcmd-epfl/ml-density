@@ -8,4 +8,4 @@ all: npy2dat.so
 	$(CC) $^ -c --std=gnu11 -fPIC -O2 -o $@
 
 clean:
-	rm -rf npy2dat.so
+	rm -vf npy2dat.so

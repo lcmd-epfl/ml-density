@@ -1,10 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import numpy as np
-import time
 from config import Config
 from basis import basis_read
-from functions import moldata_read
+from functions import moldata_read,print_progress
 
 conf = Config()
 
@@ -22,21 +21,21 @@ goodoverfilebase = conf.paths['goodover_base']
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
 
 #===================================================== start decomposition
-for iconf in xrange(ndata):
-    start = time.time()
-    print "-------------------------------"
-    print "iconf = ", iconf
+for iconf in range(ndata):
+
+    print_progress(iconf, ndata)
+
     atoms = atomic_numbers[iconf]
     #==================================================
     totsize = 0
-    for iat in xrange(natoms[iconf]):
-        for l in xrange(lmax[atoms[iat]]+1):
+    for iat in range(natoms[iconf]):
+        for l in range(lmax[atoms[iat]]+1):
             totsize += nmax[(atoms[iat],l)]*(2*l+1)
 
     idx = np.arange(totsize, dtype=int)
 
     i = 0
-    for iat in xrange(natoms[iconf]):
+    for iat in range(natoms[iconf]):
         spe = atoms[iat]
 
         i += nmax[(spe,0)]
@@ -44,13 +43,13 @@ for iconf in xrange(ndata):
         if(lmax[spe]<1):
           continue
 
-        for n1 in xrange(nmax[(spe,1)]):
+        for n1 in range(nmax[(spe,1)]):
             idx[i  ] = i+1
             idx[i+1] = i+2
             idx[i+2] = i
             i += 3
 
-        for l in xrange(2, lmax[spe]+1):
+        for l in range(2, lmax[spe]+1):
             i += (2*l+1)*nmax[(spe,l)]
 
     idx = idx.tolist()
@@ -65,5 +64,4 @@ for iconf in xrange(ndata):
 
     np.save(goodcoeffilebase+str(iconf)+".npy",coef)
     np.save(goodoverfilebase+str(iconf)+".npy",over)
-    print "time =", time.time()-start
 

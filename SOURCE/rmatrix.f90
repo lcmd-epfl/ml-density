@@ -1,6 +1,5 @@
 SUBROUTINE rmatrix(llmax,nnmax,nspecies,M,totsize,specarray,almax,ancut,kMM,Rmat)
 
-use omp_lib
 IMPLICIT NONE
 ! allocate I/O variables
 INTEGER:: M,totsize,llmax,nnmax,nspecies
