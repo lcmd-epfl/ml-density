@@ -41,7 +41,6 @@ nspecies = len(species)
 
 # atomic indices sorted by number
 atomicindx = get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf)
-atomicindx = atomicindx.T
 
 #====================================== reference environments
 fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
@@ -68,7 +67,8 @@ natoms_train = natoms[trainrange]
 
 # training set arrays
 train_configs = np.array(trainrange,int)
-atomicindx_training = atomicindx[:,:,trainrange]
+atomicindx_training = atomicindx[trainrange,:,:]
+
 atom_counting_training = atom_counting[trainrange]
 atomic_species = np.zeros((ntrain,natmax),int)
 for itrain in xrange(ntrain):

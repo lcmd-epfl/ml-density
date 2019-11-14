@@ -17,6 +17,57 @@ int nproc;
 #define SPARSEIND(L,N,IAT) ( ((L) * nnmax + (N)) * nat + (IAT) )
 #define KSPARSEIND(IREF,L,M,ICSPE) ( (((IREF) * (llmax+1) + (L)) *(2*llmax+1) + (M)) * nat + (ICSPE) )
 
+#define symsize(M) (((M)*(M)+(M))/2)
+static inline unsigned int mpos(unsigned int i, unsigned int j){
+  /* A[i+j*(j+1)/2], i <= j, 0 <= j < N */
+    return (i)+(((j)*((j)+1))>>1);
+}
+#define MPOSIF(i,j)   ((i)<=(j)? mpos((i),(j)):mpos((j),(i)))
+
+typedef struct {
+  int im;
+  int n;
+  int l;
+  int a;
+  int iref;
+} ao_t;
+
+static void print_mem(
+    const int totsize  ,
+    const int llmax    ,
+    const int nnmax    ,
+    const int M        ,
+    const int ntrain   ,
+    const int natmax   ,
+    const int * const totalsizes,
+    const int * const kernsizes,
+    FILE * f){
+
+  const double b2mib = 1.0/(1<<20);
+  const double b2gib = 1.0/(1<<30);
+
+  size_t size1 = 2*(totsize+symsize(totsize))*sizeof(double);
+  size_t size2 = 0;
+  size_t size3 = sizeof(int)*(llmax+1)*nnmax*natmax + sizeof(int)*M*(llmax+1)*(2*llmax+1)*natmax + sizeof(ao_t)*totsize;
+  for(int itrain=0; itrain<ntrain; itrain++){
+    size_t t2 = totalsizes[itrain]*(totalsizes[itrain]+1)+kernsizes[itrain];
+    if(t2>size2) size2 = t2;
+  }
+  size2 *= sizeof(double);
+
+  fprintf(f, "Problem dimensionality = %d\nNumber of training molecules = %d\n\n", totsize, ntrain);
+  fprintf(f, "\
+      output: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
+      input : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
+      inner : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n",
+      size1, size1*b2mib, size1*b2gib,
+      size2, size2*b2mib, size2*b2gib,
+      size3, size3*b2mib, size3*b2gib
+      );
+  fflush(f);
+  return;
+}
+
 static void vec_print(int n, double * v, const char * fname){
 
   FILE * f = fopen(fname, "w");
@@ -28,12 +79,15 @@ static void vec_print(int n, double * v, const char * fname){
   return;
 }
 
-static void mx_print(int n, double * a, const char * fname){
+static void mx_nosym_print(int n, double * a, const char * fname){
 
   FILE * f = fopen(fname, "w");
   for(int i=0; i<n; i++){
-    for(int j=0; j<n; j++){
-      fprintf(f, "% 21.18e   ", a[i*n+j]);
+    for(int j=0; j<=i; j++){
+      fprintf(f, "% 21.18e   ", a[mpos(j,i)]);
+    }
+    for(int j=i+1; j<n; j++){
+      fprintf(f, "% 21.18e   ", a[mpos(i,j)]);
     }
     fprintf(f, "\n");
   }
@@ -63,7 +117,6 @@ static void do_work(
     const int llmax    ,
     const int nnmax    ,
     const int M        ,
-    const int ntrain   ,
     const int natmax   ,
     const int * const atomicindx,
     const int * const atomcount ,
@@ -80,12 +133,33 @@ static void do_work(
     const char * const path_kern,
     double * Avec, double * Bmat){
 
+  ao_t * ao = malloc(sizeof(ao_t)*totsize);
+
+  int i = 0;
+  for(int iref=0; iref<M; iref++){
+    int a = specarray[iref];
+    int al = almax[a];
+    for(int l=0; l<al; l++){
+      int msize = 2*l+1;
+      int anc   = ancut[ a * (llmax+1) + l ];
+      for(int n=0; n<anc; n++){
+        for(int im=0; im<msize; im++){
+          ao[i].im = im;
+          ao[i].n  = n;
+          ao[i].l  = l;
+          ao[i].a  = a;
+          ao[i].iref = iref;
+          i++;
+        }
+      }
+    }
+  }
+
   for(int itrain=from; itrain<to; itrain++){
 
     const int nat = natoms[itrain];
     const int nao = totalsizes[itrain];
 
-    //   ! read projections, overlaps and kernels for each training molecule
     const int conf = trrange[itrain];
     char file_proj[512], file_over[512], file_kern[512];
     sprintf(file_proj, "%s%d.dat", path_proj, conf);
@@ -95,99 +169,83 @@ static void do_work(
     double * projections = vec_read(nao,     file_proj);
     double * overlaps    = vec_read(nao*nao, file_over);
     double * kernels     = vec_read( kernsizes[itrain], file_kern);
+
     int * sparseindexes = calloc(sizeof(int) * (llmax+1) * nnmax * nat, 1);
     int * kernsparseindexes = calloc(sizeof(int) *M *(llmax+1) *(2*llmax+1) * nat, 1);
 
-
-    int it1 = 0;
+    int it = 0;
     for(int iat=0; iat<nat; iat++){
-      int a1 = atomspe[itrain*natmax+iat];
-      int al1 = almax[a1];
-      for(int l1=0; l1<al1; l1++){
-        int msize1 = 2*l1+1;
-        int anc1   = ancut[ a1 * (llmax+1) + l1 ];
-        for(int n1=0; n1<anc1; n1++){
-          sparseindexes[ SPARSEIND(l1,n1,iat)] = it1;
-          it1 += msize1;
+      int a = atomspe[itrain*natmax+iat];
+      int al = almax[a];
+      for(int l=0; l<al; l++){
+        int msize = 2*l+1;
+        int anc   = ancut[ a * (llmax+1) + l ];
+        for(int n=0; n<anc; n++){
+          sparseindexes[ SPARSEIND(l,n,iat)] = it;
+          it += msize;
         }
       }
     }
 
-    int ik1 = 0;
-    for(int iref1=0; iref1<M; iref1++){
-      int a1 = specarray[iref1];
-      int al1 = almax[a1];
-
-      for(int l1=0; l1<al1; l1++){
-        int msize1 = 2*l1+1;
-        for(int im1=0; im1<msize1; im1++){
-          for(int iat=0; iat<atomcount[ itrain*nspecies+a1 ]; iat++){
-            kernsparseindexes[KSPARSEIND(iref1,l1,im1,iat)] = ik1;
-            ik1 += msize1;
+    int ik = 0;
+    for(int iref=0; iref<M; iref++){
+      int a = specarray[iref];
+      int al = almax[a];
+      for(int l=0; l<al; l++){
+        int msize = 2*l+1;
+        for(int im=0; im<msize; im++){
+          for(int iat=0; iat<atomcount[ itrain*nspecies+a ]; iat++){
+            kernsparseindexes[KSPARSEIND(iref,l,im,iat)] = ik;
+            ik += msize;
           }
         }
       }
     }
 
-    //   ! Loop over 1st dimension
-    int i1 = 0;
-    for(int iref1=0; iref1<M; iref1++){
-      int a1 = specarray[iref1];
-      int al1 = almax[a1];
-      for(int l1=0; l1<al1; l1++){
-        int msize1 = 2*l1+1;
-        int anc1   = ancut[ a1 * (llmax+1) + l1 ];
-        for(int n1=0; n1<anc1; n1++){
-          for(int im1=0; im1<msize1; im1++){
-            // ! Collect contributions for 1st dimension
-            for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
-              int iat = atomicindx[icspe1*nspecies*ntrain + a1*ntrain + itrain];
-              int sk1 = kernsparseindexes[KSPARSEIND(iref1,l1,im1,icspe1)];
-              int sp1 = sparseindexes    [SPARSEIND(l1,n1,iat)];
-              for(int imm1=0; imm1<msize1; imm1++){
-                Avec[i1] += projections[sp1+imm1] * kernels[sk1+imm1];
-              }
-            }
+    for(int i1=0; i1<totsize; i1++){
+      int iref1 = ao[i1].iref;
+      int  im1 = ao[i1].im;
+      int  n1  = ao[i1].n;
+      int  l1  = ao[i1].l;
+      int  a1  = ao[i1].a;
+      int msize1 = 2*l1+1;
+      double dA = 0.0;
+      for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
+        int iat = atomicindx[ itrain*nspecies*natmax+a1*natmax+icspe1 ];
+        int sk1 = kernsparseindexes[KSPARSEIND(iref1,l1,im1,icspe1)];
+        int sp1 = sparseindexes    [SPARSEIND(l1,n1,iat)];
+        for(int imm1=0; imm1<msize1; imm1++){
+          dA += projections[sp1+imm1] * kernels[sk1+imm1];
+        }
+      }
+      Avec[i1] += dA;
 
-            int i2 = 0;
-            for(int iref2=0; iref2<=iref1; iref2++){
-              int a2 = specarray[iref2];
-              int al2 = almax[a2];
-              for(int l2=0; l2<al2; l2++){
-                int msize2 = 2*l2+1;
-                int anc2   = ancut[ a2 * (llmax+1) + l2 ];
-                for(int n2=0; n2<anc2; n2++){
-                  for(int im2=0; im2<msize2; im2++){
-                    double contrB = 0.0;
-                    for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
-                      int iat = atomicindx[icspe1*nspecies*ntrain + a1*ntrain + itrain];
-                      int sk1 = kernsparseindexes[KSPARSEIND(iref1, l1, im1, icspe1)];
-                      int sp1 = sparseindexes    [SPARSEIND(l1,n1,iat)];
-                      for(int imm1=0; imm1<msize1; imm1++){
-                        double Btemp = 0.0;
-                        for(int icspe2=0; icspe2<atomcount[itrain*nspecies+a2]; icspe2++){
-                          int jat = atomicindx[icspe2*nspecies*ntrain + a2*ntrain + itrain];
-                          int sk2 = kernsparseindexes[KSPARSEIND(iref2, l2, im2, icspe2)];
-                          int sp2 = sparseindexes    [SPARSEIND(l2,n2,jat)];
-                          for(int imm2=0; imm2<msize2; imm2++){
-                            Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2+imm2];
-                          }
-                        }
-                        contrB += Btemp * kernels[sk1+imm1];
-                      }
-                    }
-                    Bmat[i1*totsize+i2] += contrB;
-                    if(iref2!=iref1){
-                      Bmat[i2*totsize+i1] += contrB;
-                    }
-                    i2++;
-                  }
-                }
+      for(int i2=i1; i2<totsize; i2++){
+        int iref2 = ao[i2].iref;
+        int  im2 = ao[i2].im;
+        int  n2  = ao[i2].n;
+        int  l2  = ao[i2].l;
+        int  a2  = ao[i2].a;
+        int msize2 = 2*l2+1;
+        double dB = 0.0;
+        for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
+        int iat = atomicindx[ itrain*nspecies*natmax+a1*natmax+icspe1 ];
+          int sk1 = kernsparseindexes[KSPARSEIND(iref1, l1, im1, icspe1)];
+          int sp1 = sparseindexes    [SPARSEIND(l1,n1,iat)];
+          for(int imm1=0; imm1<msize1; imm1++){
+            double Btemp = 0.0;
+            for(int icspe2=0; icspe2<atomcount[itrain*nspecies+a2]; icspe2++){
+              int jat = atomicindx[ itrain*nspecies*natmax+a2*natmax+icspe2 ];
+              int sk2 = kernsparseindexes[KSPARSEIND(iref2, l2, im2, icspe2)];
+              int sp2 = sparseindexes    [SPARSEIND(l2,n2,jat)];
+              for(int imm2=0; imm2<msize2; imm2++){
+                Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2+imm2];
               }
             }
-            i1++;
+            dB += Btemp * kernels[sk1+imm1];
           }
         }
+        Bmat[mpos(i1,i2)] += dB;
       }
     }
     free(kernsparseindexes);
@@ -196,6 +254,7 @@ static void do_work(
     free(overlaps);
     free(kernels);
   }
+  free(ao);
   return;
 }
 
@@ -208,22 +267,22 @@ int get_matrices(
     const int M        ,
     const int ntrain   ,
     const int natmax   ,
-    const int * const atomicindx,
-    const int * const atomcount ,
-    const int * const trrange   ,
-    const int * const natoms    ,
-    const int * const totalsizes,
-    const int * const kernsizes ,
-    const int * const atomspe   ,
-    const int * const specarray ,
-    const int * const almax     ,
-    const int * const ancut     ,
+    const int * const atomicindx,  //  ntrain*nspecies*natmax
+    const int * const atomcount ,  //  ntrain*nspecies
+    const int * const trrange   ,  //  ntrain
+    const int * const natoms    ,  //  ntrain
+    const int * const totalsizes,  //  ntrain
+    const int * const kernsizes ,  //  ntrain
+    const int * const atomspe   ,  //  ntrain*natmax
+    const int * const specarray ,  //  M
+    const int * const almax     ,  //  nspecies
+    const int * const ancut     ,  //  nspecies*(llmax+1)
     const char * const path_proj,
     const char * const path_over,
     const char * const path_kern,
     const char * const path_avec,
     const char * const path_bmat
-){
+    ){
 
 #ifdef USE_MPI
   int argc = 1;
@@ -236,43 +295,21 @@ int get_matrices(
   nproc = 0;
   Nproc = 1;
 #endif
-  if (nproc == 0) {
-    size_t size1 = totsize*(totsize+1)*sizeof(double);
-    size_t size2 = 0;
-    size_t size3 = 0;
-    for(int itrain=0; itrain<ntrain; itrain++){
-      size_t t2 = totalsizes[itrain]*(totalsizes[itrain]+1)+kernsizes[itrain];
-      if(t2>size2) size2 = t2;
-      size_t t3 = natoms[itrain];
-      if(t3>size3) size3 = t3;
-    }
-    size2 *= sizeof(double);
-    size3 *= sizeof(int) * (llmax+1)*(nnmax+(2*llmax+1)* M);
 
-    fprintf(stderr, "Problem dimensionality = %d\nNumber of training molecules = %d\n\n", totsize, ntrain);
-    fprintf(stderr, "\
-        output: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
-        input : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
-        inner : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n",
-        size1, size1/1048576.0, size1/1048576.0/1048576.0,
-        size2, size2/1048576.0, size2/1048576.0/1048576.0,
-        size3, size3/1048576.0, size3/1048576.0/1048576.0
-        );
-  }
-
-  double t;
 #ifdef USE_MPI
-  if (nproc == 0) {
+  double t = 0.0;
+  if(nproc == 0){
+    print_mem(totsize, llmax, nnmax, M, ntrain, natmax, totalsizes, kernsizes, stderr);
     t = MPI_Wtime ();
   }
 #endif
 
 #ifdef USE_MPI
   double * AVEC = calloc(sizeof(double)*totsize, 1);
-  double * BMAT = calloc(sizeof(double)*totsize*totsize, 1);
+  double * BMAT = calloc(sizeof(double)*symsize(totsize), 1);
 #endif
   double * Avec = calloc(sizeof(double)*totsize, 1);
-  double * Bmat = calloc(sizeof(double)*totsize*totsize, 1);
+  double * Bmat = calloc(sizeof(double)*symsize(totsize), 1);
 
   int div = ntrain/Nproc;
   int rem = ntrain%Nproc;
@@ -288,7 +325,6 @@ int get_matrices(
       llmax   ,
       nnmax   ,
       M       ,
-      ntrain  ,
       natmax  ,
       atomicindx,
       atomcount ,
@@ -306,8 +342,8 @@ int get_matrices(
       Avec, Bmat);
 
 #ifdef USE_MPI
-  MPI_Reduce (Avec, AVEC, totsize,         MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-  MPI_Reduce (Bmat, BMAT, totsize*totsize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce (Avec, AVEC, totsize,          MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce (Bmat, BMAT, symsize(totsize), MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 #endif
 
 #ifdef USE_MPI
@@ -315,11 +351,11 @@ int get_matrices(
     t = MPI_Wtime () - t;
     fprintf(stderr, "t=%4.2lf\n", t);
     vec_print(totsize, AVEC, path_avec);
-    mx_print(totsize, BMAT, path_bmat);
+    mx_nosym_print(totsize, BMAT, path_bmat);
   }
 #else
     vec_print(totsize, Avec, path_avec);
-    mx_print(totsize, Bmat, path_bmat);
+    mx_nosym_print(totsize, Bmat, path_bmat);
 #endif
 
   free(Avec);
