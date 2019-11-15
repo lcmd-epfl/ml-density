@@ -44,28 +44,32 @@ static void print_mem(
     const int natmax   ,
     const int * const totalsizes,
     const int * const kernsizes,
+    const size_t bufsize,
     FILE * f){
 
   const double b2mib = 1.0/(1<<20);
   const double b2gib = 1.0/(1<<30);
 
-  size_t size1 = 2*(totsize+symsize(totsize))*sizeof(double);
+  size_t size1 = (2*totsize+symsize(totsize))*sizeof(double);
   size_t size2 = 0;
   size_t size3 = sizeof(int)*(llmax+1)*nnmax*natmax + sizeof(int)*M*(llmax+1)*(2*llmax+1)*natmax + sizeof(ao_t)*totsize;
+  size_t size4 = sizeof(double) * bufsize;
   for(int itrain=0; itrain<ntrain; itrain++){
     size_t t2 = totalsizes[itrain]*(totalsizes[itrain]+1)+kernsizes[itrain];
     if(t2>size2) size2 = t2;
   }
   size2 *= sizeof(double);
 
-  fprintf(f, "Problem dimensionality = %d\nNumber of training molecules = %d\n\n", totsize, ntrain);
-  fprintf(f, "\
+  fprintf(f, "\nProblem dimensionality = %d\nNumber of training molecules = %d\n\n\
       output: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
       input : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
-      inner : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n",
+      inner : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
+      buffer: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\n",
+      totsize, ntrain,
       size1, size1*b2mib, size1*b2gib,
       size2, size2*b2mib, size2*b2gib,
-      size3, size3*b2mib, size3*b2gib
+      size3, size3*b2mib, size3*b2gib,
+      size4, size4*b2mib, size4*b2gib
       );
   fflush(f);
   return;
@@ -141,6 +145,10 @@ static void do_work(
     const char * const path_over,
     const char * const path_kern,
     double * Avec, double * Bmat){
+
+  if(to==from){
+    return;
+  }
 
   ao_t * ao = malloc(sizeof(ao_t)*totsize);
 
@@ -302,32 +310,64 @@ int get_matrices(
   MPI_Init (&argc, &argv);
   MPI_Comm_size (MPI_COMM_WORLD, &Nproc);
   MPI_Comm_rank (MPI_COMM_WORLD, &nproc);
+  char processor_name[MPI_MAX_PROCESSOR_NAME];
+  int name_len;
+  MPI_Get_processor_name(processor_name, &name_len);
+  printf("proc %4d : %s\n", nproc, processor_name);
+  MPI_Barrier(MPI_COMM_WORLD);
 #else
   nproc = 0;
   Nproc = 1;
 #endif
 
 #ifdef USE_MPI
+  size_t bufsize = (1<<30)/sizeof(double);  // number of doubles to take 1 GiB
+  if(bufsize > symsize(totsize)){
+    bufsize = symsize(totsize);
+  }
+  if(Nproc == 1){
+    bufsize = 0;
+  }
+
   double t = 0.0;
   if(nproc == 0){
-    print_mem(totsize, llmax, nnmax, M, ntrain, natmax, totalsizes, kernsizes, stderr);
+    print_mem(totsize, llmax, nnmax, M, ntrain, natmax, totalsizes, kernsizes, bufsize, stdout);
     t = MPI_Wtime ();
   }
+  MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
-#ifdef USE_MPI
-  double * AVEC = calloc(sizeof(double)*totsize, 1);
-  double * BMAT = calloc(sizeof(double)*symsize(totsize), 1);
-#endif
   double * Avec = calloc(sizeof(double)*totsize, 1);
-  double * Bmat = calloc(sizeof(double)*symsize(totsize), 1);
+  double * Bmat = NULL;
+  if( (Nproc==1) || nproc){
+    Bmat = calloc(sizeof(double)*symsize(totsize), 1);
+  }
+  double * AVEC = NULL;
+  double * BMAT = NULL;
+  if(!nproc){
+    if(Nproc > 1){
+      AVEC = calloc(sizeof(double)*totsize, 1);
+      BMAT = calloc(sizeof(double)*symsize(totsize), 1);
+    }
+    else{
+      AVEC = Avec;
+      BMAT = Bmat;
+    }
+  }
 
-  int div = ntrain/Nproc;
-  int rem = ntrain%Nproc;
   int start[Nproc+1];
-  start[0] = 0;
-  for(int i=0; i<Nproc; i++){
-    start[i+1] = start[i] + ((i<rem)?div+1:div);
+  if(Nproc>1){
+    int div = ntrain/(Nproc-1);
+    int rem = ntrain%(Nproc-1);
+    start[0] = 0;
+    start[1] = 0;
+    for(int i=1; i<Nproc; i++){
+      start[i+1] = start[i] + ((i<rem)?div+1:div);
+    }
+  }
+  else{
+    start[0] = 0;
+    start[1] = ntrain;
   }
 
   do_work(start[nproc], start[nproc+1],
@@ -353,35 +393,44 @@ int get_matrices(
       Avec, Bmat);
 
 #ifdef USE_MPI
-  MPI_Reduce (Avec, AVEC, totsize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
-  size_t chunk = 1073741824; // 2^30
-  size_t div_ = symsize(totsize)/chunk;
-  size_t rem_ = symsize(totsize)%chunk;
-  for(size_t i=0; i<div_; i++){
-    MPI_Reduce (Bmat+i*chunk, BMAT+i*chunk, chunk, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  if(Nproc>1){
+
+    MPI_Reduce (Avec, nproc?NULL:AVEC, totsize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    // the 0th process did not work, but it has to send data
+    double * buf = NULL;
+    if(!nproc){
+      buf = calloc(bufsize*sizeof(double), 1);
+    }
+
+    size_t div = symsize(totsize)/bufsize;
+    size_t rem = symsize(totsize)%bufsize;
+    for(size_t i=0; i<=div; i++){
+      MPI_Reduce ( nproc ? (Bmat+i*bufsize):buf, nproc?NULL:(BMAT+i*bufsize),   i<div?bufsize:rem, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    }
+
+    free(buf);
   }
-  MPI_Reduce (Bmat+div_*chunk, BMAT+div_*chunk, rem_, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
 #endif
 
-#ifdef USE_MPI
   if(nproc == 0){
+#ifdef USE_MPI
     t = MPI_Wtime () - t;
     fprintf(stderr, "t=%4.2lf\n", t);
+#endif
     vec_print(totsize, AVEC, path_avec);
     mx_nosym_print(totsize, BMAT, path_bmat);
   }
-#else
-  vec_print(totsize, Avec, path_avec);
-  mx_nosym_print(totsize, Bmat, path_bmat);
-#endif
 
   free(Avec);
   free(Bmat);
+  if(Nproci > 1){
+    free(AVEC);
+    free(BMAT);
+  }
 
 #ifdef USE_MPI
-  free(AVEC);
-  free(BMAT);
   MPI_Finalize ();
 #endif
   return 0;
