@@ -362,7 +362,7 @@ int get_matrices(
     start[0] = 0;
     start[1] = 0;
     for(int i=1; i<Nproc; i++){
-      start[i+1] = start[i] + ((i<rem)?div+1:div);
+      start[i+1] = start[i] + ( ((i-1)<rem) ? (div+1) : div );
     }
   }
   else{
@@ -425,7 +425,7 @@ int get_matrices(
 
   free(Avec);
   free(Bmat);
-  if(Nproci > 1){
+  if(Nproc > 1){
     free(AVEC);
     free(BMAT);
   }
