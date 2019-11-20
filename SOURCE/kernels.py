@@ -1,10 +1,13 @@
 #!/usr/bin/python3
 
+USE_MP = 1
 import numpy as np
 from config import Config
 from basis import basis_read
 from functions import *
 from power_spectra import read_ps_1mol
+if USE_MP:
+    import multiprocessing as mp
 
 conf = Config()
 
@@ -52,9 +55,12 @@ for l in range(llmax+1):
     power_ref_sparse[l] = np.load(powerrefbase+str(l)+"_"+str(M)+".npy");
 
 # compute sparse kernel matrix
-for iconf in range(ndata):
+def compute_kernel(iconf):
 
-    print_progress(iconf, ndata)
+    if USE_MP:
+        print('  nmol = {:5d}   nproc = {:2d}'.format(iconf, mp.current_process()._identity[0]) )
+    else:
+        print_progress(iconf, ndata)
 
     atoms = atomic_numbers[iconf]
     # define sparse indexes
@@ -97,4 +103,13 @@ for iconf in range(ndata):
                             ik = kernel_sparse_indexes[iref,iatspe,l,im1,im2]
                             k_NM[ik] = kern[im2,im1]
     np.savetxt(kernelconfbase+str(iconf)+".dat", k_NM,fmt='%.06e')
+
+if USE_MP:
+    Nproc = mp.cpu_count()
+    print("use", Nproc, "threads")
+    pool = mp.Pool(Nproc)
+    pool.map(compute_kernel, range(ndata))
+else:
+    for iconf in range(ndata):
+        compute_kernel(iconf)
 
