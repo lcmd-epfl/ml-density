@@ -1,4 +1,4 @@
-USE_MPI = 0
+USE_MPI = 1
 USE_OMP = 1
 
 CC=gcc
@@ -9,7 +9,6 @@ ifeq ($(USE_MPI),1)
 	CC=mpicc
 endif
 ifeq ($(USE_OMP),1)
-	DEF := $(DEF) -DUSE_OMP
 	OMPFLAG = -fopenmp
 endif
 
