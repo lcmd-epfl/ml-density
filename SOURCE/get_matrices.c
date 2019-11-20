@@ -3,6 +3,7 @@
 #include <math.h>
 #ifdef USE_MPI
 #include <mpi.h>
+#include <string.h>
 #endif
 
 int Nproc;
@@ -74,6 +75,31 @@ static void print_mem(
   fflush(f);
   return;
 }
+
+#ifdef USE_MPI
+static void print_nodes(FILE * f){
+
+  char processor_name[MPI_MAX_PROCESSOR_NAME];
+  int name_len;
+  MPI_Get_processor_name(processor_name, &name_len);
+
+  char buf[256];
+  snprintf(buf, sizeof(buf), " proc %4d : %s\n", nproc, processor_name);
+
+  if(nproc){
+    MPI_Send(buf, strlen(buf)+1, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
+  }
+  else{
+    fputs(buf, f);
+    MPI_Status status;
+    for(int i=1; i<Nproc; i++) {
+      MPI_Recv(buf, sizeof(buf), MPI_CHAR, i, 0, MPI_COMM_WORLD, &status);
+      fputs(buf, f);
+    }
+  }
+  return;
+}
+#endif
 
 static void vec_print(int n, double * v, const char * fname){
 
@@ -310,11 +336,7 @@ int get_matrices(
   MPI_Init (&argc, &argv);
   MPI_Comm_size (MPI_COMM_WORLD, &Nproc);
   MPI_Comm_rank (MPI_COMM_WORLD, &nproc);
-  char processor_name[MPI_MAX_PROCESSOR_NAME];
-  int name_len;
-  MPI_Get_processor_name(processor_name, &name_len);
-  printf("proc %4d : %s\n", nproc, processor_name);
-  MPI_Barrier(MPI_COMM_WORLD);
+  print_nodes(stdout);
 #else
   nproc = 0;
   Nproc = 1;
