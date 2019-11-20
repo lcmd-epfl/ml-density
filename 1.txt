@@ -10,7 +10,8 @@ jitter = 1e-8
 [paths]
 xyzfile          = ALL.xyz
 basisfile        = cc-pvqz-jkfit.1.d2k
-ps_base          = _ps_sparse100mol1024feat/PS
+ps0file          = _ps_sparse100mol1024feat/PS0.npy
+ps_split_base    = _ps_sparse100mol1024feat_split/PS
 ps_ref_base      = PS_REF/PS
 refs_sel_base    = SELECTIONS/refs_selection_
 spec_sel_base    = SELECTIONS/spec_selection_

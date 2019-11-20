@@ -62,7 +62,7 @@ for l in range(llmax+1):
 
 power_ex = {}
 for l in range(llmax+1):
-    (nfeat, power_ex[l]) = read_ps(powerexbase+str(l)+".npy", l, ndata_ex, natmax_ex, nspecies, atom_counting_ex, atomicindx_ex)
+    (nfeat, power_ex[l]) = read_ps(powerexbase+str(l)+".npy", ndata_ex, nspecies, atom_counting_ex, atomicindx_ex)
 
 # compute sparse kernel matrix
 for iconf in range(ndata_ex):
