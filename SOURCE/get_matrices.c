@@ -5,6 +5,9 @@
 #include <mpi.h>
 #include <string.h>
 #endif
+#ifdef USE_OMP
+#include <omp.h>
+#endif
 
 int Nproc;
 int nproc;
@@ -198,107 +201,130 @@ static void do_work(
     }
   }
 
-  for(int itrain=from; itrain<to; itrain++){
-
-    printf("%4d %4d\n", nproc, itrain-from);
-
-    const int nat = natoms[itrain];
-    const int nao = totalsizes[itrain];
-
-    const int conf = trrange[itrain];
-    char file_proj[512], file_over[512], file_kern[512];
-    sprintf(file_proj, "%s%d.dat", path_proj, conf);
-    sprintf(file_over, "%s%d.dat", path_over, conf);
-    sprintf(file_kern, "%s%d.dat", path_kern, conf);
-
-    double * projections = vec_read(nao,     file_proj);
-    double * overlaps    = vec_read(nao*nao, file_over);
-    double * kernels     = vec_read( kernsizes[itrain], file_kern);
-
-    int * sparseindexes = calloc(sizeof(int) * (llmax+1) * nnmax * nat, 1);
-    int * kernsparseindexes = calloc(sizeof(int) *M *(llmax+1) *(2*llmax+1) * nat, 1);
-
-    int it = 0;
-    for(int iat=0; iat<nat; iat++){
-      int a = atomspe[itrain*natmax+iat];
-      int al = almax[a];
-      for(int l=0; l<al; l++){
-        int msize = 2*l+1;
-        int anc   = ancut[ a * (llmax+1) + l ];
-        for(int n=0; n<anc; n++){
-          sparseindexes[ SPARSEIND(l,n,iat)] = it;
-          it += msize;
-        }
-      }
+#pragma omp parallel shared(Avec, Bmat)
+  {
+#ifdef USE_OMP
+    int nthr = omp_get_thread_num();
+    if(!nthr){
+      int Nthr = omp_get_num_threads();
+      printf(" proc = %d, number of threads = %d\n\n", nproc, Nthr);
+      fflush(stdout);
     }
+#else
+    int nthr = 0;
+#endif
+#pragma omp barrier
 
-    int ik = 0;
-    for(int iref=0; iref<M; iref++){
-      int a = specarray[iref];
-      int al = almax[a];
-      for(int l=0; l<al; l++){
-        int msize = 2*l+1;
-        for(int im=0; im<msize; im++){
-          for(int iat=0; iat<atomcount[ itrain*nspecies+a ]; iat++){
-            kernsparseindexes[KSPARSEIND(iref,l,im,iat)] = ik;
-            ik += msize;
+#pragma omp for schedule(dynamic)
+    for(int itrain=from; itrain<to; itrain++){
+
+      printf("%4d: %2d: %4d\n", nproc, nthr, itrain-from);
+
+      const int nat = natoms[itrain];
+      const int nao = totalsizes[itrain];
+
+      const int conf = trrange[itrain];
+      char file_proj[512], file_over[512], file_kern[512];
+      sprintf(file_proj, "%s%d.dat", path_proj, conf);
+      sprintf(file_over, "%s%d.dat", path_over, conf);
+      sprintf(file_kern, "%s%d.dat", path_kern, conf);
+
+      double * projections = vec_read(nao,     file_proj);
+      double * overlaps    = vec_read(nao*nao, file_over);
+      double * kernels     = vec_read( kernsizes[itrain], file_kern);
+
+      int * sparseindexes = calloc(sizeof(int) * (llmax+1) * nnmax * nat, 1);
+      int * kernsparseindexes = calloc(sizeof(int) *M *(llmax+1) *(2*llmax+1) * nat, 1);
+
+      int it = 0;
+      for(int iat=0; iat<nat; iat++){
+        int a = atomspe[itrain*natmax+iat];
+        int al = almax[a];
+        for(int l=0; l<al; l++){
+          int msize = 2*l+1;
+          int anc   = ancut[ a * (llmax+1) + l ];
+          for(int n=0; n<anc; n++){
+            sparseindexes[ SPARSEIND(l,n,iat)] = it;
+            it += msize;
           }
         }
       }
-    }
 
-    for(int i1=0; i1<totsize; i1++){
-      int iref1 = ao[i1].iref;
-      int  im1 = ao[i1].im;
-      int  n1  = ao[i1].n;
-      int  l1  = ao[i1].l;
-      int  a1  = ao[i1].a;
-      int msize1 = 2*l1+1;
-      double dA = 0.0;
-      for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
-        int iat = atomicindx[ itrain*nspecies*natmax+a1*natmax+icspe1 ];
-        int sk1 = kernsparseindexes[KSPARSEIND(iref1,l1,im1,icspe1)];
-        int sp1 = sparseindexes    [SPARSEIND(l1,n1,iat)];
-        for(int imm1=0; imm1<msize1; imm1++){
-          dA += projections[sp1+imm1] * kernels[sk1+imm1];
+      int ik = 0;
+      for(int iref=0; iref<M; iref++){
+        int a = specarray[iref];
+        int al = almax[a];
+        for(int l=0; l<al; l++){
+          int msize = 2*l+1;
+          for(int im=0; im<msize; im++){
+            for(int iat=0; iat<atomcount[ itrain*nspecies+a ]; iat++){
+              kernsparseindexes[KSPARSEIND(iref,l,im,iat)] = ik;
+              ik += msize;
+            }
+          }
         }
       }
-      Avec[i1] += dA;
 
-      for(int i2=i1; i2<totsize; i2++){
-        int iref2 = ao[i2].iref;
-        int  im2 = ao[i2].im;
-        int  n2  = ao[i2].n;
-        int  l2  = ao[i2].l;
-        int  a2  = ao[i2].a;
-        int msize2 = 2*l2+1;
-        double dB = 0.0;
+      for(int i1=0; i1<totsize; i1++){
+        int iref1 = ao[i1].iref;
+        int  im1 = ao[i1].im;
+        int  n1  = ao[i1].n;
+        int  l1  = ao[i1].l;
+        int  a1  = ao[i1].a;
+        int msize1 = 2*l1+1;
+        double dA = 0.0;
         for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
-        int iat = atomicindx[ itrain*nspecies*natmax+a1*natmax+icspe1 ];
-          int sk1 = kernsparseindexes[KSPARSEIND(iref1, l1, im1, icspe1)];
+          int iat = atomicindx[ itrain*nspecies*natmax+a1*natmax+icspe1 ];
+          int sk1 = kernsparseindexes[KSPARSEIND(iref1,l1,im1,icspe1)];
           int sp1 = sparseindexes    [SPARSEIND(l1,n1,iat)];
           for(int imm1=0; imm1<msize1; imm1++){
-            double Btemp = 0.0;
-            for(int icspe2=0; icspe2<atomcount[itrain*nspecies+a2]; icspe2++){
-              int jat = atomicindx[ itrain*nspecies*natmax+a2*natmax+icspe2 ];
-              int sk2 = kernsparseindexes[KSPARSEIND(iref2, l2, im2, icspe2)];
-              int sp2 = sparseindexes    [SPARSEIND(l2,n2,jat)];
-              for(int imm2=0; imm2<msize2; imm2++){
-                Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2+imm2];
-              }
-            }
-            dB += Btemp * kernels[sk1+imm1];
+            dA += projections[sp1+imm1] * kernels[sk1+imm1];
           }
         }
-        Bmat[mpos(i1,i2)] += dB;
+#pragma omp atomic update
+        Avec[i1] += dA;
+
+        for(int i2=i1; i2<totsize; i2++){
+          int iref2 = ao[i2].iref;
+          int  im2 = ao[i2].im;
+          int  n2  = ao[i2].n;
+          int  l2  = ao[i2].l;
+          int  a2  = ao[i2].a;
+          int msize2 = 2*l2+1;
+          double dB = 0.0;
+          for(int icspe1=0; icspe1<atomcount[itrain*nspecies+a1]; icspe1++){
+            int iat = atomicindx[ itrain*nspecies*natmax+a1*natmax+icspe1 ];
+            int sk1 = kernsparseindexes[KSPARSEIND(iref1, l1, im1, icspe1)];
+            int sp1 = sparseindexes    [SPARSEIND(l1,n1,iat)];
+            for(int imm1=0; imm1<msize1; imm1++){
+              double Btemp = 0.0;
+              for(int icspe2=0; icspe2<atomcount[itrain*nspecies+a2]; icspe2++){
+                int jat = atomicindx[ itrain*nspecies*natmax+a2*natmax+icspe2 ];
+                int sk2 = kernsparseindexes[KSPARSEIND(iref2, l2, im2, icspe2)];
+                int sp2 = sparseindexes    [SPARSEIND(l2,n2,jat)];
+                for(int imm2=0; imm2<msize2; imm2++){
+                  Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2+imm2];
+                }
+              }
+              dB += Btemp * kernels[sk1+imm1];
+            }
+          }
+#pragma omp atomic update
+          Bmat[mpos(i1,i2)] += dB;
+        }
       }
+      free(kernsparseindexes);
+      free(sparseindexes);
+      free(projections);
+      free(overlaps);
+      free(kernels);
     }
-    free(kernsparseindexes);
-    free(sparseindexes);
-    free(projections);
-    free(overlaps);
-    free(kernels);
+    if(!nthr){
+      printf("%4d: finished work\n", nproc);
+    }
+
   }
+
   free(ao);
   return;
 }
