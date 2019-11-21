@@ -101,9 +101,9 @@ static void print_nodes(FILE * f){
 }
 #endif
 
-static void vec_print(int n, double * v, const char * fname){
+static void vec_print(size_t n, double * v, const char * mode, const char * fname){
 
-  FILE * f = fopen(fname, "w");
+  FILE * f = fopen(fname, mode);
   if(!f){
     GOTOHELL;
   }
@@ -111,6 +111,19 @@ static void vec_print(int n, double * v, const char * fname){
     fprintf(f, "% 18.15e\n", v[i]);
   }
   fprintf(f, "\n");
+  fclose(f);
+  return;
+}
+
+static void vec_write(size_t n, double * v, const char * mode, const char * fname){
+
+  FILE * f = fopen(fname, mode);
+  if(!f){
+    GOTOHELL;
+  }
+  if(fwrite(v, sizeof(double), n, f) != n){
+    GOTOHELL;
+  }
   fclose(f);
   return;
 }
@@ -344,36 +357,14 @@ int get_matrices(
 #endif
 
   double * Avec = calloc(sizeof(double)*totsize, 1);
-  double * Bmat = NULL;
-  if( (Nproc==1) || nproc){
-    Bmat = calloc(sizeof(double)*symsize(totsize), 1);
-  }
-  double * AVEC = NULL;
-  double * BMAT = NULL;
-  if(!nproc){
-    if(Nproc > 1){
-      AVEC = calloc(sizeof(double)*totsize, 1);
-      BMAT = calloc(sizeof(double)*symsize(totsize), 1);
-    }
-    else{
-      AVEC = Avec;
-      BMAT = Bmat;
-    }
-  }
+  double * Bmat = calloc(sizeof(double)*symsize(totsize), 1);
 
   int start[Nproc+1];
-  if(Nproc>1){
-    int div = ntrain/(Nproc-1);
-    int rem = ntrain%(Nproc-1);
-    start[0] = 0;
-    start[1] = 0;
-    for(int i=1; i<Nproc; i++){
-      start[i+1] = start[i] + ( ((i-1)<rem) ? (div+1) : div );
-    }
-  }
-  else{
-    start[0] = 0;
-    start[1] = ntrain;
+  int div = ntrain/Nproc;
+  int rem = ntrain%Nproc;
+  start[0] = 0;
+  for(int i=0; i<Nproc; i++){
+    start[i+1] = start[i] + ( (i<rem) ? (div+1) : div );
   }
 
   do_work(start[nproc], start[nproc+1],
@@ -399,42 +390,49 @@ int get_matrices(
       Avec, Bmat);
 
 #ifdef USE_MPI
+  if(!nproc){
+    t = MPI_Wtime () - t;
+    fprintf(stderr, "t=%4.2lf\n", t);
+  }
+#endif
 
-  if(Nproc>1){
+  if(Nproc==1){
+    vec_print(totsize, Avec, "w", path_avec);
+    vec_write(symsize(totsize), Bmat, "w", path_bmat);
+  }
+#ifdef USE_MPI
+  else{
+    double * AVEC = NULL;
+    double * BMAT = NULL;
+    if(!nproc){
+      AVEC = calloc(sizeof(double)*totsize, 1);
+      BMAT = calloc(sizeof(double)*bufsize, 1);
+    }
 
     MPI_Reduce (Avec, nproc?NULL:AVEC, totsize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-    // the 0th process did not work, but it has to send data
-    double * buf = NULL;
     if(!nproc){
-      buf = calloc(bufsize*sizeof(double), 1);
+      vec_print(totsize, AVEC, "w", path_avec);
     }
 
     size_t div = symsize(totsize)/bufsize;
     size_t rem = symsize(totsize)%bufsize;
     for(size_t i=0; i<=div; i++){
-      MPI_Reduce ( nproc ? (Bmat+i*bufsize):buf, nproc?NULL:(BMAT+i*bufsize),   i<div?bufsize:rem, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+      size_t size = i<div?bufsize:rem;
+      if(!size){
+        break;
+      }
+      MPI_Reduce (Bmat+i*bufsize, nproc?NULL:BMAT, size, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+      if(!nproc){
+        vec_write(size, BMAT, i?"a":"w", path_bmat);
+      }
     }
 
-    free(buf);
-  }
-
-#endif
-
-  if(nproc == 0){
-#ifdef USE_MPI
-    t = MPI_Wtime () - t;
-    fprintf(stderr, "t=%4.2lf\n", t);
-#endif
-    vec_print(totsize, AVEC, path_avec);
-    vec_print(symsize(totsize), BMAT, path_bmat);
-  }
-
-  free(Avec);
-  free(Bmat);
-  if(Nproc > 1){
     free(AVEC);
     free(BMAT);
   }
+#endif
+  free(Avec);
+  free(Bmat);
 
 #ifdef USE_MPI
   MPI_Finalize ();

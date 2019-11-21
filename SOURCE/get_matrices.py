@@ -140,5 +140,5 @@ ret = get_matrices.get_matrices(
     overdatbase.encode('ascii'),
     kernelconfbase.encode('ascii'),
     (avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt").encode('ascii'),
-    (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt").encode('ascii'))
+    (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii'))
 

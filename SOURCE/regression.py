@@ -23,7 +23,7 @@ Avec = np.loadtxt(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
 
 n = Avec.shape[0]
 
-Bmat_ = np.loadtxt(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
+Bmat_ = np.fromfile(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat", dtype=np.float64)
 Bmat  = np.zeros((n,n))
 Bmat[np.tril_indices(n)] = Bmat_
 Bmat += Bmat.T - np.diag(np.diag(Bmat))
