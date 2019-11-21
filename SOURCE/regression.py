@@ -20,12 +20,18 @@ bmatfilebase    = conf.paths['bmat_base']
 weightsfilebase = conf.paths['weights_base']
 
 Avec = np.loadtxt(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
-Bmat = np.loadtxt(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
+
+n = Avec.shape[0]
+
+Bmat_ = np.loadtxt(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
+Bmat  = np.zeros((n,n))
+Bmat[np.tril_indices(n)] = Bmat_
+Bmat += Bmat.T - np.diag(np.diag(Bmat))
+
 Rmat = np.load(kmmbase+str(M)+".npy")
 
-totsize = Avec.shape[0]
-print("problem dimensionality =", totsize)
+print("problem dimensionality =", n)
 
-weights = np.linalg.solve(Bmat + reg*Rmat + jit*np.eye(totsize),Avec)
+weights = np.linalg.solve(Bmat + reg*Rmat + jit*np.eye(n),Avec)
 np.save(weightsfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",weights)
 

@@ -115,26 +115,6 @@ static void vec_print(int n, double * v, const char * fname){
   return;
 }
 
-static void mx_nosym_print(size_t n, double * a, const char * fname){
-
-  FILE * f = fopen(fname, "w");
-  if(!f){
-    GOTOHELL;
-  }
-  for(size_t i=0; i<n; i++){
-    for(size_t j=0; j<=i; j++){
-      fprintf(f, "% 18.15e   ", a[mpos(j,i)]);
-    }
-    for(size_t j=i+1; j<n; j++){
-      fprintf(f, "% 18.15e   ", a[mpos(i,j)]);
-    }
-    fprintf(f, "\n");
-  }
-  fprintf(f, "\n");
-  fclose(f);
-  return;
-}
-
 static double * vec_read(int n, char * fname){
 
   double * v = malloc(sizeof(double)*n);
@@ -446,7 +426,7 @@ int get_matrices(
     fprintf(stderr, "t=%4.2lf\n", t);
 #endif
     vec_print(totsize, AVEC, path_avec);
-    mx_nosym_print(totsize, BMAT, path_bmat);
+    vec_print(symsize(totsize), BMAT, path_bmat);
   }
 
   free(Avec);
