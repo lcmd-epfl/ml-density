@@ -1,0 +1,11 @@
+CC=gcc
+
+all: regression.so
+
+%.so: %.o
+	$(CC) $^ -shared -Wl,-soname,$@ -o $@
+%.o: %.c
+	$(CC) $^ -c --std=gnu11 -fPIC -O2 -o $@
+
+clean:
+	rm -vf npy2dat.so

@@ -1,7 +1,13 @@
 #!/usr/bin/python3
 
 import numpy as np
+from basis import basis_read
 from config import Config
+from functions import *
+import os
+import sys
+import ctypes
+import numpy.ctypeslib as npct
 
 conf = Config()
 
@@ -18,20 +24,70 @@ kmmbase         = conf.paths['kmm_base']
 avecfilebase    = conf.paths['avec_base']
 bmatfilebase    = conf.paths['bmat_base']
 weightsfilebase = conf.paths['weights_base']
+xyzfilename     = conf.paths['xyzfile']
+basisfilename   = conf.paths['basisfile']
+specselfilebase = conf.paths['spec_sel_base']
 
+#====================================== reference environments
+fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
+
+(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
+species = get_species_list(atomic_numbers)
+nspecies = len(species)
+
+# species dictionary, max. angular momenta, number of radial channels
+(spe_dict, lmax, nmax) = basis_read(basisfilename)
+if list(species) != list(spe_dict.values()):
+    print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
+    exit(1)
+
+# basis set size
+llmax = max(lmax.values())
+nnmax = max(nmax.values())
+[bsize, almax, anmax] = basis_info(spe_dict, lmax, nmax);
+totsize = sum(bsize[fps_species])
+
+#===============================================================
+
+k_MM = np.load(kmmbase+str(M)+".npy")
 Avec = np.loadtxt(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
+mat  = np.zeros((totsize,totsize))
 
-n = Avec.shape[0]
+array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
+array_2d_double = npct.ndpointer(dtype=np.float64, ndim=2, flags='CONTIGUOUS')
+array_3d_double = npct.ndpointer(dtype=np.float64, ndim=3, flags='CONTIGUOUS')
+regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/regression.so")
+regression.make_matrix.restype = ctypes.c_int
+regression.make_matrix.argtypes = [
+  ctypes.c_int,
+  ctypes.c_int,
+  ctypes.c_int,
+  ctypes.c_int,
+  ctypes.c_int,
+  array_1d_int,
+  array_1d_int,
+  array_1d_int,
+  array_3d_double,
+  array_2d_double,
+  ctypes.c_double,
+  ctypes.c_double,
+  ctypes.c_char_p,
+  ctypes.c_char_p ]
 
-Bmat_ = np.fromfile(bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat", dtype=np.float64)
-Bmat  = np.zeros((n,n))
-Bmat[np.tril_indices(n)] = Bmat_
-Bmat += Bmat.T - np.diag(np.diag(Bmat))
+ret = regression.make_matrix(
+      totsize,
+      nspecies,
+      llmax   ,
+      nnmax   ,
+      M       ,
+      fps_species.astype(np.uint32),
+      almax.astype(np.uint32),
+      anmax.flatten().astype(np.uint32),
+      k_MM,
+      mat, reg, jit, (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii'), (kmmbase+str(M)+".dat").encode('ascii'))
 
-Rmat = np.load(kmmbase+str(M)+".npy")
+print("problem dimensionality =", totsize)
 
-print("problem dimensionality =", n)
-
-weights = np.linalg.solve(Bmat + reg*Rmat + jit*np.eye(n),Avec)
+weights = np.linalg.solve(mat, Avec)
 np.save(weightsfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",weights)
 

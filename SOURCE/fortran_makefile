@@ -10,7 +10,7 @@ LIBS='-lgomp'
 
 SUFFIX=cpython-37m-x86_64-linux-gnu.so
 
-MODULES=rmatrix.$(SUFFIX) prediction.$(SUFFIX)
+MODULES=prediction.$(SUFFIX)
 
 all: $(MODULES)
 
