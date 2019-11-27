@@ -1,10 +1,9 @@
 #!/usr/bin/python3
 
 import numpy as np
-import prediction
 from config import Config
-from basis import basis_read
-from functions import *
+from functions import moldata_read,get_species_list,get_spec_list_per_conf,get_atomicindx
+from run_prediction import *
 
 conf = Config()
 
@@ -31,45 +30,31 @@ predictfilebase = conf.paths['ex_predict_base']
 (ndata_ex, natoms_ex, atomic_numbers_ex) = moldata_read(xyzexfilename)
 natmax_ex = max(natoms_ex)
 
-#==================== species array
+# species array
 species = get_species_list(atomic_numbers)
-nspecies = len(species)
+species_ex = get_species_list(atomic_numbers_ex)
+if not set(species_ex).issubset(set(species)):
+    print("different elements in the molecule and in the training set:", list(species_ex), "and", list(species))
+    exit(1)
 
 (atom_counting_ex, spec_list_per_conf_ex) = get_spec_list_per_conf(species, ndata_ex, natoms_ex, atomic_numbers_ex)
 
 # atomic indices sorted by number
-atomicindx_ex = get_atomicindx(ndata_ex, nspecies, natmax_ex, atom_counting_ex, spec_list_per_conf_ex)
+atomicindx_ex = get_atomicindx(ndata_ex, len(species), natmax_ex, atom_counting_ex, spec_list_per_conf_ex)
 atomicindx_ex = atomicindx_ex.T
-
-#====================================== reference environments
-fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
-
-# species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read(basisfilename)
-if list(species) != list(spe_dict.values()):
-    print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
-    exit(1)
-
-# basis set size
-llmax = max(lmax.values())
-nnmax = max(nmax.values())
-[bsize, almax, anmax] = basis_info(spe_dict, lmax, nmax);
 
 test_configs = np.arange(ndata_ex)
 test_species = np.zeros((ndata_ex,natmax_ex),int)
 for itest in range(ndata_ex):
     test_species[itest] = spec_list_per_conf_ex[itest]
 
-# sparse kernel sizes
-kernel_sizes = get_kernel_sizes(test_configs, fps_species, spe_dict, M, lmax, atom_counting_ex)
-
-# load regression weights
-weights = np.load(weightsfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
-w = unravel_weights(M, llmax, nnmax, fps_species, anmax, almax, weights)
-
-# load testing kernels and perform prediction
-coeffs = prediction.prediction(kernelexbase,
-                               kernel_sizes,fps_species,atom_counting_ex,atomicindx_ex,nspecies,ndata_ex,natmax_ex,
-                               llmax,nnmax,natoms_ex,test_configs,test_species,almax,anmax,M,w)
-np.save(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",coeffs)
+run_prediction(ndata_ex, natmax_ex, natoms_ex,
+    atom_counting_ex, atomicindx_ex,
+    test_configs, test_species,
+    M, species,
+    kernelexbase,
+    basisfilename,
+    specselfilebase+str(M)+".txt",
+    weightsfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",
+    predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 
