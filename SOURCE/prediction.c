@@ -11,6 +11,9 @@ static double * vec_read(int n, char * fname){
 
   double * v = malloc(sizeof(double)*n);
   FILE   * f = fopen(fname, "r");
+  if(!f){
+    GOTOHELL;
+  }
 
   for(int i=0; i<n; i++){
     if(fscanf(f, "%lf", v+i)!=1){
