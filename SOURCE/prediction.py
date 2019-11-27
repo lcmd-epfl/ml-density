@@ -34,7 +34,6 @@ species = get_species_list(atomic_numbers)
 
 # atomic indices sorted by number
 atomicindx = get_atomicindx(ndata,len(species),natmax,atom_counting,spec_list_per_conf)
-atomicindx = atomicindx.T
 
 # dataset partitioning
 trainrangetot = np.loadtxt(trainfilename,int)
@@ -46,17 +45,11 @@ print("Number of training molecules =", ntrain)
 print("Number of testing molecules =", ntest)
 
 # define testing indexes
-atomicindx_test = atomicindx[:,:,test_configs]
+atomicindx_test = atomicindx[test_configs,:,:]
 atom_counting_test = atom_counting[test_configs]
 
-test_species = np.zeros((ntest,natmax),int)
-for itest in range(ntest):
-    for iat in range(natoms_test[itest]):
-        test_species[itest,iat] = spec_list_per_conf[test_configs[itest]][iat]
-
 run_prediction(ntest, natmax, natoms_test,
-    atom_counting_test, atomicindx_test,
-    test_configs, test_species,
+    atom_counting_test, atomicindx_test, test_configs,
     M, species,
     kernelconfbase,
     basisfilename,

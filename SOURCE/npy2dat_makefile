@@ -1,11 +1,14 @@
 CC=gcc
 
+W= -Warray-bounds -Wmaybe-uninitialized -Wmissing-braces -Wparentheses -Wsequence-point -Wtype-limits -Wundef \
+   -Wuninitialized -Wunused -Wmisleading-indentation -Wempty-body -Wunused-but-set-variable -Wunused-parameter -Winline
+
 all: npy2dat.so
 
 %.so: %.o
 	$(CC) $^ -shared -Wl,-soname,$@ -o $@
 %.o: %.c
-	$(CC) $^ -c --std=gnu11 -fPIC -O2 -o $@
+	$(CC) $(W) $^ -c --std=gnu11 -fPIC -O2 -o $@
 
 clean:
 	rm -vf npy2dat.so

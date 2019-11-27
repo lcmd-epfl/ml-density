@@ -232,7 +232,7 @@ static void do_work(
       for(int l=0; l<al; l++){
         int msize = 2*l+1;
         for(int im=0; im<msize; im++){
-          for(int iat=0; iat<atomcount[ itrain*nspecies+a ]; iat++){
+          for(int iat=0; iat<atomcount[itrain*nspecies+a]; iat++){
             kernsparseindexes[KSPARSEIND(iref,l,im,iat)] = ik;
             ik += msize;
           }

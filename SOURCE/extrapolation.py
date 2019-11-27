@@ -38,19 +38,11 @@ if not set(species_ex).issubset(set(species)):
     exit(1)
 
 (atom_counting_ex, spec_list_per_conf_ex) = get_spec_list_per_conf(species, ndata_ex, natoms_ex, atomic_numbers_ex)
-
-# atomic indices sorted by number
 atomicindx_ex = get_atomicindx(ndata_ex, len(species), natmax_ex, atom_counting_ex, spec_list_per_conf_ex)
-atomicindx_ex = atomicindx_ex.T
-
 test_configs = np.arange(ndata_ex)
-test_species = np.zeros((ndata_ex,natmax_ex),int)
-for itest in range(ndata_ex):
-    test_species[itest] = spec_list_per_conf_ex[itest]
 
 run_prediction(ndata_ex, natmax_ex, natoms_ex,
-    atom_counting_ex, atomicindx_ex,
-    test_configs, test_species,
+    atom_counting_ex, atomicindx_ex, test_configs,
     M, species,
     kernelexbase,
     basisfilename,

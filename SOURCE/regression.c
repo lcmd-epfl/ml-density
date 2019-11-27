@@ -37,17 +37,13 @@ static void vec_read(size_t n, double * v, const char * fname){
 
 int make_matrix(
     const int n,
-    const int nspecies ,
-    const int llmax    ,
-    const int nnmax    ,
-    const int M        ,
+    const int llmax,
+    const int M,
     const int * const specarray ,  // M
     const int * const almax     ,  // nspecies
     const int * const ancut     ,  // nspecies*(llmax+1)
     const double kMM[llmax+1][M*(2*llmax+1)][M*(2*llmax+1)],
-    double * mat,
-    double reg, double jit,
-    char * Bmatpath, char * Rmatpath){
+    double * mat, double reg, double jit, char * Bmatpath){
 
   ao_t * ao = malloc(sizeof(ao_t)*n);
 
@@ -57,7 +53,7 @@ int make_matrix(
     int al = almax[a];
     for(int l=0; l<al; l++){
       int msize = 2*l+1;
-      int anc   = ancut[ a * (llmax+1) + l ];
+      int anc   = ancut[a*(llmax+1)+l];
       for(int n=0; n<anc; n++){
         for(int im=0; im<msize; im++){
           ao[i].im = im;

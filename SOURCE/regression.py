@@ -33,7 +33,6 @@ fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
 
 (ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
 species = get_species_list(atomic_numbers)
-nspecies = len(species)
 
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
@@ -43,7 +42,6 @@ if list(species) != list(spe_dict.values()):
 
 # basis set size
 llmax = max(lmax.values())
-nnmax = max(nmax.values())
 [bsize, almax, anmax] = basis_info(spe_dict, lmax, nmax);
 totsize = sum(bsize[fps_species])
 
@@ -62,8 +60,6 @@ regression.make_matrix.argtypes = [
   ctypes.c_int,
   ctypes.c_int,
   ctypes.c_int,
-  ctypes.c_int,
-  ctypes.c_int,
   array_1d_int,
   array_1d_int,
   array_1d_int,
@@ -71,20 +67,17 @@ regression.make_matrix.argtypes = [
   array_2d_double,
   ctypes.c_double,
   ctypes.c_double,
-  ctypes.c_char_p,
   ctypes.c_char_p ]
 
 ret = regression.make_matrix(
       totsize,
-      nspecies,
-      llmax   ,
-      nnmax   ,
-      M       ,
+      llmax  ,
+      M      ,
       fps_species.astype(np.uint32),
       almax.astype(np.uint32),
       anmax.flatten().astype(np.uint32),
-      k_MM,
-      mat, reg, jit, (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii'), (kmmbase+str(M)+".dat").encode('ascii'))
+      k_MM, mat, reg, jit,
+      (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii'))
 
 print("problem dimensionality =", totsize)
 
