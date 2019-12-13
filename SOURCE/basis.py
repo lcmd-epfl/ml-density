@@ -1,6 +1,10 @@
 from ase.data import atomic_numbers
 
 def basis_read(filename):
+  (basis, spe_dict, Lmax, Nmax) = basis_read_full(filename)
+  return (spe_dict, Lmax, Nmax)
+
+def basis_read_full(filename):
 
   f = open(filename, "r")
   lines = [ i.strip() for i in f.read().split('\n') ];
@@ -8,6 +12,7 @@ def basis_read(filename):
 
   spe_dict = {}
   angular_momenta = {}
+  basis = {}
 
   errormsg = 'you gave me a bad basis'
 
@@ -24,6 +29,7 @@ def basis_read(filename):
       spe_dict[nelements] = element
       nelements+=1
       angular_momenta[ element ] = []
+      basis          [ element ] = []
       i+=1
       continue
 
@@ -39,7 +45,14 @@ def basis_read(filename):
       for j in range(nbf):
         [tmp, l, np] = [int(k) for k in filter(None, lines[i].split(' ') )];
         angular_momenta[element].append(l)
-        i += np+1
+        i+=1
+
+        gto = []
+        for ii in range(np):
+          a, c = lines[i].split()
+          gto.append([float(a), float(c)])
+          i+=1
+        basis[element].append([l, gto])
 
     else:
       raise SystemExit(errormsg)
@@ -53,5 +66,16 @@ def basis_read(filename):
     for l in range(0,lmax+1):
       Nmax[(q,l)] = angular_momenta[q].count(l)
 
-  return (spe_dict, Lmax, Nmax)
+  return (basis, spe_dict, Lmax, Nmax)
+
+def basis_print(basis):
+  for key in basis.keys():
+    print(key)
+    for gto in basis[key]:
+      l = gto[0]
+      prim = gto[1]
+      n = len(prim)
+      print ("l =", l, "n =", n)
+      for i in prim:
+        print(i)
 

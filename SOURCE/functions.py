@@ -85,3 +85,23 @@ def print_progress(i, n):
     strg = "Doing point %*i of %*i (%5.1f %%)"%(npad,i+1,npad,n,100 * float(i+1)/n)
     print(strg, end='\r', flush=True)
 
+def nel_contrib(a):
+  # norm = (2.0*a/np.pi)^3/4
+  # integral = (pi/a)^3/2
+  return pow (2.0*np.pi/a, 0.75)
+
+def number_of_electrons(basis, atoms, c):
+  nel = 0.0
+  i = 0
+  for iat in range(len(atoms)):
+    q = atoms[iat]
+    for [l,gto] in basis[q]:
+      if l==0:
+        for p in range(len(gto)):
+          a, w = gto[p]
+          nel += c[i] * w * nel_contrib(a)
+        i+=1
+      else:
+        i+=2*l+1
+  return nel
+
