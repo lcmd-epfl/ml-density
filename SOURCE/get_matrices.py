@@ -19,15 +19,15 @@ def set_variable_values():
 
 [frac,M] = set_variable_values()
 
-xyzfilename     = conf.paths['xyzfile']
-basisfilename   = conf.paths['basisfile']
-trainfilename   = conf.paths['trainingselfile']
-specselfilebase = conf.paths['spec_sel_base']
-kernelconfbase  = conf.paths['kernel_conf_base']
-baselinedwbase  = conf.paths['baselined_w_base']
-overdatbase     = conf.paths['over_dat_base']
-avecfilebase    = conf.paths['avec_base']
-bmatfilebase    = conf.paths['bmat_base']
+xyzfilename      = conf.paths['xyzfile']
+basisfilename    = conf.paths['basisfile']
+trainfilename    = conf.paths['trainingselfile']
+specselfilebase  = conf.paths['spec_sel_base']
+kernelconfbase   = conf.paths['kernel_conf_base']
+baselinedwbase   = conf.paths['baselined_w_base']
+goodoverfilebase = conf.paths['goodover_base']
+avecfilebase     = conf.paths['avec_base']
+bmatfilebase     = conf.paths['bmat_base']
 
 
 (ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
@@ -137,7 +137,7 @@ ret = get_matrices.get_matrices(
     almax.astype(np.uint32)                           ,
     anmax.flatten().astype(np.uint32)                 ,
     baselinedwbase.encode('ascii'),
-    overdatbase.encode('ascii'),
+    goodoverfilebase.encode('ascii'),
     kernelconfbase.encode('ascii'),
     (avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt").encode('ascii'),
     (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii'))

@@ -128,7 +128,7 @@ static void vec_write(size_t n, double * v, const char * mode, const char * fnam
   return;
 }
 
-static double * vec_read(int n, char * fname){
+static double * vec_read(int n, const char * fname){
 
   double * v = malloc(sizeof(double)*n);
   FILE   * f = fopen(fname, "r");
@@ -141,6 +141,29 @@ static double * vec_read(int n, char * fname){
     }
   }
   fclose(f);
+  return v;
+}
+
+static double * npy_read(int n, const char * fname){
+
+  // read simple 1d / symmetric 2d arrays of doubles only
+  static const size_t header_size = 128;
+
+  FILE * f = fopen(fname, "r");
+  if(!f){
+    return NULL;
+  }
+
+  fseek(f, header_size, SEEK_SET);
+  double * v = calloc(n, sizeof(double));
+  int ret = fread(v, sizeof(double), n, f);
+  fclose(f);
+
+  if(ret!=n){
+    free(v);
+    return NULL;
+  }
+
   return v;
 }
 
@@ -203,11 +226,11 @@ static void do_work(
     const int conf = trrange[itrain];
     char file_proj[512], file_over[512], file_kern[512];
     sprintf(file_proj, "%s%d.dat", path_proj, conf);
-    sprintf(file_over, "%s%d.dat", path_over, conf);
+    sprintf(file_over, "%s%d.npy", path_over, conf);
     sprintf(file_kern, "%s%d.dat", path_kern, conf);
 
     double * projections = vec_read(nao,     file_proj);
-    double * overlaps    = vec_read(nao*nao, file_over);
+    double * overlaps    = npy_read(nao*nao, file_over);
     double * kernels     = vec_read( kernsizes[itrain], file_kern);
 
     int * sparseindexes = calloc(sizeof(int) * (llmax+1) * nnmax * nat, 1);
@@ -427,6 +450,7 @@ int get_matrices(
       MPI_Reduce (Bmat+i*bufsize, nproc?NULL:BMAT, size, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
       if(!nproc){
         vec_write(size, BMAT, i?"a":"w", path_bmat);
+        printf("chunk #%d/%d written\n", i+1, rem?(div+1):div);
       }
     }
 
