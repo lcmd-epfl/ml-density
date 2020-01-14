@@ -5,6 +5,12 @@ from config import Config
 from basis import basis_read
 from functions import *
 from power_spectra import read_ps_1mol
+import time
+
+import os
+import sys
+import ctypes
+import numpy.ctypeslib as npct
 
 conf = Config()
 
@@ -46,17 +52,40 @@ if list(species) != list(spe_dict.values()):
     exit(1)
 llmax = max(lmax.values())
 
+start = time.time()
 # load power spectra
 power_ref_sparse = {}
 for l in range(llmax+1):
     power_ref_sparse[l] = np.load(powerrefbase+str(l)+"_"+str(M)+".npy");
+end = time.time()
+print(end - start)
+
+start = time.time()
+
+
+
+array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
+array_5d_int    = npct.ndpointer(dtype=np.uint32,  ndim=5, flags='CONTIGUOUS')
+array_1d_double = npct.ndpointer(dtype=np.float64, ndim=1, flags='CONTIGUOUS')
+array_2d_double = npct.ndpointer(dtype=np.float64, ndim=2, flags='CONTIGUOUS')
+array_3d_double = npct.ndpointer(dtype=np.float64, ndim=3, flags='CONTIGUOUS')
+kernels = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/kernels.so")
+kernels.kernels.restype = ctypes.c_int
+
+
+
 
 # compute sparse kernel matrix
-for iconf in range(ndata):
+for iconf in range(1):
+#for iconf in range(4):
+#for iconf in range(ndata):
 
     print_progress(iconf, ndata)
 
-    atoms = atomic_numbers[iconf]
+    power_training_iconf = {}
+    for l in range(llmax+1):
+        (dummy, power_training_iconf[l]) = read_ps_1mol(splitpsfilebase+str(l)+"_"+str(iconf)+".npy", nspecies, atom_counting[iconf], atomicindx[iconf])
+
     # define sparse indexes
     kernel_size = 0
     kernel_sparse_indexes = np.zeros((M,natoms[iconf],llmax+1,2*llmax+1,2*llmax+1),int)
@@ -71,30 +100,59 @@ for iconf in range(ndata):
                         kernel_sparse_indexes[iref,iat,l,im,imm] = kernel_size
                         kernel_size += 1
 
-    power_training_iconf = {}
-    for l in range(llmax+1):
-        (dummy, power_training_iconf[l]) = read_ps_1mol(splitpsfilebase+str(l)+"_"+str(iconf)+".npy", nspecies, atom_counting[iconf], atomicindx[iconf])
-
     # compute kernels
     k_NM = np.zeros(kernel_size,float)
-    for iref in range(M):
+    for iref in range(10):
+    #for iref in range(M):
+        print(iref)
         ispe = fps_species[iref]
         spe = spe_dict[ispe]
         for iatspe in range(atom_counting[iconf,ispe]):
             iat = atomicindx[iconf,ispe,iatspe]
-            ik0 = kernel_sparse_indexes[iref,iatspe,0,0,0]
             for l in range(lmax[spe]+1):
                 msize = 2*l+1
                 powert = power_training_iconf[l][iat]
                 powerr = power_ref_sparse[l][iref]
+
+                kernels.kernels.argtypes = [
+                 ctypes.c_int,
+                 ctypes.c_int,
+                 ctypes.c_int,
+                 ctypes.c_int,
+                 ctypes.c_int,
+                 ctypes.c_int,
+                 ctypes.c_double,
+                 array_5d_int,
+                 ctypes.c_int,
+                 array_1d_double,
+                 array_1d_double,
+                 array_1d_double,
+                 ]
+
                 if l==0:
-                    ik = kernel_sparse_indexes[iref,iatspe,l,0,0]
-                    k_NM[ik] = np.dot(powert,powerr)**zeta
+
+                  ret = kernels.kernels(
+                       M,
+                       natoms[iconf],
+                       llmax,
+                       l,
+                       iref,
+                       iatspe,
+                       zeta,
+                       kernel_sparse_indexes.astype(np.uint32),
+                       powert.shape[-1],
+                       powert.flatten(),
+                       powerr.flatten(),
+                       k_NM)
+
                 else:
-                    kern = np.dot(powert,powerr.T) * k_NM[ik0]**(float(zeta-1)/zeta)
+                    ik0 = kernel_sparse_indexes[iref,iatspe,0,0,0]
+                    mult = k_NM[ik0]**(float(zeta-1)/zeta)
                     for im1 in range(msize):
                         for im2 in range(msize):
-                            ik = kernel_sparse_indexes[iref,iatspe,l,im1,im2]
-                            k_NM[ik] = kern[im2,im1]
+                            ik = kernel_sparse_indexes[iref,iatspe,l,im2,im1]
+                            k_NM[ik] = mult * np.dot(powert[im1],powerr[im2])
     np.savetxt(kernelconfbase+str(iconf)+".dat", k_NM,fmt='%.06e')
+end = time.time()
+print(end - start)
 
