@@ -20,7 +20,6 @@ goodoverfilebase = conf.paths['goodover_base']
 # species dictionary, max. angular momenta, number of radial channels
 (spe_dict, lmax, nmax) = basis_read(basisfilename)
 
-#===================================================== start decomposition
 for iconf in range(ndata):
 
     print_progress(iconf, ndata)

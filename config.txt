@@ -16,7 +16,6 @@ goodcoef_base    = QMDATA/COEF_NPY/coef_conf
 goodover_base    = QMDATA/OVER_NPY/overlap_conf
 averages_dir     = QMDATA/AVERAGES/
 baselined_w_base = QMDATA/BASELINED_PROJECTIONS/projections_conf
-over_dat_base    = QMDATA/OVER_DAT/overlap_conf
 ps0file          = ps_full/_ps_full/PS0.npy
 ps_split_base    = ps_full/_ps_full_split/PS
 ps_ref_base      = ps_full/INNER/PS_REF/PS

@@ -5,11 +5,6 @@ from basis import basis_read
 from config import Config
 from functions import *
 
-import os
-import sys
-import ctypes
-import numpy.ctypeslib as npct
-
 conf = Config()
 
 def set_variable_values():
