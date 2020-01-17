@@ -2,7 +2,9 @@
 
 import numpy as np
 from config import Config
+from ase.data import chemical_symbols
 from functions import *
+from power_spectra import reorder_ps
 
 conf = Config()
 
@@ -19,18 +21,20 @@ specselfilebase = conf.paths['spec_sel_base']
 
 def do_fps(x, d=0):
     # Code from Giulio Imbalzano
-    if d == 0 : d = len(x)
     n = len(x)
+    if d==0:
+        d = n
     iy = np.zeros(d,int)
+    measure = np.zeros(d-1,float)
     iy[0] = 0
     # Faster evaluation of Euclidean distance
-    n2 = np.sum((x*np.conj(x)),axis=1)
-    dl = n2 + n2[iy[0]] - 2*np.real(np.dot(x,np.conj(x[iy[0]])))
+    n2 = np.sum(x*x, axis=1)
+    dl = n2 + n2[iy[0]] - 2.0*np.dot(x,x[iy[0]])
     for i in range(1,d):
-        iy[i] = np.argmax(dl)
-        nd = n2 + n2[iy[i]] - 2*np.real(np.dot(x,np.conj(x[iy[i]])))
+        iy[i], measure[i-1] = np.argmax(dl), np.amax(dl)
+        nd = n2 + n2[iy[i]] - 2.0*np.dot(x,x[iy[i]])
         dl = np.minimum(dl,nd)
-    return iy
+    return iy, measure
 
 # number of molecules, number of atoms in each molecule, atomic numbers
 (ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
@@ -52,25 +56,26 @@ atomicindx = get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_co
 
 #====================== environmental power spectrum
 power = np.load(ps0file)
-nfeat = len(power[0,0])
-power_env = np.zeros((nenv,nfeat),complex)
+nfeat = power.shape[-1]
+power_env = np.zeros((nenv,nfeat),float)
 ienv = 0
 for iconf in range(ndata):
-    power_per_conf = np.zeros((natoms[iconf],nfeat),complex)
-    iat = 0
-    for ispe in range(nspecies):
-        for icount in range(atom_counting[iconf,ispe]):
-            jat = atomicindx[iconf,ispe,icount]
-            power_per_conf[jat,:] = power[iconf,iat,:]
-            iat+=1
-    for iat in range(natoms[iconf]):
-        power_env[ienv,:] = power_per_conf[iat,:]
-        ienv += 1
+    reorder_ps(power_env[ienv:ienv+natoms[iconf]], power[iconf], nspecies, atom_counting[iconf], atomicindx[iconf])
+    ienv += natoms[iconf]
 
-fps_indexes = np.array(do_fps(power_env,M),int)
+fps_indexes, measure = do_fps(power_env,M)
 fps_species = spec_array[fps_indexes]
 np.savetxt(refsselfilebase+str(M)+".txt",fps_indexes,fmt='%i')
 np.savetxt(specselfilebase+str(M)+".txt",fps_species,fmt='%i')
+
+for i in range(1,M):
+  print(i, measure[i-1])
+
+fps_species_list = fps_species.tolist()
+for i in range(nspecies):
+  n1 = fps_species_list.count(i)
+  n2 = spec_list.count(i)
+  print('#', chemical_symbols[species[i]]+':', n1, '/', n2, "(%.1f%%)"%(100.0*n1/n2) )
 
 nuniq = len(np.unique(fps_indexes))
 if nuniq != len(fps_indexes):
