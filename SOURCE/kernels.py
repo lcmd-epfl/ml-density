@@ -3,8 +3,9 @@
 import numpy as np
 from config import Config
 from basis import basis_read
-from functions import *
+from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx,print_progress
 from power_spectra import read_ps_1mol
+from kernels_lib import kernel_nm_sparse_indices,kernel_nm
 
 USEMPI = 1
 
@@ -27,9 +28,6 @@ splitpsfilebase = conf.paths['ps_split_base']
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 natmax = max(natoms)
 
-#================= SOAP PARAMETERS
-zeta = 2.0
-
 elements = get_elements_list(atomic_numbers)
 nel = len(elements)
 (atom_counting, el_list_per_conf) = get_el_list_per_conf(elements, nmol, natoms, atomic_numbers)
@@ -48,10 +46,9 @@ if list(elements) != list(el_dict.values()):
 llmax = max(lmax.values())
 
 # load power spectra
-power_ref_sparse = {}
+power_ref = {}
 for l in range(llmax+1):
-    power_ref_sparse[l] = np.load(powerrefbase+str(l)+"_"+str(M)+".npy");
-
+    power_ref[l] = np.load(powerrefbase+str(l)+"_"+str(M)+".npy");
 
 #------------------------------------------------------------------------
 
@@ -61,48 +58,17 @@ def kernel_for_mol(imol):
     else:
       print(nproc, ':', imol-start[nproc], flush=1)
 
-    atoms = atomic_numbers[imol]
-    kernel_size = 0
-    kernel_sparse_indexes = np.zeros((M,natoms[imol],llmax+1,2*llmax+1,2*llmax+1),int)
-    for iref in range(M):
-        iel = ref_elements[iref]
-        q   = el_dict[iel]
-        for l in range(lmax[q]+1):
-            msize = 2*l+1
-            for im in range(msize):
-                for iat in range(atom_counting[imol,iel]):
-                    for imm in range(msize):
-                        kernel_sparse_indexes[iref,iat,l,im,imm] = kernel_size
-                        kernel_size += 1
+    kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(M, natoms[imol], llmax, lmax, ref_elements, el_dict, atom_counting[imol])
 
-    power_training_imol = {}
+    power_mol = {}
     for l in range(llmax+1):
-        (dummy, power_training_imol[l]) = read_ps_1mol(splitpsfilebase+str(l)+"_"+str(imol)+".npy", nel, atom_counting[imol], atomicindx[imol])
+        (dummy, power_mol[l]) = read_ps_1mol(splitpsfilebase+str(l)+"_"+str(imol)+".npy", nel, atom_counting[imol], atomicindx[imol])
 
-    # compute kernels
-    k_NM = np.zeros(kernel_size,float)
-    for iref in range(M):
-        iel = ref_elements[iref]
-        q   = el_dict[iel]
-        for iatq in range(atom_counting[imol,iel]):
-            iat = atomicindx[imol,iel,iatq]
-            ik0 = kernel_sparse_indexes[iref,iatq,0,0,0]
-            for l in range(lmax[q]+1):
-                msize = 2*l+1
-                powert = power_training_imol[l][iat]
-                powerr = power_ref_sparse[l][iref]
-                if l==0:
-                    ik = kernel_sparse_indexes[iref,iatq,l,0,0]
-                    k_NM[ik] = np.dot(powert,powerr)**zeta
-                else:
-                    kern = np.dot(powert,powerr.T) * k_NM[ik0]**(float(zeta-1)/zeta)
-                    for im1 in range(msize):
-                        for im2 in range(msize):
-                            ik = kernel_sparse_indexes[iref,iatq,l,im1,im2]
-                            k_NM[ik] = kern[im2,im1]
+    k_NM = kernel_nm(M, llmax, lmax, nel, el_dict, ref_elements, kernel_size, kernel_sparse_indices, power_mol, power_ref, atom_counting[imol], atomicindx[imol])
     np.savetxt(kernelconfbase+str(imol)+".dat", k_NM,fmt='%.06e')
 
 #------------------------------------------------------------------------
+
 if USEMPI==0:
     for imol in range(nmol):
         kernel_for_mol(imol)
@@ -130,6 +96,6 @@ else:
   for i in range(0,Nproc):
     start[i+1] = start[i] + ( (div+1) if (i<rem) else div )
   for imol in range(start[nproc], start[nproc+1]):
-      kernel_for_mol(imol)
+    kernel_for_mol(imol)
   print(nproc, ':', 'finished')
 
