@@ -1,5 +1,5 @@
 import numpy as np
-from power_spectra import read_ps_1mol
+from power_spectra_lib import read_ps_1mol
 
 # SOAP parameters
 zeta = 2.0

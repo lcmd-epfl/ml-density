@@ -1,10 +1,10 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import numpy as np
 from config import Config
 from basis import basis_read
 from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx,print_progress
-from power_spectra import read_ps
+from power_spectra_lib import read_ps
 from kernels_lib import kernel_nm_sparse_indices,kernel_nm
 
 conf = Config()

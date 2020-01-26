@@ -1,10 +1,10 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import numpy as np
 from config import Config
 from basis import basis_read
 from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx
-from run_prediction import *
+from run_prediction import run_prediction
 
 conf = Config()
 

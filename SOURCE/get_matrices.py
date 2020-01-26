@@ -1,9 +1,9 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import numpy as np
 from config import Config
 from basis import basis_read
-from functions import *
+from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx,basis_info,get_kernel_sizes
 
 import os
 import sys

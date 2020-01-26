@@ -1,9 +1,9 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import numpy as np
 from basis import basis_read
 from config import Config
-from functions import *
+from functions import moldata_read,get_elements_list,basis_info
 import os
 import sys
 import ctypes
@@ -28,11 +28,11 @@ xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
 elselfilebase   = conf.paths['spec_sel_base']
 
-kmmfile         = kmmbase+str(M)+".npy"
-avecfile        = avecfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".txt"
-bmatfile        = bmatfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
-elselfile     = elselfilebase+str(M)+".txt"
-weightsfile     = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
+kmmfile     = kmmbase+str(M)+".npy"
+avecfile    = avecfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".txt"
+bmatfile    = bmatfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
+elselfile   = elselfilebase+str(M)+".txt"
+weightsfile = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
 
 # print ("  input:")
 # print ( xyzfilename )

@@ -1,10 +1,10 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import numpy as np
 from config import Config
 from ase.data import chemical_symbols
 from functions import moldata_read,get_atomicindx,get_el_list_per_conf,get_elements_list
-from power_spectra import reorder_ps
+from power_spectra_lib import reorder_ps
 
 
 conf = Config()
