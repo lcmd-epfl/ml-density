@@ -17,10 +17,10 @@ xyzfilename      = conf.paths['xyzfile']
 trainfilename    = conf.paths['trainingselfile']
 
 xyzfile = ase.io.read(xyzfilename,":")
-fullsize = len(xyzfile)
+nmol = len(xyzfile)
 
 np.random.seed(seed)
-output = np.random.choice(fullsize, train, replace=False)
+output = np.random.choice(nmol, train, replace=False)
 output.sort()
 np.savetxt(trainfilename, output, fmt='%i')
 

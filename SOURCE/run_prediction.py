@@ -10,33 +10,33 @@ def run_prediction(
     nmol, natmax, natoms,
     atom_counting, atomicindx,
     test_configs,
-    M, species,
+    M, elements,
     kernelbase,
     basisfilename,
-    specselfilename,
+    elselfilename,
     weightsfilename,
     predictfilename):
 
-  # species dictionary, max. angular momenta, number of radial channels
-  (spe_dict, lmax, nmax) = basis_read(basisfilename)
-  if list(species) != list(spe_dict.values()):
-      print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
+  # elements dictionary, max. angular momenta, number of radial channels
+  (el_dict, lmax, nmax) = basis_read(basisfilename)
+  if list(elements) != list(el_dict.values()):
+      print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
       exit(1)
 
   # basis set size
   llmax = max(lmax.values())
   nnmax = max(nmax.values())
-  [bsize, almax, anmax] = basis_info(spe_dict, lmax, nmax)
+  [bsize, almax, anmax] = basis_info(el_dict, lmax, nmax)
 
   # reference environments
-  fps_species = np.loadtxt(specselfilename, int)
+  ref_elements = np.loadtxt(elselfilename, int)
 
   # sparse kernel sizes
-  kernel_sizes = get_kernel_sizes(test_configs, fps_species, spe_dict, M, lmax, atom_counting)
+  kernel_sizes = get_kernel_sizes(test_configs, ref_elements, el_dict, M, lmax, atom_counting)
 
   # regression weights
   weights = np.load(weightsfilename)
-  w = unravel_weights(M, llmax, nnmax, fps_species, anmax, almax, weights)
+  w = unravel_weights(M, llmax, nnmax, ref_elements, anmax, almax, weights)
 
   array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
   array_4d_double = npct.ndpointer(dtype=np.float64, ndim=4, flags='CONTIGUOUS')
@@ -66,7 +66,7 @@ def run_prediction(
   coeffs = np.zeros((nmol, natmax, llmax+1, nnmax, 2*llmax+1))
 
   ret = prediction.prediction(
-      len(species),
+      len(elements),
       llmax   ,
       nnmax   ,
       M       ,
@@ -77,7 +77,7 @@ def run_prediction(
       test_configs.astype(np.uint32)                    ,
       natoms.astype(np.uint32)                          ,
       kernel_sizes.astype(np.uint32)                    ,
-      fps_species.astype(np.uint32)                     ,
+      ref_elements.astype(np.uint32)                     ,
       almax.astype(np.uint32)                           ,
       anmax.flatten().astype(np.uint32)                 ,
       w, coeffs, kernelbase.encode('ascii')             )

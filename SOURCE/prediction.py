@@ -3,7 +3,7 @@
 import numpy as np
 from config import Config
 from basis import basis_read
-from functions import moldata_read,get_species_list,get_spec_list_per_conf,get_atomicindx
+from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx
 from run_prediction import *
 
 conf = Config()
@@ -20,25 +20,24 @@ def set_variable_values():
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
 trainfilename   = conf.paths['trainingselfile']
-specselfilebase = conf.paths['spec_sel_base']
+elselfilebase   = conf.paths['spec_sel_base']
 kernelconfbase  = conf.paths['kernel_conf_base']
 weightsfilebase = conf.paths['weights_base']
 predictfilebase = conf.paths['predict_base']
 
-(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
+(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 natmax = max(natoms)
 
-# species array
-species = get_species_list(atomic_numbers)
-(atom_counting, spec_list_per_conf) = get_spec_list_per_conf(species, ndata, natoms, atomic_numbers)
+elements = get_elements_list(atomic_numbers)
+(atom_counting, el_list_per_conf) = get_el_list_per_conf(elements, nmol, natoms, atomic_numbers)
 
 # atomic indices sorted by number
-atomicindx = get_atomicindx(ndata,len(species),natmax,atom_counting,spec_list_per_conf)
+atomicindx = get_atomicindx(nmol,len(elements),natmax,atom_counting,el_list_per_conf)
 
 # dataset partitioning
 trainrangetot = np.loadtxt(trainfilename,int)
 ntrain = int(frac*len(trainrangetot))
-test_configs = np.setdiff1d(range(ndata),trainrangetot)
+test_configs = np.setdiff1d(range(nmol),trainrangetot)
 ntest = len(test_configs)
 natoms_test = natoms[test_configs]
 print("Number of training molecules =", ntrain)
@@ -50,10 +49,10 @@ atom_counting_test = atom_counting[test_configs]
 
 run_prediction(ntest, natmax, natoms_test,
     atom_counting_test, atomicindx_test, test_configs,
-    M, species,
+    M, elements,
     kernelconfbase,
     basisfilename,
-    specselfilebase+str(M)+".txt",
+    elselfilebase+str(M)+".txt",
     weightsfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",
     predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 

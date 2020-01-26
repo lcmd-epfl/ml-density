@@ -3,8 +3,9 @@
 import numpy as np
 from config import Config
 from ase.data import chemical_symbols
-from functions import *
+from functions import moldata_read,get_atomicindx,get_el_list_per_conf,get_elements_list
 from power_spectra import reorder_ps
+
 
 conf = Config()
 
@@ -17,7 +18,7 @@ def set_variable_values():
 xyzfilename     = conf.paths['xyzfile']
 ps0file         = conf.paths['ps0file']
 refsselfilebase = conf.paths['refs_sel_base']
-specselfilebase = conf.paths['spec_sel_base']
+elselfilebase   = conf.paths['spec_sel_base']
 
 def do_fps(x, d=0):
     # Code from Giulio Imbalzano
@@ -37,47 +38,47 @@ def do_fps(x, d=0):
     return iy, measure
 
 # number of molecules, number of atoms in each molecule, atomic numbers
-(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
+(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 natmax = max(natoms)
 nenv = sum(natoms)
 
-#==================== species array
-species = get_species_list(atomic_numbers)
-nspecies = len(species)
-(atom_counting, spec_list_per_conf) = get_spec_list_per_conf(species, ndata, natoms, atomic_numbers)
+#==================== elements array
+elements = get_elements_list(atomic_numbers)
+nel = len(elements)
+(atom_counting, el_list_per_conf) = get_el_list_per_conf(elements, nmol, natoms, atomic_numbers)
 
-spec_list = []
-for i in spec_list_per_conf.values():
-  spec_list += i
-spec_array = np.asarray(spec_list,int)
+el_list = []
+for i in el_list_per_conf.values():
+  el_list += i
+el_array = np.asarray(el_list,int)
 
-#===================== atomic indexes sorted by species
-atomicindx = get_atomicindx(ndata,nspecies,natmax,atom_counting,spec_list_per_conf)
+#===================== atomic indexes sorted by elements
+atomicindx = get_atomicindx(nmol,nel,natmax,atom_counting,el_list_per_conf)
 
 #====================== environmental power spectrum
 power = np.load(ps0file)
 nfeat = power.shape[-1]
 power_env = np.zeros((nenv,nfeat),float)
 ienv = 0
-for iconf in range(ndata):
-    reorder_ps(power_env[ienv:ienv+natoms[iconf]], power[iconf], nspecies, atom_counting[iconf], atomicindx[iconf])
-    ienv += natoms[iconf]
+for imol in range(nmol):
+    reorder_ps(power_env[ienv:ienv+natoms[imol]], power[imol], nel, atom_counting[imol], atomicindx[imol])
+    ienv += natoms[imol]
 
-fps_indexes, measure = do_fps(power_env,M)
-fps_species = spec_array[fps_indexes]
-np.savetxt(refsselfilebase+str(M)+".txt",fps_indexes,fmt='%i')
-np.savetxt(specselfilebase+str(M)+".txt",fps_species,fmt='%i')
+ref_indexes, measure = do_fps(power_env,M)
+ref_elements = el_array[ref_indexes]
+np.savetxt(refsselfilebase+str(M)+".txt",ref_indexes,fmt='%i')
+np.savetxt(elselfilebase+str(M)+".txt",ref_elements,fmt='%i')
 
 for i in range(1,M):
   print(i, measure[i-1])
 
-fps_species_list = fps_species.tolist()
-for i in range(nspecies):
-  n1 = fps_species_list.count(i)
-  n2 = spec_list.count(i)
-  print('#', chemical_symbols[species[i]]+':', n1, '/', n2, "(%.1f%%)"%(100.0*n1/n2) )
+ref_elements_list = ref_elements.tolist()
+for i in range(nel):
+  n1 = ref_elements_list.count(i)
+  n2 = el_list.count(i)
+  print('#', chemical_symbols[elements[i]]+':', n1, '/', n2, "(%.1f%%)"%(100.0*n1/n2) )
 
-nuniq = len(np.unique(fps_indexes))
-if nuniq != len(fps_indexes):
+nuniq = len(np.unique(ref_indexes))
+if nuniq != len(ref_indexes):
     print('warning: i have found only', nuniq, 'unique environments')
 

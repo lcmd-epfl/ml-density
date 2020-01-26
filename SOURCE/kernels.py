@@ -18,33 +18,32 @@ def set_variable_values():
 
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
-specselfilebase = conf.paths['spec_sel_base']
+elselfilebase   = conf.paths['spec_sel_base']
 kernelconfbase  = conf.paths['kernel_conf_base']
 powerrefbase    = conf.paths['ps_ref_base']
 splitpsfilebase = conf.paths['ps_split_base']
 
 
-(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
+(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 natmax = max(natoms)
 
 #================= SOAP PARAMETERS
 zeta = 2.0
 
-#==================== species array
-species = get_species_list(atomic_numbers)
-nspecies = len(species)
-(atom_counting, spec_list_per_conf) = get_spec_list_per_conf(species, ndata, natoms, atomic_numbers)
+elements = get_elements_list(atomic_numbers)
+nel = len(elements)
+(atom_counting, el_list_per_conf) = get_el_list_per_conf(elements, nmol, natoms, atomic_numbers)
 
-#===================== atomic indices sorted by species
-atomicindx = get_atomicindx(ndata, nspecies, natmax, atom_counting, spec_list_per_conf)
+#===================== atomic indices sorted by elements
+atomicindx = get_atomicindx(nmol, nel, natmax, atom_counting, el_list_per_conf)
 
 #====================================== reference environments
-fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
+ref_elements = np.loadtxt(elselfilebase+str(M)+".txt",int)
 
-# species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read(basisfilename)
-if list(species) != list(spe_dict.values()):
-    print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
+# elements dictionary, max. angular momenta, number of radial channels
+(el_dict, lmax, nmax) = basis_read(basisfilename)
+if list(elements) != list(el_dict.values()):
+    print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
     exit(1)
 llmax = max(lmax.values())
 
@@ -56,57 +55,57 @@ for l in range(llmax+1):
 
 #------------------------------------------------------------------------
 
-def kernel_for_mol(iconf):
+def kernel_for_mol(imol):
     if USEMPI==0:
-      print_progress(iconf, ndata)
+      print_progress(imol, nmol)
     else:
-      print(nproc, ':', iconf-start[nproc], flush=1)
+      print(nproc, ':', imol-start[nproc], flush=1)
 
-    atoms = atomic_numbers[iconf]
+    atoms = atomic_numbers[imol]
     kernel_size = 0
-    kernel_sparse_indexes = np.zeros((M,natoms[iconf],llmax+1,2*llmax+1,2*llmax+1),int)
+    kernel_sparse_indexes = np.zeros((M,natoms[imol],llmax+1,2*llmax+1,2*llmax+1),int)
     for iref in range(M):
-        ispe = fps_species[iref]
-        spe = spe_dict[ispe]
-        for l in range(lmax[spe]+1):
+        iel = ref_elements[iref]
+        q   = el_dict[iel]
+        for l in range(lmax[q]+1):
             msize = 2*l+1
             for im in range(msize):
-                for iat in range(atom_counting[iconf,ispe]):
+                for iat in range(atom_counting[imol,iel]):
                     for imm in range(msize):
                         kernel_sparse_indexes[iref,iat,l,im,imm] = kernel_size
                         kernel_size += 1
 
-    power_training_iconf = {}
+    power_training_imol = {}
     for l in range(llmax+1):
-        (dummy, power_training_iconf[l]) = read_ps_1mol(splitpsfilebase+str(l)+"_"+str(iconf)+".npy", nspecies, atom_counting[iconf], atomicindx[iconf])
+        (dummy, power_training_imol[l]) = read_ps_1mol(splitpsfilebase+str(l)+"_"+str(imol)+".npy", nel, atom_counting[imol], atomicindx[imol])
 
     # compute kernels
     k_NM = np.zeros(kernel_size,float)
     for iref in range(M):
-        ispe = fps_species[iref]
-        spe = spe_dict[ispe]
-        for iatspe in range(atom_counting[iconf,ispe]):
-            iat = atomicindx[iconf,ispe,iatspe]
-            ik0 = kernel_sparse_indexes[iref,iatspe,0,0,0]
-            for l in range(lmax[spe]+1):
+        iel = ref_elements[iref]
+        q   = el_dict[iel]
+        for iatq in range(atom_counting[imol,iel]):
+            iat = atomicindx[imol,iel,iatq]
+            ik0 = kernel_sparse_indexes[iref,iatq,0,0,0]
+            for l in range(lmax[q]+1):
                 msize = 2*l+1
-                powert = power_training_iconf[l][iat]
+                powert = power_training_imol[l][iat]
                 powerr = power_ref_sparse[l][iref]
                 if l==0:
-                    ik = kernel_sparse_indexes[iref,iatspe,l,0,0]
+                    ik = kernel_sparse_indexes[iref,iatq,l,0,0]
                     k_NM[ik] = np.dot(powert,powerr)**zeta
                 else:
                     kern = np.dot(powert,powerr.T) * k_NM[ik0]**(float(zeta-1)/zeta)
                     for im1 in range(msize):
                         for im2 in range(msize):
-                            ik = kernel_sparse_indexes[iref,iatspe,l,im1,im2]
+                            ik = kernel_sparse_indexes[iref,iatq,l,im1,im2]
                             k_NM[ik] = kern[im2,im1]
-    np.savetxt(kernelconfbase+str(iconf)+".dat", k_NM,fmt='%.06e')
+    np.savetxt(kernelconfbase+str(imol)+".dat", k_NM,fmt='%.06e')
 
 #------------------------------------------------------------------------
 if USEMPI==0:
-    for iconf in range(ndata):
-        kernel_for_mol(iconf)
+    for imol in range(nmol):
+        kernel_for_mol(imol)
 
 else:
   from mpi4py import MPI
@@ -126,11 +125,11 @@ else:
   comm.barrier()
 
   start = [0]*(Nproc+1)
-  div = ndata//Nproc
-  rem = ndata%Nproc
+  div = nmol//Nproc
+  rem = nmol%Nproc
   for i in range(0,Nproc):
     start[i+1] = start[i] + ( (div+1) if (i<rem) else div )
-  for iconf in range(start[nproc], start[nproc+1]):
-      kernel_for_mol(iconf)
+  for imol in range(start[nproc], start[nproc+1]):
+      kernel_for_mol(imol)
   print(nproc, ':', 'finished')
 

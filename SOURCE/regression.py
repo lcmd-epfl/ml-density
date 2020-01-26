@@ -26,29 +26,46 @@ bmatfilebase    = conf.paths['bmat_base']
 weightsfilebase = conf.paths['weights_base']
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
-specselfilebase = conf.paths['spec_sel_base']
+elselfilebase   = conf.paths['spec_sel_base']
+
+kmmfile         = kmmbase+str(M)+".npy"
+avecfile        = avecfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".txt"
+bmatfile        = bmatfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
+elselfile     = elselfilebase+str(M)+".txt"
+weightsfile     = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
+
+# print ("  input:")
+# print ( xyzfilename )
+# print ( basisfilename)
+# print ( elselfile )
+# print ( kmmfile )
+# print ( avecfile )
+# print ( bmatfile )
+# print ("  output:")
+# print (weightsfile)
+# print ()
 
 #====================================== reference environments
-fps_species = np.loadtxt(specselfilebase+str(M)+".txt",int)
+ref_elements = np.loadtxt(elselfile, int)
 
-(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
-species = get_species_list(atomic_numbers)
+(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
+elements = get_elements_list(atomic_numbers)
 
-# species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read(basisfilename)
-if list(species) != list(spe_dict.values()):
-    print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
+# elements dictionary, max. angular momenta, number of radial channels
+(el_dict, lmax, nmax) = basis_read(basisfilename)
+if list(elements) != list(el_dict.values()):
+    print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
     exit(1)
 
 # basis set size
 llmax = max(lmax.values())
-[bsize, almax, anmax] = basis_info(spe_dict, lmax, nmax);
-totsize = sum(bsize[fps_species])
+[bsize, almax, anmax] = basis_info(el_dict, lmax, nmax);
+totsize = sum(bsize[ref_elements])
 
 #===============================================================
 
-k_MM = np.load(kmmbase+str(M)+".npy")
-Avec = np.loadtxt(avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt")
+k_MM = np.load(kmmfile)
+Avec = np.loadtxt(avecfile)
 mat  = np.zeros((totsize,totsize))
 
 array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
@@ -73,14 +90,14 @@ ret = regression.make_matrix(
       totsize,
       llmax  ,
       M      ,
-      fps_species.astype(np.uint32),
+      ref_elements.astype(np.uint32),
       almax.astype(np.uint32),
       anmax.flatten().astype(np.uint32),
       k_MM, mat, reg, jit,
-      (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii'))
+      bmatfile.encode('ascii'))
 
 print("problem dimensionality =", totsize)
 
 weights = np.linalg.solve(mat, Avec)
-np.save(weightsfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",weights)
+np.save(weightsfile, weights)
 

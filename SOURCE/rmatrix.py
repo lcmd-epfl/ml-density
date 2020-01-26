@@ -15,21 +15,19 @@ def set_variable_values():
 
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
-specselfilebase = conf.paths['spec_sel_base']
 kmmbase         = conf.paths['kmm_base']
 powerrefbase    = conf.paths['ps_ref_base']
 
 #================= SOAP PARAMETERS
 zeta = 2.0
 
-#==================== species array
-(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
-species = get_species_list(atomic_numbers)
+(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
+elements = get_elements_list(atomic_numbers)
 
-# species dictionary, max. angular momenta, number of radial channels
-(spe_dict, lmax, nmax) = basis_read(basisfilename)
-if list(species) != list(spe_dict.values()):
-    print("different elements in the molecules and in the basis:", list(species), "and", list(spe_dict.values()) )
+# elements dictionary, max. angular momenta, number of radial channels
+(el_dict, lmax, nmax) = basis_read(basisfilename)
+if list(elements) != list(el_dict.values()):
+    print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
     exit(1)
 llmax = max(lmax.values())
 

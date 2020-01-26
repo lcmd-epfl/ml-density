@@ -26,37 +26,37 @@ goodoverfilebase = conf.paths['goodover_base']
 avdir            = conf.paths['averages_dir']
 
 # number of molecules, number of atoms in each molecule, atomic numbers
-(ndata, natoms, atomic_numbers) = moldata_read(xyzfilename)
+(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 
-# species dictionary, max. angular momenta, number of radial channels
-(basis, spe_dict, lmax, nmax) = basis_read_full(basisfilename)
+# elements dictionary, max. angular momenta, number of radial channels
+(basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
 
 # load predicted coefficients for test structures
 trainrangetot = np.loadtxt(trainfilename,int)
-testrange = np.setdiff1d(range(ndata),trainrangetot)
+testrange = np.setdiff1d(range(nmol),trainrangetot)
 
 coeffs_unraveled = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 
 av_coefs = {}
-for spe in spe_dict.values():
-    av_coefs[spe] = np.load(avdir+chemical_symbols[spe]+".npy")
+for q in el_dict.values():
+    av_coefs[q] = np.load(avdir+chemical_symbols[q]+".npy")
 
 itest = 0
 error_sum = 0.0
 STD_bl = 0.0
 STD = 0.0
-for iconf in testrange:
-    atoms = atomic_numbers[iconf]
+for imol in testrange:
+    atoms = atomic_numbers[imol]
     #================================================
-    overl      = np.load(goodoverfilebase+str(iconf)+".npy")
-    coeffs_ref = np.load(goodcoeffilebase+str(iconf)+".npy")
+    overl      = np.load(goodoverfilebase+str(imol)+".npy")
+    coeffs_ref = np.load(goodcoeffilebase+str(imol)+".npy")
     size_coeffs = coeffs_ref.shape
 
 
     averages  = np.zeros(size_coeffs,float)
     coeffs_bl = np.zeros(size_coeffs,float)
     icoeff = 0
-    for iat in range(natoms[iconf]):
+    for iat in range(natoms[imol]):
         for l in range(lmax[atoms[iat]]+1):
             for n in range(nmax[(atoms[iat],l)]):
                 for im in range(2*l+1):
@@ -82,8 +82,8 @@ for iconf in testrange:
     strg = "mol # %*i (%*i):  %8.3f %%  %.2e %%    ( %.2e )   %8.4f / %8.4f ( %3d )"%(
         len(str(len(testrange))),
         itest,
-        len(str(ndata)),
-        iconf,
+        len(str(nmol)),
+        imol,
         (error/norm_bl)*100.0,
         (error/norm)*100.0,
         error,
