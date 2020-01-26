@@ -22,12 +22,17 @@ baselinedwbase   = conf.paths['baselined_w_base']
 nenv = {}
 atomic_numbers_joined = [item for sublist in atomic_numbers for item in sublist]
 elements_in_set = list(set(atomic_numbers_joined))
+elements_in_set.sort()
 for q in elements_in_set:
     nenv[q] = atomic_numbers_joined.count(q)
     print(chemical_symbols[q], nenv[q])
 
 # elements dictionary, max. angular momenta, number of radial channels
 (el_dict, lmax, nmax) = basis_read(basisfilename)
+
+if elements_in_set != list(el_dict.values()):
+  print("different elements in the molecules and in the basis:", elements_in_set, "and", list(el_dict.values()) )
+  exit(1)
 
 av_coefs = {}
 for q in el_dict.values():

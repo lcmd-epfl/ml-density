@@ -95,7 +95,7 @@ for imol in testrange:
     itest += 1
 
 print()
-print("%% RMSE = %8.3f %%  %.2e %%    ( %.2e )" % (
+print("%% RMSE = %.2e %%  %.2e %%    ( %.2e )" % (
       (error_sum/STD_bl)*100.0,
       (error_sum/STD)*100.0,
       error_sum/len(testrange)
