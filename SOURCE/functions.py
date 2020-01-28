@@ -15,15 +15,15 @@ def basis_info(el_dict, lmax, nmax):
     nel = len(el_dict)
     llmax = max(lmax.values())
     bsize = np.zeros(nel,int)
-    almax = np.zeros(nel,int)
-    anmax = np.zeros((nel,llmax+1),int)
+    alnum = np.zeros(nel,int)
+    annum = np.zeros((nel,llmax+1),int)
     for iel in range(nel):
         q = el_dict[iel]
-        almax[iel] = lmax[q]+1
+        alnum[iel] = lmax[q]+1
         for l in range(lmax[q]+1):
-            anmax[iel,l] = nmax[(q,l)]
+            annum[iel,l] = nmax[(q,l)]
             bsize[iel] += nmax[(q,l)]*(2*l+1)
-    return [bsize, almax, anmax]
+    return [bsize, alnum, annum]
 
 def get_kernel_sizes(myrange, ref_elements, el_dict, M, lmax, atom_counting):
     kernel_sizes = np.zeros(len(myrange),int)
@@ -60,20 +60,20 @@ def get_atomicindx(nmol,nel,natmax,atom_counting,el_list_per_conf):
     atomicindx = np.zeros((nmol,nel,natmax),int)
     for imol in range(nmol):
         for iel in range(nel):
-            indexes = [i for i,x in enumerate(el_list_per_conf[imol]) if x==iel]
+            indices = [i for i,x in enumerate(el_list_per_conf[imol]) if x==iel]
             for icount in range(atom_counting[imol,iel]):
-                atomicindx[imol,iel,icount] = indexes[icount]
+                atomicindx[imol,iel,icount] = indices[icount]
     return atomicindx
 
-def unravel_weights(M, llmax, nnmax, ref_elements, anmax, almax, weights):
+def unravel_weights(M, llmax, nnmax, ref_elements, annum, alnum, weights):
     w = np.zeros((M,llmax+1,nnmax,2*llmax+1),float)
     i = 0
     for ienv in range(M):
         iel = ref_elements[ienv]
-        al = almax[iel]
+        al = alnum[iel]
         for l in range(al):
             msize = 2*l+1
-            anc = anmax[iel,l]
+            anc = annum[iel,l]
             for n in range(anc):
                 for im in range(msize):
                     w[ienv,l,n,im] = weights[i]

@@ -26,7 +26,7 @@ def run_prediction(
   # basis set size
   llmax = max(lmax.values())
   nnmax = max(nmax.values())
-  [bsize, almax, anmax] = basis_info(el_dict, lmax, nmax)
+  [bsize, alnum, annum] = basis_info(el_dict, lmax, nmax)
 
   # reference environments
   ref_elements = np.loadtxt(elselfilename, int)
@@ -36,9 +36,11 @@ def run_prediction(
 
   # regression weights
   weights = np.load(weightsfilename)
-  w = unravel_weights(M, llmax, nnmax, ref_elements, anmax, almax, weights)
+  w = unravel_weights(M, llmax, nnmax, ref_elements, annum, alnum, weights)
 
   array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
+  array_2d_int    = npct.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
+  array_3d_int    = npct.ndpointer(dtype=np.uint32,  ndim=3, flags='CONTIGUOUS')
   array_4d_double = npct.ndpointer(dtype=np.float64, ndim=4, flags='CONTIGUOUS')
   array_5d_double = npct.ndpointer(dtype=np.float64, ndim=5, flags='CONTIGUOUS')
 
@@ -51,14 +53,14 @@ def run_prediction(
     ctypes.c_int,
     ctypes.c_int,
     ctypes.c_int,
+    array_3d_int,
+    array_2d_int,
     array_1d_int,
     array_1d_int,
     array_1d_int,
     array_1d_int,
     array_1d_int,
-    array_1d_int,
-    array_1d_int,
-    array_1d_int,
+    array_2d_int,
     array_4d_double,
     array_5d_double,
     ctypes.c_char_p ]
@@ -72,15 +74,15 @@ def run_prediction(
       M       ,
       nmol    ,
       natmax  ,
-      atomicindx.flatten().astype(np.uint32)            ,
-      atom_counting.flatten().astype(np.uint32)         ,
-      test_configs.astype(np.uint32)                    ,
-      natoms.astype(np.uint32)                          ,
-      kernel_sizes.astype(np.uint32)                    ,
-      ref_elements.astype(np.uint32)                     ,
-      almax.astype(np.uint32)                           ,
-      anmax.flatten().astype(np.uint32)                 ,
-      w, coeffs, kernelbase.encode('ascii')             )
+      atomicindx.astype(np.uint32)          ,
+      atom_counting.astype(np.uint32)       ,
+      test_configs.astype(np.uint32)        ,
+      natoms.astype(np.uint32)              ,
+      kernel_sizes.astype(np.uint32)        ,
+      ref_elements.astype(np.uint32)        ,
+      alnum.astype(np.uint32)               ,
+      annum.astype(np.uint32)               ,
+      w, coeffs, kernelbase.encode('ascii') )
 
   np.save(predictfilename, coeffs)
   return

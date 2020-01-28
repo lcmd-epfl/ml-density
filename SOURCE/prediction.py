@@ -43,7 +43,7 @@ natoms_test = natoms[test_configs]
 print("Number of training molecules =", ntrain)
 print("Number of testing molecules =", ntest)
 
-# define testing indexes
+# define testing indices
 atomicindx_test = atomicindx[test_configs,:,:]
 atom_counting_test = atom_counting[test_configs]
 

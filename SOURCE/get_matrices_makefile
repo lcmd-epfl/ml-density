@@ -17,7 +17,7 @@ W= -Warray-bounds -Wmaybe-uninitialized -Wmissing-braces -Wparentheses -Wsequenc
 
 all: get_matrices.so
 
-%.so: %.o
+%.so: %.o mylib.o
 	$(CC) $^ -shared -Wl,-soname,$@ -o $@
 %.o: %.c
 	$(CC) $(DEF) $(OMPFLAG) $(W) $^ -c --std=gnu11 -O2 -fPIC -o $@

@@ -59,7 +59,7 @@ if list(elements) != list(el_dict.values()):
 
 # basis set size
 llmax = max(lmax.values())
-[bsize, almax, anmax] = basis_info(el_dict, lmax, nmax);
+[bsize, alnum, annum] = basis_info(el_dict, lmax, nmax);
 totsize = sum(bsize[ref_elements])
 
 #===============================================================
@@ -69,6 +69,7 @@ Avec = np.loadtxt(avecfile)
 mat  = np.zeros((totsize,totsize))
 
 array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
+array_2d_int    = npct.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
 array_2d_double = npct.ndpointer(dtype=np.float64, ndim=2, flags='CONTIGUOUS')
 array_3d_double = npct.ndpointer(dtype=np.float64, ndim=3, flags='CONTIGUOUS')
 regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/regression.so")
@@ -79,7 +80,7 @@ regression.make_matrix.argtypes = [
   ctypes.c_int,
   array_1d_int,
   array_1d_int,
-  array_1d_int,
+  array_2d_int,
   array_3d_double,
   array_2d_double,
   ctypes.c_double,
@@ -91,8 +92,8 @@ ret = regression.make_matrix(
       llmax  ,
       M      ,
       ref_elements.astype(np.uint32),
-      almax.astype(np.uint32),
-      anmax.flatten().astype(np.uint32),
+      alnum.astype(np.uint32),
+      annum.astype(np.uint32),
       k_MM, mat, reg, jit,
       bmatfile.encode('ascii'))
 

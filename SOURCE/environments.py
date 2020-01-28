@@ -52,7 +52,7 @@ for i in el_list_per_conf.values():
   el_list += i
 el_array = np.asarray(el_list,int)
 
-#===================== atomic indexes sorted by elements
+#===================== atomic indices sorted by elements
 atomicindx = get_atomicindx(nmol,nel,natmax,atom_counting,el_list_per_conf)
 
 #====================== environmental power spectrum
@@ -64,9 +64,9 @@ for imol in range(nmol):
     reorder_ps(power_env[ienv:ienv+natoms[imol]], power[imol], nel, atom_counting[imol], atomicindx[imol])
     ienv += natoms[imol]
 
-ref_indexes, measure = do_fps(power_env,M)
-ref_elements = el_array[ref_indexes]
-np.savetxt(refsselfilebase+str(M)+".txt",ref_indexes,fmt='%i')
+ref_indices, measure = do_fps(power_env,M)
+ref_elements = el_array[ref_indices]
+np.savetxt(refsselfilebase+str(M)+".txt",ref_indices,fmt='%i')
 np.savetxt(elselfilebase+str(M)+".txt",ref_elements,fmt='%i')
 
 for i in range(1,M):
@@ -78,7 +78,7 @@ for i in range(nel):
   n2 = el_list.count(i)
   print('#', chemical_symbols[elements[i]]+':', n1, '/', n2, "(%.1f%%)"%(100.0*n1/n2) )
 
-nuniq = len(np.unique(ref_indexes))
-if nuniq != len(ref_indexes):
+nuniq = len(np.unique(ref_indices))
+if nuniq != len(ref_indices):
     print('warning: i have found only', nuniq, 'unique environments')
 

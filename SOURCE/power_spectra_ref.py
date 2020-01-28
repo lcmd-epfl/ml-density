@@ -32,7 +32,7 @@ nel = len(elements)
 atomicindx = get_atomicindx(nmol, nel, natmax, atom_counting, el_list_per_conf)
 
 #====================================== reference environments
-ref_indexes = np.loadtxt(refsselfilebase+str(M)+".txt",int)
+ref_indices = np.loadtxt(refsselfilebase+str(M)+".txt",int)
 
 # elements dictionary, max. angular momenta, number of radial channels
 (el_dict, lmax, nmax) = basis_read(basisfilename)
@@ -42,14 +42,14 @@ if list(elements) != list(el_dict.values()):
 llmax = max(lmax.values())
 
 
-ref_indexes = list(ref_indexes)
+ref_indices = list(ref_indices)
 ref_imol = [None]*M
 ref_iat  = [None]*M
 ienv = 0
 for imol in range(nmol):
     for iat in range(natoms[imol]):
-        if ienv in ref_indexes:
-             ind = ref_indexes.index(ienv)
+        if ienv in ref_indices:
+             ind = ref_indices.index(ienv)
              ref_imol[ind] = imol
              ref_iat [ind] = iat
         ienv += 1

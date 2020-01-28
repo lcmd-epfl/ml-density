@@ -5,9 +5,9 @@ W= -Warray-bounds -Wmaybe-uninitialized -Wmissing-braces -Wparentheses -Wsequenc
 
 all: regression.so
 
-%.so: %.o
+%.so: %.o mylib.o
 	$(CC) $^ -shared -Wl,-soname,$@ -o $@
-%.o: %.c
+%.o: %.c 
 	$(CC) $(W) $^ -c --std=gnu11 -fPIC -O2 -o $@
 
 clean:
