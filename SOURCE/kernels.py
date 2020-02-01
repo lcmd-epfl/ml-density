@@ -53,10 +53,6 @@ for l in range(llmax+1):
 #------------------------------------------------------------------------
 
 def kernel_for_mol(imol):
-    if USEMPI==0:
-      print_progress(imol, nmol)
-    else:
-      print(nproc, ':', imol-start[nproc], flush=1)
 
     kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(M, natoms[imol], llmax, lmax, ref_elements, el_dict, atom_counting[imol])
 
@@ -70,8 +66,9 @@ def kernel_for_mol(imol):
 #------------------------------------------------------------------------
 
 if USEMPI==0:
-    for imol in range(nmol):
-        kernel_for_mol(imol)
+  for imol in range(nmol):
+    print_progress(imol, nmol)
+    kernel_for_mol(imol)
 
 else:
   from mpi4py import MPI
@@ -90,12 +87,27 @@ else:
     comm.send(msg, dest=0)
   comm.barrier()
 
-  start = [0]*(Nproc+1)
-  div = nmol//Nproc
-  rem = nmol%Nproc
-  for i in range(0,Nproc):
-    start[i+1] = start[i] + ( (div+1) if (i<rem) else div )
-  for imol in range(start[nproc], start[nproc+1]):
-    kernel_for_mol(imol)
-  print(nproc, ':', 'finished')
+  if Nproc == 1:
+    for imol in range(nmol):
+      print_progress(imol, nmol)
+      kernel_for_mol(imol)
+
+  else:
+
+    if nproc == 0:
+      for imol in range(nmol+Nproc-1):
+        (npr, im) = comm.recv(source=MPI.ANY_SOURCE)
+        im = imol if imol<nmol else -1
+        comm.send(im, dest=npr);
+        print("sent", npr, ':', im, flush=1)
+
+    else:
+      imol = -1
+      while True:
+        comm.send((nproc, imol), dest=0)
+        imol = comm.recv(source=0)
+        if(imol<0):
+          break
+        kernel_for_mol(imol)
+      print(nproc, ':', 'finished')
 

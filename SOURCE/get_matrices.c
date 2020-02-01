@@ -11,42 +11,17 @@ int nproc;
 #define SPARSEIND(L,N,IAT) ( ((L) * nnmax + (N)) * nat + (IAT) )
 #define KSPARSEIND(IREF,L,M,ICSPE) ( (((IREF) * (llmax+1) + (L)) *(2*llmax+1) + (M)) * nat + (ICSPE) )
 
-static void print_mem(
-    const int totsize ,
-    const int llmax   ,
-    const int nnmax   ,
-    const int M       ,
-    const int ntrain  ,
-    const int natmax  ,
-    const unsigned int const totalsizes[ntrain],
-    const unsigned int const kernsizes [ntrain],
-    const size_t bufsize,
-    FILE * f){
+static void print_mem(const int totsize, const int ntrain, FILE * f){
 
   const double b2mib = 1.0/(1<<20);
   const double b2gib = 1.0/(1<<30);
+  size_t size = (symsize(totsize))*sizeof(double);
 
-  size_t size1 = (symsize(totsize))*sizeof(double);
-  size_t size2 = 0;
-  size_t size3 = sizeof(int)*(llmax+1)*nnmax*natmax + sizeof(int)*M*(llmax+1)*(2*llmax+1)*natmax + sizeof(ao_t)*totsize;
-  size_t size4 = sizeof(double) * bufsize;
-  for(int imol=0; imol<ntrain; imol++){
-    size_t t2 = totalsizes[imol]*totalsizes[imol] + kernsizes[imol];
-    if(t2>size2) size2 = t2;
-  }
-  size2 *= sizeof(double);
-
-  fprintf(f, "\nProblem dimensionality = %d\nNumber of training molecules = %d\n\n\
-      output: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
-      input : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
-      inner : %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\
-      buffer: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\n",
-      totsize, ntrain,
-      size1, size1*b2mib, size1*b2gib,
-      size2, size2*b2mib, size2*b2gib,
-      size3, size3*b2mib, size3*b2gib,
-      size4, size4*b2mib, size4*b2gib
-      );
+  fprintf(f, "\
+      Problem dimensionality = %d\n\
+      Number of training molecules = %d\n\
+      output: %16zu bytes (%10.2lf MiB, %6.2lf GiB)\n\n",
+      totsize, ntrain, size, size*b2mib, size*b2gib);
   fflush(f);
   return;
 }
@@ -71,9 +46,31 @@ static void print_nodes(FILE * f){
       MPI_Recv(buf, sizeof(buf), MPI_CHAR, i, 0, MPI_COMM_WORLD, &status);
       fputs(buf, f);
     }
+    fputs("\n", f);
   }
   return;
 }
+
+static void send_jobs(const int ntrain){
+  for(int imol=0; imol<ntrain+Nproc-1; imol++){
+    MPI_Status status;
+    int p[2];
+    MPI_Recv(p, 2, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+    p[1] = (imol<ntrain) ? imol : -1;
+    MPI_Send(p, 2, MPI_INT, p[0], 0, MPI_COMM_WORLD);
+    printf("%4d: %4d\n", p[0], p[1]);
+  }
+  return;
+}
+
+static int receive_job(int imol){
+  int p[] = {nproc, imol};
+  MPI_Status status;
+  MPI_Send(p, 2, MPI_INT, 0, 0, MPI_COMM_WORLD);
+  MPI_Recv(p, 2, MPI_INT, 0, 0, MPI_COMM_WORLD, &status);
+  return p[1];
+}
+
 #endif
 
 static void vec_print(size_t n, double * v, const char * mode, const char * fname){
@@ -132,7 +129,7 @@ static int * sparseindices_fill(
     const int nnmax,
     const unsigned int const alnum[],           //  nelem
     const unsigned int const annum[][llmax+1],  //  nelem*(llmax+1)
-    const unsigned int const atom_elem[]        // natmax
+    const unsigned int const atom_elem[]        //  natmax
     ){
 
   int * sparseindices = calloc((llmax+1) * nnmax * nat, sizeof(int));
@@ -180,215 +177,160 @@ static int * kernsparseindices_fill(
 }
 
 static void do_work_a(
-    const int from, const int to,
-    const int totsize  ,
-    const int nelem ,
-    const int llmax    ,
-    const int nnmax    ,
-    const int M        ,
-    const int natmax   ,
-    const unsigned int const atomicindx[][nelem][natmax], //  ntrain*nelem*natmax
-    const unsigned int const atomcount [][nelem],         //  ntrain*nelem
-    const unsigned int const trrange   [],                //  ntrain
-    const unsigned int const natoms    [],                //  ntrain
-    const unsigned int const totalsizes[],                //  ntrain
-    const unsigned int const kernsizes [],                //  ntrain
-    const unsigned int const atom_elem [][natmax],        //  ntrain*natmax
+    const unsigned int totsize,
+    const unsigned int nelem,
+    const unsigned int llmax,
+    const unsigned int nnmax,
+    const unsigned int M,
+    const unsigned int natmax,
+    const unsigned int nat,
+    const unsigned int conf,
+    const unsigned int nao,
+    const unsigned int kernsize,
+    const unsigned int const atomicindx[nelem][natmax],
+    const unsigned int const atomcount [nelem],
+    const unsigned int const atom_elem [natmax],
     const unsigned int const ref_elem  [M],
     const unsigned int const alnum     [nelem],
     const unsigned int const annum     [nelem][llmax+1],
+    const ao_t         const aoref     [totsize],
     const char * const path_proj,
     const char * const path_kern,
     double * Avec){
 
-  if(to==from){
-    return;
-  }
+  char file_proj[512], file_kern[512];
+  sprintf(file_proj, "%s%d.dat", path_proj, conf);
+  sprintf(file_kern, "%s%d.dat", path_kern, conf);
 
-  ao_t * aoref = ao_fill(totsize, llmax, M, ref_elem, alnum, annum);
+  double * projections = vec_readtxt(nao, file_proj);
+  double * kernels     = vec_readtxt(kernsize, file_kern);
 
-  for(int imol=from; imol<to; imol++){
-
-    printf("%4d: %4d\n", nproc, imol-from);
-
-    const int nat = natoms[imol];
-    const int nao = totalsizes[imol];
-
-    const int conf = trrange[imol];
-    char file_proj[512], file_kern[512];
-    sprintf(file_proj, "%s%d.dat", path_proj, conf);
-    sprintf(file_kern, "%s%d.dat", path_kern, conf);
-
-    double * projections = vec_readtxt(nao, file_proj);
-    double * kernels     = vec_readtxt(kernsizes[imol], file_kern);
-
-    int * sparseindices = sparseindices_fill(nat, llmax, nnmax, alnum, annum, atom_elem[imol]);
-    int * kernsparseindices = kernsparseindices_fill(nat, llmax , M, atomcount[imol], ref_elem , alnum);
+  int * sparseindices = sparseindices_fill(nat, llmax, nnmax, alnum, annum, atom_elem);
+  int * kernsparseindices = kernsparseindices_fill(nat, llmax , M, atomcount, ref_elem , alnum);
 
 #pragma omp parallel shared(Avec)
 #pragma omp for schedule(dynamic)
-    for(int i1=0; i1<totsize; i1++){
-      int iref1 = aoref[i1].iref;
-      int im1   = aoref[i1].im;
-      int n1    = aoref[i1].n;
-      int l1    = aoref[i1].l;
-      int a1    = aoref[i1].a;
-      int msize1 = 2*l1+1;
-      double dA = 0.0;
-      for(int icel1=0; icel1<atomcount[imol][a1]; icel1++){
-        int iat = atomicindx[imol][a1][icel1];
-        int sk1 = kernsparseindices[KSPARSEIND(iref1,l1,im1,icel1)];
-        int sp1 = sparseindices    [SPARSEIND(l1,n1,iat)];
-        for(int imm1=0; imm1<msize1; imm1++){
-          dA += projections[sp1+imm1] * kernels[sk1+imm1];
-        }
+  for(int i1=0; i1<totsize; i1++){
+    int iref1 = aoref[i1].iref;
+    int im1   = aoref[i1].im;
+    int n1    = aoref[i1].n;
+    int l1    = aoref[i1].l;
+    int a1    = aoref[i1].a;
+    int msize1 = 2*l1+1;
+    double dA = 0.0;
+    for(int icel1=0; icel1<atomcount[a1]; icel1++){
+      int iat = atomicindx[a1][icel1];
+      int sk1 = kernsparseindices[KSPARSEIND(iref1,l1,im1,icel1)];
+      int sp1 = sparseindices    [SPARSEIND(l1,n1,iat)];
+      for(int imm1=0; imm1<msize1; imm1++){
+        dA += projections[sp1+imm1] * kernels[sk1+imm1];
       }
-      Avec[i1] += dA;
     }
-    free(kernsparseindices);
-    free(sparseindices);
-    free(projections);
-    free(kernels);
+    Avec[i1] += dA;
   }
-  printf("%4d: finished work\n", nproc);
+  free(kernsparseindices);
+  free(sparseindices);
+  free(projections);
+  free(kernels);
 
-  free(aoref);
   return;
 }
 
 static void do_work_b(
-    const int from, const int to,
-    const int totsize,
-    const int nelem  ,
-    const int llmax  ,
-    const int nnmax  ,
-    const int M      ,
-    const int natmax ,
-    const unsigned int const atomicindx[][nelem][natmax], //  ntrain*nelem*natmax
-    const unsigned int const atomcount [][nelem],         //  ntrain*nelem
-    const unsigned int const trrange   [],                //  ntrain
-    const unsigned int const natoms    [],                //  ntrain
-    const unsigned int const totalsizes[],                //  ntrain
-    const unsigned int const kernsizes [],                //  ntrain
-    const unsigned int const atom_elem [][natmax],        //  ntrain*natmax
+    const unsigned int totsize,
+    const unsigned int nelem,
+    const unsigned int llmax,
+    const unsigned int nnmax,
+    const unsigned int M,
+    const unsigned int natmax,
+    const unsigned int nat,
+    const unsigned int conf,
+    const unsigned int nao,
+    const unsigned int kernsize,
+    const unsigned int const atomicindx[nelem][natmax],
+    const unsigned int const atomcount [nelem],
+    const unsigned int const atom_elem [natmax],
     const unsigned int const ref_elem  [M],
     const unsigned int const alnum     [nelem],
     const unsigned int const annum     [nelem][llmax+1],
+    const ao_t         const aoref     [totsize],
     const char * const path_over,
     const char * const path_kern,
     double * Bmat){
 
-  if(to==from){
-    return;
-  }
+  char file_over[512], file_kern[512];
+  sprintf(file_over, "%s%d.npy", path_over, conf);
+  sprintf(file_kern, "%s%d.dat", path_kern, conf);
 
-  ao_t * aoref = malloc(sizeof(ao_t)*totsize);
+  double * overlaps = npy_read(nao*nao, file_over);
+  double * kernels  = vec_readtxt(kernsize, file_kern);
 
-  int i = 0;
-  for(int iref=0; iref<M; iref++){
-    int a = ref_elem[iref];
-    int al = alnum[a];
-    for(int l=0; l<al; l++){
-      int msize = 2*l+1;
-      int anc   = annum[a][l];
-      for(int n=0; n<anc; n++){
-        for(int im=0; im<msize; im++){
-          aoref[i].im   = im;
-          aoref[i].n    = n;
-          aoref[i].l    = l;
-          aoref[i].a    = a;
-          aoref[i].iref = iref;
-          i++;
-        }
-      }
-    }
-  }
-
-  for(int imol=from; imol<to; imol++){
-
-    printf("%4d: %4d\n", nproc, imol-from);
-
-    const int nat = natoms[imol];
-    const int nao = totalsizes[imol];
-
-    const int conf = trrange[imol];
-    char file_over[512], file_kern[512];
-    sprintf(file_over, "%s%d.npy", path_over, conf);
-    sprintf(file_kern, "%s%d.dat", path_kern, conf);
-
-    double * overlaps = npy_read(nao*nao, file_over);
-    double * kernels  = vec_readtxt(kernsizes[imol], file_kern);
-
-    int * sparseindices = sparseindices_fill(nat, llmax, nnmax, alnum, annum, atom_elem[imol]);
-    int * kernsparseindices = kernsparseindices_fill(nat, llmax , M, atomcount[imol], ref_elem , alnum);
+  int * sparseindices = sparseindices_fill(nat, llmax, nnmax, alnum, annum, atom_elem);
+  int * kernsparseindices = kernsparseindices_fill(nat, llmax , M, atomcount, ref_elem , alnum);
 
 #pragma omp parallel shared(Bmat)
 #pragma omp for schedule(dynamic)
-    for(int i1=0; i1<totsize; i1++){
-      int iref1 = aoref[i1].iref;
-      int im1   = aoref[i1].im;
-      int n1    = aoref[i1].n;
-      int l1    = aoref[i1].l;
-      int a1    = aoref[i1].a;
-      int msize1 = 2*l1+1;
+  for(int i1=0; i1<totsize; i1++){
+    int iref1 = aoref[i1].iref;
+    int im1   = aoref[i1].im;
+    int n1    = aoref[i1].n;
+    int l1    = aoref[i1].l;
+    int a1    = aoref[i1].a;
+    int msize1 = 2*l1+1;
 
-      for(int i2=i1; i2<totsize; i2++){
-        int iref2 = aoref[i2].iref;
-        int im2   = aoref[i2].im;
-        int n2    = aoref[i2].n;
-        int l2    = aoref[i2].l;
-        int a2    = aoref[i2].a;
-        int msize2 = 2*l2+1;
-        double dB = 0.0;
-        for(int icel1=0; icel1<atomcount[imol][a1]; icel1++){
-          int iat = atomicindx[imol][a1][icel1];
-          int sk1 = kernsparseindices[KSPARSEIND(iref1, l1, im1, icel1)];
-          int sp1 = sparseindices    [SPARSEIND(l1,n1,iat)];
-          for(int imm1=0; imm1<msize1; imm1++){
-            double Btemp = 0.0;
-            for(int icel2=0; icel2<atomcount[imol][a2]; icel2++){
-              int jat = atomicindx[imol][a2][icel2];
-              int sk2 = kernsparseindices[KSPARSEIND(iref2, l2, im2, icel2)];
-              int sp2 = sparseindices    [SPARSEIND(l2,n2,jat)];
-              for(int imm2=0; imm2<msize2; imm2++){
-                Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2+imm2];
-              }
+    for(int i2=i1; i2<totsize; i2++){
+      int iref2 = aoref[i2].iref;
+      int im2   = aoref[i2].im;
+      int n2    = aoref[i2].n;
+      int l2    = aoref[i2].l;
+      int a2    = aoref[i2].a;
+      int msize2 = 2*l2+1;
+      double dB = 0.0;
+      for(int icel1=0; icel1<atomcount[a1]; icel1++){
+        int iat = atomicindx[a1][icel1];
+        int sk1 = kernsparseindices[KSPARSEIND(iref1, l1, im1, icel1)];
+        int sp1 = sparseindices    [SPARSEIND(l1,n1,iat)];
+        for(int imm1=0; imm1<msize1; imm1++){
+          double Btemp = 0.0;
+          for(int icel2=0; icel2<atomcount[a2]; icel2++){
+            int jat = atomicindx[a2][icel2];
+            int sk2 = kernsparseindices[KSPARSEIND(iref2, l2, im2, icel2)];
+            int sp2 = sparseindices    [SPARSEIND(l2,n2,jat)];
+            for(int imm2=0; imm2<msize2; imm2++){
+              Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2+imm2];
             }
-            dB += Btemp * kernels[sk1+imm1];
           }
+          dB += Btemp * kernels[sk1+imm1];
         }
-        Bmat[mpos(i1,i2)] += dB;
       }
+      Bmat[mpos(i1,i2)] += dB;
     }
-    free(kernsparseindices);
-    free(sparseindices);
-    free(overlaps);
-    free(kernels);
   }
-  printf("%4d: finished work\n", nproc);
-
-  free(aoref);
+  free(kernsparseindices);
+  free(sparseindices);
+  free(overlaps);
+  free(kernels);
   return;
 }
 
 int get_a(
-    const int totsize  ,
-    const int nelem ,
-    const int llmax    ,
-    const int nnmax    ,
-    const int M        ,
-    const int ntrain   ,
-    const int natmax   ,
+    const unsigned int totsize,
+    const unsigned int nelem,
+    const unsigned int llmax,
+    const unsigned int nnmax,
+    const unsigned int M,
+    const unsigned int ntrain,
+    const unsigned int natmax,
     const unsigned int const atomicindx[ntrain][nelem][natmax],  //  ntrain*nelem*natmax
-    const unsigned int const atomcount [ntrain][nelem],  //  ntrain*nelem
-    const unsigned int const trrange   [ntrain],  //  ntrain
-    const unsigned int const natoms    [ntrain],  //  ntrain
-    const unsigned int const totalsizes[ntrain],  //  ntrain
-    const unsigned int const kernsizes [ntrain],  //  ntrain
-    const unsigned int const atom_elem   [ntrain][natmax]   ,  //  ntrain*natmax
-    const unsigned int const ref_elem [M],  //  M
-    const unsigned int const alnum     [nelem]     ,  //  nelem
-    const unsigned int const annum     [nelem][llmax+1],  //  nelem*(llmax+1)
+    const unsigned int const atomcount [ntrain][nelem],          //  ntrain*nelem
+    const unsigned int const trrange   [ntrain],                 //  ntrain
+    const unsigned int const natoms    [ntrain],                 //  ntrain
+    const unsigned int const totalsizes[ntrain],                 //  ntrain
+    const unsigned int const kernsizes [ntrain],                 //  ntrain
+    const unsigned int const atom_elem [ntrain][natmax],         //  ntrain*natmax
+    const unsigned int const ref_elem  [M],                      //  M
+    const unsigned int const alnum     [nelem],                  //  nelem
+    const unsigned int const annum     [nelem][llmax+1],         //  nelem*(llmax+1)
     const char * const path_proj,
     const char * const path_kern,
     const char * const path_avec
@@ -416,35 +358,73 @@ int get_a(
 #endif
 
   double * Avec = calloc(sizeof(double)*totsize, 1);
+  ao_t * aoref = ao_fill(totsize, llmax, M, ref_elem, alnum, annum);
 
-  int start[Nproc+1];
-  int div = ntrain/Nproc;
-  int rem = ntrain%Nproc;
-  start[0] = 0;
-  for(int i=0; i<Nproc; i++){
-    start[i+1] = start[i] + ( (i<rem) ? (div+1) : div );
+  if(Nproc==1){
+    for(int imol=0; imol<ntrain; imol++){
+      printf("%4d: %4d\n", nproc, imol);
+      do_work_a(
+          totsize,
+          nelem  ,
+          llmax  ,
+          nnmax  ,
+          M      ,
+          natmax ,
+          natoms    [imol],
+          trrange   [imol],
+          totalsizes[imol],
+          kernsizes [imol],
+          atomicindx[imol],
+          atomcount [imol],
+          atom_elem [imol],
+          ref_elem  ,
+          alnum     ,
+          annum     ,
+          aoref     ,
+          path_proj,
+          path_kern,
+          Avec);
+    }
   }
-
-  do_work_a(start[nproc], start[nproc+1],
-      totsize ,
-      nelem,
-      llmax   ,
-      nnmax   ,
-      M       ,
-      natmax  ,
-      atomicindx,
-      atomcount ,
-      trrange   ,
-      natoms    ,
-      totalsizes,
-      kernsizes ,
-      atom_elem   ,
-      ref_elem ,
-      alnum     ,
-      annum     ,
-      path_proj,
-      path_kern,
-      Avec);
+#ifdef USE_MPI
+  else{
+    if(!nproc){
+      send_jobs(ntrain);
+    }
+    else{
+      int imol = -1;
+      while(1){
+        imol = receive_job(imol);
+        if(imol<0){
+          break;
+        }
+        do_work_a(
+            totsize,
+            nelem  ,
+            llmax  ,
+            nnmax  ,
+            M      ,
+            natmax ,
+            natoms    [imol],
+            trrange   [imol],
+            totalsizes[imol],
+            kernsizes [imol],
+            atomicindx[imol],
+            atomcount [imol],
+            atom_elem [imol],
+            ref_elem  ,
+            alnum     ,
+            annum     ,
+            aoref     ,
+            path_proj,
+            path_kern,
+            Avec);
+      }
+      printf("%4d: finished work\n", nproc);
+    }
+  }
+#endif
+  free(aoref);
 
 #ifdef USE_MPI
   MPI_Barrier(MPI_COMM_WORLD);
@@ -481,13 +461,13 @@ int get_a(
 }
 
 int get_b(
-    const int totsize,
-    const int nelem  ,
-    const int llmax  ,
-    const int nnmax  ,
-    const int M      ,
-    const int ntrain ,
-    const int natmax ,
+    const unsigned int totsize,
+    const unsigned int nelem  ,
+    const unsigned int llmax  ,
+    const unsigned int nnmax  ,
+    const unsigned int M      ,
+    const unsigned int ntrain ,
+    const unsigned int natmax ,
     const unsigned int const atomicindx[ntrain][nelem][natmax], // ntrain*nelem*natmax
     const unsigned int const atomcount [ntrain][nelem],         // ntrain*nelem
     const unsigned int const trrange   [ntrain],                // ntrain
@@ -527,42 +507,80 @@ int get_b(
 
   double t = 0.0;
   if(nproc == 0){
-    print_mem(totsize, llmax, nnmax, M, ntrain, natmax, totalsizes, kernsizes, bufsize, stdout);
+    print_mem(totsize, ntrain, stdout);
     t = MPI_Wtime ();
   }
   MPI_Barrier(MPI_COMM_WORLD);
 #endif
 
   double * Bmat = calloc(sizeof(double)*symsize(totsize), 1);
+  ao_t * aoref = ao_fill(totsize, llmax, M, ref_elem, alnum, annum);
 
-  int start[Nproc+1];
-  int div = ntrain/Nproc;
-  int rem = ntrain%Nproc;
-  start[0] = 0;
-  for(int i=0; i<Nproc; i++){
-    start[i+1] = start[i] + ( (i<rem) ? (div+1) : div );
+  if(Nproc==1){
+    for(int imol=0; imol<ntrain; imol++){
+      printf("%4d: %4d\n", nproc, imol);
+      do_work_b(
+          totsize,
+          nelem  ,
+          llmax  ,
+          nnmax  ,
+          M      ,
+          natmax ,
+          natoms    [imol],
+          trrange   [imol],
+          totalsizes[imol],
+          kernsizes [imol],
+          atomicindx[imol],
+          atomcount [imol],
+          atom_elem [imol],
+          ref_elem  ,
+          alnum     ,
+          annum     ,
+          aoref     ,
+          path_over,
+          path_kern,
+          Bmat);
+    }
   }
-
-  do_work_b(start[nproc], start[nproc+1],
-      totsize,
-      nelem  ,
-      llmax  ,
-      nnmax  ,
-      M      ,
-      natmax ,
-      atomicindx,
-      atomcount ,
-      trrange   ,
-      natoms    ,
-      totalsizes,
-      kernsizes ,
-      atom_elem ,
-      ref_elem  ,
-      alnum     ,
-      annum     ,
-      path_over,
-      path_kern,
-      Bmat);
+#ifdef USE_MPI
+  else{
+    if(!nproc){
+      send_jobs(ntrain);
+    }
+    else{
+      int imol = -1;
+      while(1){
+        imol = receive_job(imol);
+        if(imol<0){
+          break;
+        }
+        do_work_b(
+            totsize,
+            nelem  ,
+            llmax  ,
+            nnmax  ,
+            M      ,
+            natmax ,
+            natoms    [imol],
+            trrange   [imol],
+            totalsizes[imol],
+            kernsizes [imol],
+            atomicindx[imol],
+            atomcount [imol],
+            atom_elem [imol],
+            ref_elem  ,
+            alnum     ,
+            annum     ,
+            aoref     ,
+            path_over,
+            path_kern,
+            Bmat);
+      }
+      printf("%4d: finished work\n", nproc);
+    }
+  }
+#endif
+  free(aoref);
 
 #ifdef USE_MPI
   MPI_Barrier(MPI_COMM_WORLD);
