@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import numpy as np
 from config import Config
 from basis import basis_read
@@ -58,6 +59,8 @@ for imol in range(nmol):
     good_coef = coef[idx]
     np.save(goodcoeffilebase+str(imol)+".npy", good_coef)
 
+    if len(sys.argv)>1 and sys.argv[1][0].lower()=='c':
+      continue
     over      = np.load(overfilebase+str(imol)+".npy")
     over1     = (np.transpose(over)) [idx]
     good_over = (np.transpose(over1))[idx]
