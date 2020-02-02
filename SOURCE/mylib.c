@@ -38,10 +38,12 @@ double * vec_readtxt(int n, const char * fname){
   double * v = malloc(sizeof(double)*n);
   FILE   * f = fopen(fname, "r");
   if(!f){
+    fprintf(stderr, "cannot open file %s", fname);
     GOTOHELL;
   }
   for(int i=0; i<n; i++){
     if(fscanf(f, "%lf", v+i)!=1){
+      fprintf(stderr, "cannot read file %s line %d", fname, i+1);
       GOTOHELL;
     }
   }

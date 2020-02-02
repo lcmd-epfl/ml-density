@@ -80,6 +80,7 @@ static void vec_print(size_t n, double * v, const char * mode, const char * fnam
 
   FILE * f = fopen(fname, mode);
   if(!f){
+    fprintf(stderr, "cannot open file %s", fname);
     GOTOHELL;
   }
   for(int i=0; i<n; i++){
@@ -94,9 +95,11 @@ static void vec_write(size_t n, double * v, const char * mode, const char * fnam
 
   FILE * f = fopen(fname, mode);
   if(!f){
+    fprintf(stderr, "cannot open file %s", fname);
     GOTOHELL;
   }
   if(fwrite(v, sizeof(double), n, f) != n){
+    fprintf(stderr, "cannot write to file %s line %d", fname);
     GOTOHELL;
   }
   fclose(f);
@@ -108,21 +111,18 @@ static double * npy_read(int n, const char * fname){
   // read simple 1d / symmetric 2d arrays of doubles only
   static const size_t header_size = 128;
 
-  FILE * f = fopen(fname, "r");
-  if(!f){
-    return NULL;
-  }
-
-  fseek(f, header_size, SEEK_SET);
   double * v = calloc(n, sizeof(double));
-  int ret = fread(v, sizeof(double), n, f);
-  fclose(f);
-
-  if(ret!=n){
-    free(v);
-    return NULL;
+  FILE   * f = fopen(fname, "r");
+  if(!f){
+    fprintf(stderr, "cannot open file %s", fname);
+    GOTOHELL;
   }
-
+  if( fseek(f, header_size, SEEK_SET) ||
+      fread(v, sizeof(double), n, f)!=n){
+    fprintf(stderr, "cannot read file %s line %d", fname);
+    GOTOHELL;
+  }
+  fclose(f);
   return v;
 }
 

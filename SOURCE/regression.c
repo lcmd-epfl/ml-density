@@ -5,9 +5,11 @@ static double * vec_read(size_t n, const char * fname){
   double * v = malloc(sizeof(double)*n);
   FILE   * f = fopen(fname, "r");
   if(!f){
+    fprintf(stderr, "cannot open file %s", fname);
     GOTOHELL;
   }
   if(fread(v, sizeof(double), n, f) != n){
+    fprintf(stderr, "cannot read file %s", fname);
     GOTOHELL;
   }
   fclose(f);
