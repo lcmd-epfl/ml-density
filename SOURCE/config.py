@@ -8,7 +8,7 @@ class Config(object):
     self.paths   = dict(self.configuration.items('paths'))
 
   def get_option(self, key, default, ttype):
-    if key in self.options.keys():
+    if key in self.options:
       return ttype(self.options[key])
     else:
       return default

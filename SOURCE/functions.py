@@ -93,12 +93,10 @@ def nel_contrib(a):
 def number_of_electrons(basis, atoms, c):
   nel = 0.0
   i = 0
-  for iat in range(len(atoms)):
-    q = atoms[iat]
+  for q in atoms:
     for [l,gto] in basis[q]:
       if l==0:
-        for p in range(len(gto)):
-          a, w = gto[p]
+        for [a,w] in gto:
           nel += c[i] * w * nel_contrib(a)
         i+=1
       else:

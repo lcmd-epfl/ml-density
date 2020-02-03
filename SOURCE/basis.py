@@ -6,9 +6,8 @@ def basis_read(filename):
 
 def basis_read_full(filename):
 
-  f = open(filename, "r")
-  lines = [ i.strip() for i in f.read().split('\n') ];
-  f.close()
+  with open(filename, "r") as f:
+    lines = [ i.strip() for i in f.read().split('\n') ]
 
   el_dict = {}
   angular_momenta = {}
@@ -24,7 +23,7 @@ def basis_read_full(filename):
     if len(lines[i]) > 2 and lines[i][0:2] == 'O-':
       q = lines[i].split(' ')[1]
       q = atomic_numbers[q]
-      if q in angular_momenta.keys():
+      if q in angular_momenta:
         raise SystemExit(errormsg)
       el_dict[nelements] = q
       nelements += 1
@@ -60,7 +59,7 @@ def basis_read_full(filename):
   Lmax = {}
   Nmax = {}
 
-  for q in angular_momenta.keys():
+  for q in angular_momenta:
     lmax = max(angular_momenta[q])
     Lmax[q] = lmax
     for l in range(0,lmax+1):
@@ -69,7 +68,7 @@ def basis_read_full(filename):
   return (basis, el_dict, Lmax, Nmax)
 
 def basis_print(basis):
-  for q in basis.keys():
+  for q in basis:
     print(q)
     for gto in basis[q]:
       l = gto[0]
