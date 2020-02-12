@@ -1,5 +1,6 @@
 import numpy as np
 import ase.io
+from ase.data import chemical_symbols
 
 def moldata_read(xyzfilename):
   xyzfile = ase.io.read(xyzfilename,":")
@@ -102,4 +103,35 @@ def number_of_electrons(basis, atoms, c):
       else:
         i+=2*l+1
   return nel
+
+def averages_read(elements, avdir):
+  av_coefs = {}
+  for q in elements:
+    av_coefs[q] = np.load(avdir+chemical_symbols[q]+".npy")
+  return av_coefs
+
+
+def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs):
+
+    size = 0
+    for q in atoms:
+      for l in range(lmax[q]+1):
+        size += (2*l+1)*nmax[(q,l)]
+
+    rho = np.zeros(size)
+    i = 0
+    for iat,q in enumerate(atoms):
+      for l in range(lmax[q]+1):
+        msize = 2*l+1
+        for n in range(nmax[(q,l)]):
+          if l == 0 :
+            rho[i] = coeff[iat,l,n,0] + av_coefs[q][n]
+          elif l ==1 :
+            rho[i+1]=coeff[iat,l,n,0]
+            rho[i+2]=coeff[iat,l,n,1]
+            rho[i  ]=coeff[iat,l,n,2]
+          else:
+            rho[i:i+msize] = coeff[iat,l,n,0:msize]
+          i+=msize
+    return rho
 
