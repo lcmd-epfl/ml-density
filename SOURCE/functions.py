@@ -110,14 +110,16 @@ def averages_read(elements, avdir):
     av_coefs[q] = np.load(avdir+chemical_symbols[q]+".npy")
   return av_coefs
 
-
-def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs):
-
-    size = 0
+def nao_for_mol(atoms, lmax, nmax):
+    nao = 0
     for q in atoms:
       for l in range(lmax[q]+1):
-        size += (2*l+1)*nmax[(q,l)]
+        nao += (2*l+1)*nmax[(q,l)]
+    return nao
 
+def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs, reorder=1):
+
+    size = nao_for_mol(atoms, lmax, nmax)
     rho = np.zeros(size)
     i = 0
     for iat,q in enumerate(atoms):
@@ -126,10 +128,10 @@ def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs):
         for n in range(nmax[(q,l)]):
           if l == 0 :
             rho[i] = coeff[iat,l,n,0] + av_coefs[q][n]
-          elif l ==1 :
-            rho[i+1]=coeff[iat,l,n,0]
-            rho[i+2]=coeff[iat,l,n,1]
-            rho[i  ]=coeff[iat,l,n,2]
+          elif l == 1 and reorder:
+            rho[i+1] = coeff[iat,l,n,0]
+            rho[i+2] = coeff[iat,l,n,1]
+            rho[i  ] = coeff[iat,l,n,2]
           else:
             rho[i:i+msize] = coeff[iat,l,n,0:msize]
           i+=msize
