@@ -2,7 +2,8 @@
 
 import numpy as np
 from config import Config
-from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx
+from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx,prediction2coefficients,number_of_electrons,averages_read
+from basis import basis_read_full
 from run_prediction import run_prediction
 
 conf = Config()
@@ -22,9 +23,11 @@ trainfilename   = conf.paths['trainingselfile']
 elselfilebase   = conf.paths['spec_sel_base']
 kernelconfbase  = conf.paths['kernel_conf_base']
 weightsfilebase = conf.paths['weights_base']
+avdir           = conf.paths['averages_dir']
 xyzexfilename   = conf.paths['ex_xyzfile']
 kernelexbase    = conf.paths['ex_kernel_base']
 predictfilebase = conf.paths['ex_predict_base']
+outfilebase     = conf.paths['ex_output_base']
 
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 (nmol_ex, natoms_ex, atomic_numbers_ex) = moldata_read(xyzexfilename)
@@ -41,7 +44,7 @@ if not set(elements_ex).issubset(set(elements)):
 atomicindx_ex = get_atomicindx(nmol_ex, len(elements), natmax_ex, atom_counting_ex, el_list_per_conf_ex)
 test_configs = np.arange(nmol_ex)
 
-run_prediction(nmol_ex, natmax_ex, natoms_ex,
+pred = run_prediction(nmol_ex, natmax_ex, natoms_ex,
     atom_counting_ex, atomicindx_ex, test_configs,
     M, elements,
     kernelexbase,
@@ -49,4 +52,17 @@ run_prediction(nmol_ex, natmax_ex, natoms_ex,
     elselfilebase+str(M)+".txt",
     weightsfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy",
     predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
+
+(basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
+av_coefs = averages_read(elements_ex, avdir)
+for imol in range(nmol_ex):
+    atoms = atomic_numbers_ex[imol]
+    rho1 = prediction2coefficients(atoms, lmax, nmax, pred[imol], av_coefs)
+    rho2 = prediction2coefficients(atoms, lmax, nmax, pred[imol], av_coefs, False)
+    nel = number_of_electrons(basis, atoms, rho1)
+    strg = "mol # %*i :  %8.4f / %3d (%.1e)"%(
+        len(str(nmol_ex)), imol, nel, sum(atoms), nel-sum(atoms) )
+    print(strg)
+    np.savetxt(outfilebase             +str(imol)+'.dat', rho1)
+    np.savetxt(outfilebase+'noreorder_'+str(imol)+'.dat', rho2)
 

@@ -85,5 +85,5 @@ def run_prediction(
       w, coeffs, kernelbase.encode('ascii') )
 
   np.save(predictfilename, coeffs)
-  return
+  return coeffs
 

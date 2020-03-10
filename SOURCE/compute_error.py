@@ -2,9 +2,9 @@
 
 import numpy as np
 from config import Config
-from basis import basis_read_full
 from ase.data import chemical_symbols
-from functions import moldata_read,number_of_electrons
+from basis import basis_read_full
+from functions import moldata_read,averages_read,number_of_electrons
 
 conf = Config()
 
@@ -25,10 +25,11 @@ goodcoeffilebase = conf.paths['goodcoef_base']
 goodoverfilebase = conf.paths['goodover_base']
 avdir            = conf.paths['averages_dir']
 
+
 # number of molecules, number of atoms in each molecule, atomic numbers
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 
-# elements dictionary, max. angular momenta, number of radial channels
+# basis, elements dictionary, max. angular momenta, number of radial channels
 (basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
 
 # load predicted coefficients for test structures
@@ -37,21 +38,17 @@ testrange = np.setdiff1d(range(nmol),trainrangetot)
 
 coeffs_unraveled = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 
-av_coefs = {}
-for q in el_dict.values():
-    av_coefs[q] = np.load(avdir+chemical_symbols[q]+".npy")
+av_coefs = averages_read(el_dict.values(), avdir)
 
-itest = 0
 error_sum = 0.0
 STD_bl = 0.0
 STD = 0.0
-for imol in testrange:
+for itest,imol in enumerate(testrange):
     atoms = atomic_numbers[imol]
     #================================================
     overl      = np.load(goodoverfilebase+str(imol)+".npy")
     coeffs_ref = np.load(goodcoeffilebase+str(imol)+".npy")
     size_coeffs = coeffs_ref.shape
-
 
     averages  = np.zeros(size_coeffs,float)
     coeffs_bl = np.zeros(size_coeffs,float)
@@ -66,16 +63,18 @@ for imol in testrange:
                     icoeff +=1
 
     coeffs_ref_bl = coeffs_ref - averages
+    coeffs        = coeffs_bl  + averages
     delta_coeffs  = coeffs_bl  - coeffs_ref_bl
 
     #================================================
 
     nel_ref = number_of_electrons(basis, atoms, coeffs_ref)
-    nel_pr  = number_of_electrons(basis, atoms, coeffs_bl+averages)
+    nel_pr  = number_of_electrons(basis, atoms, coeffs)
 
     error    = np.dot(delta_coeffs , np.dot(overl, delta_coeffs ))
     norm_bl  = np.dot(coeffs_ref_bl, np.dot(overl, coeffs_ref_bl))
     norm     = np.dot(coeffs_ref   , np.dot(overl, coeffs_ref   ))
+
     error_sum += error
     STD_bl    += norm_bl
     STD       += norm
@@ -92,7 +91,6 @@ for imol in testrange:
         sum(atoms)
         )
     print(strg)
-    itest += 1
 
 print()
 print("%% RMSE = %.2e %%  %.2e %%    ( %.2e )" % (
