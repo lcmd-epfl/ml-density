@@ -42,29 +42,23 @@ def get_kernel_sizes(myrange, ref_elements, el_dict, M, lmax, atom_counting):
     return kernel_sizes
 
 def get_elements_list(atomic_numbers):
-    return np.sort(list(set(np.array([item for sublist in atomic_numbers for item in sublist]))))
+    return np.unique(np.concatenate(atomic_numbers))
 
-def get_el_list_per_conf(elements, nmol, natoms, atomic_numbers):
-    nel = len(elements)
-    el_list_per_conf = {}
+def get_atomicindx(elements,atomic_numbers,natmax):
+    nmol = len(atomic_numbers)
+    nel  = len(elements)
+    element_indices = []
     atom_counting = np.zeros((nmol,nel),int)
-    for imol in range(nmol):
-        el_list_per_conf[imol] = []
-        for iat in range(natoms[imol]):
-            for iel in range(nel):
-                if atomic_numbers[imol][iat] == elements[iel]:
-                   atom_counting[imol,iel] += 1
-                   el_list_per_conf[imol].append(iel)
-    return (atom_counting, el_list_per_conf)
-
-def get_atomicindx(nmol,nel,natmax,atom_counting,el_list_per_conf):
-    atomicindx = np.zeros((nmol,nel,natmax),int)
-    for imol in range(nmol):
-        for iel in range(nel):
-            indices = [i for i,x in enumerate(el_list_per_conf[imol]) if x==iel]
-            for icount in range(atom_counting[imol,iel]):
-                atomicindx[imol,iel,icount] = indices[icount]
-    return atomicindx
+    atomicindx    = np.zeros((nmol,nel,natmax),int)
+    for imol,atoms in enumerate(atomic_numbers):
+        element_indices.append( np.full(len(atoms),-1,int) )
+        for iel,el in enumerate(elements):
+            idx = np.nonzero(atomic_numbers[imol]==el)[0]
+            count = len(idx)
+            atomicindx[imol,iel,0:count] = idx
+            atom_counting[imol,iel] = count
+            element_indices[imol][idx] = iel
+    return (atomicindx, atom_counting, element_indices)
 
 def unravel_weights(M, llmax, nnmax, ref_elements, annum, alnum, weights):
     w = np.zeros((M,llmax+1,nnmax,2*llmax+1),float)
@@ -84,7 +78,8 @@ def unravel_weights(M, llmax, nnmax, ref_elements, annum, alnum, weights):
 def print_progress(i, n):
     npad = len(str(n))
     strg = "Doing point %*i of %*i (%5.1f %%)"%(npad,i+1,npad,n,100 * float(i+1)/n)
-    print(strg, end='\r', flush=True)
+    end  = '\r' if i<n-1 else '\n'
+    print(strg, end=end, flush=True)
 
 def nel_contrib(a):
   # norm = (2.0*a/np.pi)^3/4

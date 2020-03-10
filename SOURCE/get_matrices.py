@@ -3,7 +3,7 @@
 import numpy as np
 from config import Config
 from basis import basis_read
-from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx,basis_info,get_kernel_sizes
+from functions import moldata_read,get_elements_list,get_atomicindx,basis_info,get_kernel_sizes
 
 import os
 import sys
@@ -34,13 +34,10 @@ bmatfilebase     = conf.paths['bmat_base']
 natmax = max(natoms)
 nenv = sum(natoms)
 
-# atomic elements arrays
+# elements array and atomic indices sorted by elements
 elements = get_elements_list(atomic_numbers)
 nel = len(elements)
-(atom_counting, el_list_per_conf) = get_el_list_per_conf(elements, nmol, natoms, atomic_numbers)
-
-# atomic indices sorted by number
-atomicindx = get_atomicindx(nmol,nel,natmax,atom_counting,el_list_per_conf)
+(atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
 
 #====================================== reference environments
 ref_elements = np.loadtxt(elselfilebase+str(M)+".txt",int)
@@ -73,7 +70,7 @@ atom_counting_training = atom_counting[trainrange]
 atomic_elements = np.zeros((ntrain,natmax),int)
 for itrain in range(ntrain):
     for iat in range(natoms_train[itrain]):
-        atomic_elements[itrain,iat] = el_list_per_conf[trainrange[itrain]][iat]
+        atomic_elements[itrain,iat] = element_indices[trainrange[itrain]][iat]
 
 # sparse overlap and projection indices
 total_sizes = np.zeros(ntrain,int)

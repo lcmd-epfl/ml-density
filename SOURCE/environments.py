@@ -3,7 +3,7 @@
 import numpy as np
 from config import Config
 from ase.data import chemical_symbols
-from functions import moldata_read,get_atomicindx,get_el_list_per_conf,get_elements_list
+from functions import moldata_read,get_atomicindx,get_elements_list
 from power_spectra_lib import reorder_ps
 
 
@@ -42,18 +42,10 @@ def do_fps(x, d=0):
 natmax = max(natoms)
 nenv = sum(natoms)
 
-#==================== elements array
+# elements array and atomic indices sorted by elements
 elements = get_elements_list(atomic_numbers)
 nel = len(elements)
-(atom_counting, el_list_per_conf) = get_el_list_per_conf(elements, nmol, natoms, atomic_numbers)
-
-el_list = []
-for i in el_list_per_conf.values():
-  el_list += i
-el_array = np.asarray(el_list,int)
-
-#===================== atomic indices sorted by elements
-atomicindx = get_atomicindx(nmol,nel,natmax,atom_counting,el_list_per_conf)
+(atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
 
 #====================== environmental power spectrum
 power = np.load(ps0file)
@@ -64,18 +56,20 @@ for imol in range(nmol):
     reorder_ps(power_env[ienv:ienv+natoms[imol]], power[imol], nel, atom_counting[imol], atomicindx[imol])
     ienv += natoms[imol]
 
-ref_indices, measure = do_fps(power_env,M)
-ref_elements = el_array[ref_indices]
+ref_indices, distances = do_fps(power_env,M)
+ref_elements = np.concatenate(element_indices)[ref_indices]
+
 np.savetxt(refsselfilebase+str(M)+".txt",ref_indices,fmt='%i')
 np.savetxt(elselfilebase+str(M)+".txt",ref_elements,fmt='%i')
 
-for i in range(1,M):
-  print(i, measure[i-1])
+for i,d in enumerate(distances):
+  print(i+1, d)
 
-ref_elements_list = ref_elements.tolist()
+el_count_total = sum(atom_counting)
+el_count_ref = dict(zip( *np.unique(ref_elements, return_counts=True)))
 for i in range(nel):
-  n1 = ref_elements_list.count(i)
-  n2 = el_list.count(i)
+  n1 = el_count_ref[i]
+  n2 = el_count_total[i]
   print('#', chemical_symbols[elements[i]]+':', n1, '/', n2, "(%.1f%%)"%(100.0*n1/n2) )
 
 nuniq = len(np.unique(ref_indices))

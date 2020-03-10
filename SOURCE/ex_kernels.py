@@ -3,7 +3,7 @@
 import numpy as np
 from config import Config
 from basis import basis_read
-from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx,print_progress
+from functions import moldata_read,get_elements_list,get_atomicindx,print_progress
 from power_spectra_lib import read_ps
 from kernels_lib import kernel_nm_sparse_indices,kernel_nm
 
@@ -30,16 +30,11 @@ nenv = sum(natoms)
 (nmol_ex, natoms_ex, atomic_numbers_ex) = moldata_read(xyzexfilename)
 natmax_ex = max(natoms_ex)
 
-#==================== elements array
+# elements array and atomic indices sorted by elements
 elements = get_elements_list(atomic_numbers)
 nel = len(elements)
-
-(atom_counting,    el_list_per_conf   ) = get_el_list_per_conf(elements, nmol,    natoms,    atomic_numbers   )
-(atom_counting_ex, el_list_per_conf_ex) = get_el_list_per_conf(elements, nmol_ex, natoms_ex, atomic_numbers_ex)
-
-#===================== atomic indices sorted by elements
-atomicindx    = get_atomicindx(nmol,    nel, natmax,    atom_counting,    el_list_per_conf   )
-atomicindx_ex = get_atomicindx(nmol_ex, nel, natmax_ex, atom_counting_ex, el_list_per_conf_ex)
+(atomicindx,    atom_counting,    element_indices)    = get_atomicindx(elements, atomic_numbers, natmax)
+(atomicindx_ex, atom_counting_ex, element_indices_ex) = get_atomicindx(elements, atomic_numbers_ex, natmax_ex)
 
 #====================================== reference environments
 ref_elements = np.loadtxt(elselfilebase+str(M)+".txt",int)

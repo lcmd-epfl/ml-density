@@ -2,7 +2,7 @@
 
 import numpy as np
 from config import Config
-from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx,prediction2coefficients,number_of_electrons,averages_read
+from functions import moldata_read,get_elements_list,get_atomicindx,prediction2coefficients,number_of_electrons,averages_read
 from basis import basis_read_full
 from run_prediction import run_prediction
 
@@ -40,8 +40,7 @@ if not set(elements_ex).issubset(set(elements)):
     print("different elements in the molecule and in the training set:", list(elements_ex), "and", list(elements))
     exit(1)
 
-(atom_counting_ex, el_list_per_conf_ex) = get_el_list_per_conf(elements, nmol_ex, natoms_ex, atomic_numbers_ex)
-atomicindx_ex = get_atomicindx(nmol_ex, len(elements), natmax_ex, atom_counting_ex, el_list_per_conf_ex)
+(atomicindx_ex, atom_counting_ex, element_indices_ex) = get_atomicindx(elements, atomic_numbers_ex, natmax_ex)
 test_configs = np.arange(nmol_ex)
 
 pred = run_prediction(nmol_ex, natmax_ex, natoms_ex,

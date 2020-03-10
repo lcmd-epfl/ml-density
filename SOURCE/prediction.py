@@ -3,7 +3,7 @@
 import numpy as np
 from config import Config
 from basis import basis_read
-from functions import moldata_read,get_elements_list,get_el_list_per_conf,get_atomicindx
+from functions import moldata_read,get_elements_list,get_atomicindx
 from run_prediction import run_prediction
 
 conf = Config()
@@ -28,11 +28,10 @@ predictfilebase = conf.paths['predict_base']
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 natmax = max(natoms)
 
+# elements array and atomic indices sorted by elements
 elements = get_elements_list(atomic_numbers)
-(atom_counting, el_list_per_conf) = get_el_list_per_conf(elements, nmol, natoms, atomic_numbers)
-
-# atomic indices sorted by number
-atomicindx = get_atomicindx(nmol,len(elements),natmax,atom_counting,el_list_per_conf)
+nel = len(elements)
+(atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
 
 # dataset partitioning
 trainrangetot = np.loadtxt(trainfilename,int)

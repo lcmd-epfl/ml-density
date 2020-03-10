@@ -28,33 +28,28 @@ if 'noreorder' in sys.argv[1:]:
 # elements dictionary, max. angular momenta, number of radial channels
 (el_dict, lmax, nmax) = basis_read(basisfilename)
 
-def reorder_idx(nao, atoms, lmax, nmax):
+def reorder_idx(atoms, lmax, nmax, reorder=True):
+    nao = nao_for_mol(atoms, lmax, nmax)
     idx = np.arange(nao, dtype=int)
-    i = 0
-    for q in atoms:
-        i += nmax[(q,0)]
-        if(lmax[q]<1):
-            continue
-        for n in range(nmax[(q,1)]):
-            idx[i  ] = i+1
-            idx[i+1] = i+2
-            idx[i+2] = i
-            i += 3
-        for l in range(2, lmax[q]+1):
-            i += (2*l+1)*nmax[(q,l)]
+    if reorder:
+        i = 0
+        for q in atoms:
+            i += nmax[(q,0)]
+            if(lmax[q]<1):
+                continue
+            for n in range(nmax[(q,1)]):
+                idx[i  ] = i+1
+                idx[i+1] = i+2
+                idx[i+2] = i
+                i += 3
+            for l in range(2, lmax[q]+1):
+                i += (2*l+1)*nmax[(q,l)]
     return idx
 
 for imol in range(nmol):
 
     print_progress(imol, nmol)
-
-    atoms = atomic_numbers[imol]
-    nao = nao_for_mol(atoms, lmax, nmax)
-
-    if(reorder):
-        idx = reorder_idx(nao, atoms, lmax, nmax)
-    else:
-        idx = np.arange(nao, dtype=int)
+    idx = reorder_idx(atomic_numbers[imol], lmax, nmax, reorder)
 
     coef      = np.loadtxt(coefffilebase+str(imol)+".dat")
     good_coef = coef[idx]
