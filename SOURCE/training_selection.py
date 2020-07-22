@@ -21,6 +21,5 @@ nmol = len(xyzfile)
 
 np.random.seed(seed)
 output = np.random.choice(nmol, train, replace=False)
-output.sort()
 np.savetxt(trainfilename, output, fmt='%i')
 

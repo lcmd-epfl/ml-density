@@ -19,7 +19,6 @@ def set_variable_values():
 
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
-trainfilename   = conf.paths['trainingselfile']
 elselfilebase   = conf.paths['spec_sel_base']
 kernelconfbase  = conf.paths['kernel_conf_base']
 weightsfilebase = conf.paths['weights_base']

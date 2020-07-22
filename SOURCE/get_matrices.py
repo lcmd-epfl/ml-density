@@ -60,6 +60,7 @@ totsize = sum(bsize[ref_elements])
 trainrangetot = np.loadtxt(trainfilename,int)
 ntrain = int(frac*len(trainrangetot))
 trainrange = trainrangetot[0:ntrain]
+trainrange.sort()
 natoms_train = natoms[trainrange]
 
 # training set arrays
