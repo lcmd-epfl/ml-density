@@ -22,7 +22,7 @@ def basis_read_full(filename):
 
     if len(lines[i]) > 2 and lines[i][0:2] == 'O-':
       q = lines[i].split(' ')[1]
-      q = atomic_numbers[q]
+      q = atomic_numbers[q.capitalize()]
       if q in angular_momenta:
         raise SystemExit(errormsg)
       el_dict[nelements] = q
