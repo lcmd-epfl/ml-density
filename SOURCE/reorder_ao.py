@@ -51,7 +51,10 @@ for imol in range(nmol):
     print_progress(imol, nmol)
     idx = reorder_idx(atomic_numbers[imol], lmax, nmax, reorder)
 
-    coef      = np.loadtxt(coefffilebase+str(imol)+".dat")
+    try:
+      coef    = np.loadtxt(coefffilebase+str(imol)+".dat")
+    except:
+      coef    = np.load   (coefffilebase+str(imol)+".npy")
     good_coef = coef[idx]
     np.save(goodcoeffilebase+str(imol)+".npy", good_coef)
 
