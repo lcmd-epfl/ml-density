@@ -48,6 +48,7 @@ nenv = sum(natoms)
 elements = get_elements_list(atomic_numbers)
 nel = len(elements)
 (atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
+element_indices = np.concatenate(element_indices)
 
 #====================== environmental power spectrum
 try:
@@ -61,8 +62,34 @@ try:
 except:
     power_env = np.vstack([read_ps_1mol(f"{splitpsfilebase}0_{imol}.npy", nel, atom_counting[imol], atomicindx[imol])[1] for imol in range(nmol)])
 
+#########################################################
+
+vectors_for_elements = []
+for i in range(nel):
+  idx = np.where(element_indices==i)
+  vectors_for_elements.append(power_env[idx])
+
+nrefenv = [61, 39]
+
+for i in range(nel):
+  print(chemical_symbols[elements[i]])
+  n    = nrefenv[i]
+  xt   = vectors_for_elements[i]
+  xxt  = np.dot(xt.T, xt)
+  l2,u = np.linalg.eigh(xxt)
+  idx  = l2.argsort()[::-1]
+  l2   = l2 [idx[:n]]
+  y    = u.T[idx[:n]]
+  for j in l2:
+    print(j)
+  print()
+  print()
+
+#########################################################
+exit()
+
 ref_indices, distances = do_fps(power_env,M)
-ref_elements = np.concatenate(element_indices)[ref_indices]
+ref_elements = element_indices[ref_indices]
 
 np.savetxt(refsselfilebase+str(M)+".txt",ref_indices,fmt='%i')
 np.savetxt(elselfilebase+str(M)+".txt",ref_elements,fmt='%i')
