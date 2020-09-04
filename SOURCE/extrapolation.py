@@ -55,12 +55,12 @@ pred = run_prediction(nmol_ex, natmax_ex, natoms_ex,
 av_coefs = averages_read(elements_ex, avdir)
 for imol in range(nmol_ex):
     atoms = atomic_numbers_ex[imol]
-    rho1 = prediction2coefficients(atoms, lmax, nmax, pred[imol], av_coefs)
+    rho1 = prediction2coefficients(atoms, lmax, nmax, pred[imol], av_coefs, True)
     rho2 = prediction2coefficients(atoms, lmax, nmax, pred[imol], av_coefs, False)
     nel = number_of_electrons(basis, atoms, rho1)
     strg = "mol # %*i :  %8.4f / %3d (%.1e)"%(
         len(str(nmol_ex)), imol, nel, sum(atoms), nel-sum(atoms) )
     print(strg)
-    np.savetxt(outfilebase             +str(imol)+'.dat', rho1)
-    np.savetxt(outfilebase+'noreorder_'+str(imol)+'.dat', rho2)
+    np.savetxt(outfilebase+'pyscf_'+str(imol)+'.dat', rho1)
+    np.savetxt(outfilebase+'gpr_'  +str(imol)+'.dat', rho2)
 

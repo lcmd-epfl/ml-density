@@ -42,5 +42,5 @@ for itest,imol in enumerate(testrange):
     rho1 = prediction2coefficients(atomic_numbers[imol], lmax, nmax, coeff[itest], av_coefs, True)
     rho2 = prediction2coefficients(atomic_numbers[imol], lmax, nmax, coeff[itest], av_coefs, False)
     np.savetxt(outfilebase+'pyscf_'+str(imol)+'.dat', rho1)
-    np.savetxt(outfilebase+'gpr_'+str(imol)+'.dat', rho2)
+    np.savetxt(outfilebase+'gpr_'  +str(imol)+'.dat', rho2)
 
