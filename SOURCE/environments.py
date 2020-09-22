@@ -70,18 +70,35 @@ for i in range(nel):
   vectors_for_elements.append(power_env[idx])
 
 nrefenv = [61, 39]
+#nrefenv = [2000, 1000]
 
 for i in range(nel):
-  print(chemical_symbols[elements[i]])
+  symb = chemical_symbols[elements[i]]
+  print(symb)
   n    = nrefenv[i]
-  xt   = vectors_for_elements[i]
-  xxt  = np.dot(xt.T, xt)
-  l2,u = np.linalg.eigh(xxt)
+  At   = vectors_for_elements[i]
+
+  l2,w = np.linalg.eigh(At@At.T)
   idx  = l2.argsort()[::-1]
   l2   = l2 [idx[:n]]
-  y    = u.T[idx[:n]]
+  wt   = w.T[idx[:n]]
+  lwt = np.diag(1.0/np.sqrt(l2))@wt
+
+  #l2,u = np.linalg.eigh(At.T@At)
+  #idx  = l2.argsort()[::-1]
+  #l2   = l2 [idx[:n]]
+  #ut   = u.T[idx[:n]]
+  #x1  = lwt@At
+  #x2  = ut
+  #for j in range(n):
+  #  print(min(np.sum(abs(x1[j]-x2[j])), np.sum(abs(x1[j]+x2[j]))))
+  #  #print(x1[j])
+  #  #print(x2[j])
+
   for j in l2:
     print(j)
+  np.save(symb+'.npy', lwt)
+
   print()
   print()
 
