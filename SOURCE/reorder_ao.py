@@ -22,6 +22,8 @@ if 'c' in sys.argv[1:]:
   only_c = True
 if 'noreorder' in sys.argv[1:]:
   reorder = False
+print('only_c =', only_c)
+print('reorder =', reorder)
 
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 
