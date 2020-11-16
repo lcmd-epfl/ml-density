@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+
+import numpy as np
+from config import Config
+from basis import basis_read_full
+from functions import moldata_read,averages_read,print_progress,prediction2coefficients_new,gpr2pyscf,number_of_electrons_ao,correct_number_of_electrons
+
+conf = Config()
+
+def set_variable_values():
+    f   = conf.get_option('trainfrac'   ,  1.0,   float)
+    m   = conf.get_option('m'           ,  100,   int  )
+    r   = conf.get_option('regular'     ,  1e-6,  float)
+    j   = conf.get_option('jitter'      ,  1e-10, float)
+    return [f,m,r,j]
+
+[frac,M,reg,jit] = set_variable_values()
+
+xyzfilename      = conf.paths['xyzfile']
+basisfilename    = conf.paths['basisfile']
+trainfilename    = conf.paths['trainingselfile']
+predictfilebase  = conf.paths['predict_base']
+goodoverfilebase = conf.paths['goodover_base']
+avdir            = conf.paths['averages_dir']
+outfilebase      = conf.paths['output_base']
+chargefilename   = conf.paths['chargesfile']
+
+# number of molecules, number of atoms in each molecule, atomic numbers
+(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
+
+# basis, elements dictionary, max. angular momenta, number of radial channels
+(basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
+
+# load predicted coefficients for test structures
+trainrangetot = np.loadtxt(trainfilename,int)
+testrange = np.setdiff1d(range(nmol),trainrangetot)
+
+coeff = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
+
+av_coefs = averages_read(el_dict.values(), avdir)
+charges  = np.loadtxt(chargefilename, dtype=int)
+
+for itest,imol in enumerate(testrange):
+    print_progress(itest, len(testrange))
+    atoms = atomic_numbers[imol]
+
+    rho  = prediction2coefficients_new(atoms, lmax, nmax, coeff[itest], av_coefs)
+    rho1 = gpr2pyscf                  (atoms, lmax, nmax, rho)
+    np.savetxt(outfilebase+'gpr_'  +str(imol)+'.dat', rho)
+    np.savetxt(outfilebase+'pyscf_'+str(imol)+'.dat', rho1)
+
+    N  = sum(atoms) - charges[imol]
+    S  = np.load(goodoverfilebase+str(imol)+".npy")
+    q  = number_of_electrons_ao(basis, atoms, len(rho))
+    rho_n  = correct_number_of_electrons(rho, S, q, N)
+    rho_n1 = gpr2pyscf(atoms, lmax, nmax, rho_n)
+    np.savetxt(outfilebase+'gpr_'  +str(imol)+'.N.dat', rho_n)
+    np.savetxt(outfilebase+'pyscf_'+str(imol)+'.N.dat', rho_n1)
+

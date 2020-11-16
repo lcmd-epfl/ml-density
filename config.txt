@@ -9,6 +9,7 @@ jitter = 1e-8
 
 [paths]
 xyzfile          = ALL.xyz
+chargesfile      = charges.dat
 basisfile        = cc-pvqz-jkfit.1.d2k
 coeff_base       = QMDATA/ALL_C/mol_c_
 over_base        = QMDATA/ALL_S/mol_s_

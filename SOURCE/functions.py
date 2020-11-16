@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 import ase.io
 from ase.data import chemical_symbols
@@ -99,6 +100,23 @@ def number_of_electrons(basis, atoms, c):
         i+=2*l+1
   return nel
 
+def number_of_electrons_ao(basis, atoms, n):
+  nel = np.zeros(n)
+  i = 0
+  for q in atoms:
+    for [l,gto] in basis[q]:
+      if l==0:
+        for [a,w] in gto:
+          nel[i] += w * nel_contrib(a)
+        i+=1
+      else:
+        i+=2*l+1
+  return nel
+
+def correct_number_of_electrons(c, S, q, N):
+  S1q  = np.linalg.solve(S, q)
+  return c + S1q * (N - c@q)/(q@S1q)
+
 def averages_read(elements, avdir):
   av_coefs = {}
   for q in elements:
@@ -114,21 +132,50 @@ def nao_for_mol(atoms, lmax, nmax):
 
 def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs, reorder=1):
 
-    size = nao_for_mol(atoms, lmax, nmax)
-    rho = np.zeros(size)
-    i = 0
-    for iat,q in enumerate(atoms):
-      for l in range(lmax[q]+1):
-        msize = 2*l+1
-        for n in range(nmax[(q,l)]):
-          if l == 0 :
-            rho[i] = coeff[iat,l,n,0] + av_coefs[q][n]
-          elif l == 1 and reorder:
-            rho[i+1] = coeff[iat,l,n,0]
-            rho[i+2] = coeff[iat,l,n,1]
-            rho[i  ] = coeff[iat,l,n,2]
-          else:
-            rho[i:i+msize] = coeff[iat,l,n,0:msize]
-          i+=msize
-    return rho
+  size = nao_for_mol(atoms, lmax, nmax)
+  rho = np.zeros(size)
+  i = 0
+  for iat,q in enumerate(atoms):
+    for l in range(lmax[q]+1):
+      msize = 2*l+1
+      for n in range(nmax[(q,l)]):
+        if l == 0 :
+          rho[i] = coeff[iat,l,n,0] + av_coefs[q][n]
+        elif l == 1 and reorder:
+          rho[i+1] = coeff[iat,l,n,0]
+          rho[i+2] = coeff[iat,l,n,1]
+          rho[i  ] = coeff[iat,l,n,2]
+        else:
+          rho[i:i+msize] = coeff[iat,l,n,0:msize]
+        i+=msize
+  return rho
+
+def prediction2coefficients_new(atoms, lmax, nmax, coeff, av_coefs):
+  size = nao_for_mol(atoms, lmax, nmax)
+  rho = np.zeros(size)
+  i = 0
+  for iat,q in enumerate(atoms):
+    for l in range(lmax[q]+1):
+      msize = 2*l+1
+      for n in range(nmax[(q,l)]):
+        if l == 0 :
+          rho[i] = coeff[iat,l,n,0] + av_coefs[q][n]
+        else:
+          rho[i:i+msize] = coeff[iat,l,n,0:msize]
+        i+=msize
+  return rho
+
+def gpr2pyscf(atoms, lmax, nmax, rho0):
+  rho = copy.deepcopy(rho0)
+  i = 0
+  for iat,q in enumerate(atoms):
+    for l in range(lmax[q]+1):
+      msize = 2*l+1
+      for n in range(nmax[(q,l)]):
+        if l == 1:
+          rho[i+1] = rho0[i+0]
+          rho[i+2] = rho0[i+1]
+          rho[i  ] = rho0[i+2]
+        i+=msize
+  return rho
 
