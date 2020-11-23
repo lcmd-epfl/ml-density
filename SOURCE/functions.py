@@ -100,18 +100,18 @@ def number_of_electrons(basis, atoms, c):
         i+=2*l+1
   return nel
 
-def number_of_electrons_ao(basis, atoms, n):
-  nel = np.zeros(n)
-  i = 0
+def number_of_electrons_ao(basis, atoms):
+  nel = []
   for q in atoms:
     for [l,gto] in basis[q]:
       if l==0:
+        t = 0.0
         for [a,w] in gto:
-          nel[i] += w * nel_contrib(a)
-        i+=1
+          t += w * nel_contrib(a)
+        nel.append(t)
       else:
-        i+=2*l+1
-  return nel
+        nel.extend([0]*(2*l+1))
+  return np.array(nel)
 
 def correct_number_of_electrons(c, S, q, N):
   S1q  = np.linalg.solve(S, q)

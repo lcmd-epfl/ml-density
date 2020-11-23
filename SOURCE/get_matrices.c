@@ -625,3 +625,73 @@ int get_b(
   return 0;
 }
 
+int get_a_for_mol(
+    const unsigned int totsize,
+    const unsigned int nelem,
+    const unsigned int llmax,
+    const unsigned int nnmax,
+    const unsigned int M,
+    const unsigned int ntrain,
+    const unsigned int natmax,
+    const unsigned int const atomicindx[ntrain][nelem][natmax],  //  ntrain*nelem*natmax
+    const unsigned int const atomcount [ntrain][nelem],          //  ntrain*nelem
+    const unsigned int const trrange   [ntrain],                 //  ntrain
+    const unsigned int const natoms    [ntrain],                 //  ntrain
+    const unsigned int const totalsizes[ntrain],                 //  ntrain
+    const unsigned int const kernsizes [ntrain],                 //  ntrain
+    const unsigned int const atom_elem [ntrain][natmax],         //  ntrain*natmax
+    const unsigned int const ref_elem  [M],                      //  M
+    const unsigned int const alnum     [nelem],                  //  nelem
+    const unsigned int const annum     [nelem][llmax+1],         //  nelem*(llmax+1)
+    const char * const path_proj,
+    const char * const path_kern,
+    const char * const path_avec
+    ){
+
+  nproc = 0;
+  Nproc = 1;
+
+  double * Avec = calloc(sizeof(double)*totsize*ntrain, 1);
+  ao_t * aoref = ao_fill(totsize, llmax, M, ref_elem, alnum, annum);
+
+  if(Nproc==1){
+    for(int imol=0; imol<ntrain; imol++){
+      printf("%4d: %4d\n", nproc, imol);
+      do_work_a(
+          totsize,
+          nelem  ,
+          llmax  ,
+          nnmax  ,
+          M      ,
+          natmax ,
+          natoms    [imol],
+          trrange   [imol],
+          totalsizes[imol],
+          kernsizes [imol],
+          atomicindx[imol],
+          atomcount [imol],
+          atom_elem [imol],
+          ref_elem  ,
+          alnum     ,
+          annum     ,
+          aoref     ,
+          path_proj,
+          path_kern,
+          Avec+imol*totsize);
+    }
+  }
+  free(aoref);
+
+  vec_write(totsize*ntrain, Avec, "w", path_avec);
+  free(Avec);
+
+  return 0;
+}
+
+
+
+
+
+
+
+

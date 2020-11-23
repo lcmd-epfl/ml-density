@@ -51,7 +51,7 @@ for itest,imol in enumerate(testrange):
 
     N  = sum(atoms) - charges[imol]
     S  = np.load(goodoverfilebase+str(imol)+".npy")
-    q  = number_of_electrons_ao(basis, atoms, len(rho))
+    q  = number_of_electrons_ao(basis, atoms)
     rho_n  = correct_number_of_electrons(rho, S, q, N)
     rho_n1 = gpr2pyscf(atoms, lmax, nmax, rho_n)
     np.savetxt(outfilebase+'gpr_'  +str(imol)+'.N.dat', rho_n)

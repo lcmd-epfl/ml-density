@@ -34,7 +34,7 @@ chargefilename   = conf.paths['chargesfile']
 
 # load predicted coefficients for test structures
 trainrangetot = np.loadtxt(trainfilename,int)
-testrange = np.setdiff1d(range(nmol),trainrangetot)
+testrange = trainrangetot # np.setdiff1d(range(nmol),trainrangetot)
 
 coeffs_unraveled = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 
@@ -51,7 +51,7 @@ for itest,imol in enumerate(testrange):
     N  = sum(atoms) - charges[imol]
     S  = np.load(goodoverfilebase+str(imol)+".npy")
     c0 = np.load(goodcoeffilebase+str(imol)+".npy")
-    q  = number_of_electrons_ao(basis, atoms, len(c0))
+    q  = number_of_electrons_ao(basis, atoms)
 
     c_av = np.zeros_like(c0)
     c_bl = np.zeros_like(c0)

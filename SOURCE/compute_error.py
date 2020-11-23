@@ -48,7 +48,7 @@ for itest,imol in enumerate(testrange):
     atoms = atomic_numbers[imol]
     S  = np.load(goodoverfilebase+str(imol)+".npy")
     c0 = np.load(goodcoeffilebase+str(imol)+".npy")
-    q  = number_of_electrons_ao(basis, atoms, len(c0))
+    q  = number_of_electrons_ao(basis, atoms)
 
     c_av = np.zeros_like(c0)
     c_bl = np.zeros_like(c0)
