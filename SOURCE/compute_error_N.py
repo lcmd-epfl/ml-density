@@ -34,7 +34,7 @@ chargefilename   = conf.paths['chargesfile']
 
 # load predicted coefficients for test structures
 trainrangetot = np.loadtxt(trainfilename,int)
-testrange = trainrangetot # np.setdiff1d(range(nmol),trainrangetot)
+testrange = np.setdiff1d(range(nmol),trainrangetot)
 
 coeffs_unraveled = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 

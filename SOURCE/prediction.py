@@ -36,7 +36,7 @@ nel = len(elements)
 # dataset partitioning
 trainrangetot = np.loadtxt(trainfilename,int)
 ntrain = int(frac*len(trainrangetot))
-test_configs = trainrangetot  #  = np.setdiff1d(range(nmol),trainrangetot)
+test_configs = np.setdiff1d(range(nmol),trainrangetot)
 ntest = len(test_configs)
 natoms_test = natoms[test_configs]
 print("Number of training molecules =", ntrain)

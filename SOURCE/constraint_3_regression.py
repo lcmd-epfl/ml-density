@@ -31,6 +31,7 @@ elselfilebase   = conf.paths['spec_sel_base']
 chargefilename   = conf.paths['chargesfile']
 Kqfilebase      = 'Kq'
 Kqfile          = Kqfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
+avdir            = conf.paths['averages_dir']
 
 kmmfile     = kmmbase+str(M)+".npy"
 avecfile    = avecfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".txt"
@@ -107,7 +108,6 @@ x0 = np.linalg.solve(mat, Avec)
 print( np.sum(np.abs(mat @ x0 - Avec)))
 
 
-
 trainfilename    = conf.paths['trainingselfile']
 trainrangetot = np.loadtxt(trainfilename,int)
 ntrain = int(frac*len(trainrangetot))
@@ -125,20 +125,33 @@ for itrain in range(ntrain):
 
 
 Kq = np.fromfile(Kqfile)
-Kq = Kq.reshape(len(x0),ntrain).T
-#Kq = Kq.reshape(ntrain,len(x0))
-# idk what's correct
+Kq = Kq.reshape(ntrain,len(x0))
 
 alpha = np.einsum('ij,j->i', Kq, x0)
 B1Kq = np.linalg.solve(mat, Kq.T)
 qKB1Kq = np.einsum('ij,jk->ik', Kq, B1Kq)
 
-charges = np.loadtxt(chargefilename, dtype=int)
-charges = charges[train_configs]
+#####################################################################
 
-la = np.linalg.solve(qKB1Kq+reg*np.eye(ntrain), alpha-charges)
+av_charges = np.zeros(elements[-1]+1)
+av_coefs = averages_read(el_dict.values(), avdir)
+for q in elements:
+  ch = number_of_electrons_ao(basis, [q])
+  ch = ch[ch!=0.0]
+  av_charges[q] = ch @ av_coefs[q]
+
+molcharges = np.loadtxt(chargefilename, dtype=int)
+constraints = np.zeros(ntrain)
+for i,imol in enumerate(train_configs):
+    atoms = atomic_numbers[imol]
+    constraints[i] = sum(atoms) - sum(av_charges[atoms]) - molcharges[imol]
+
+#####################################################################
+
+la = np.linalg.solve(qKB1Kq+reg*np.eye(ntrain), alpha-constraints)
 
 dx = np.einsum('ij,j->i', B1Kq, la)
 weights = x0 - dx
 
 np.save(weightsfile, weights)
+
