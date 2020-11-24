@@ -4,7 +4,7 @@ import numpy as np
 from config import Config
 from ase.data import chemical_symbols
 from basis import basis_read_full
-from functions import moldata_read,averages_read,number_of_electrons_ao,correct_number_of_electrons
+from functions import moldata_read,averages_read,number_of_electrons_ao,correct_number_of_electrons,get_test_set
 
 conf = Config()
 
@@ -30,17 +30,13 @@ if use_charges:
 
 # number of molecules, number of atoms in each molecule, atomic numbers
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
-
 # basis, elements dictionary, max. angular momenta, number of radial channels
 (basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
 
-# load predicted coefficients for test structures
-trainrangetot = np.loadtxt(trainfilename,int)
-testrange = np.setdiff1d(range(nmol),trainrangetot)
-
+ntest,test_configs = get_test_set(trainfilename, nmol)
 coeffs_unraveled = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
-
 av_coefs = averages_read(el_dict.values(), avdir)
+
 if use_charges:
   print('charge_file:', chargefilename, '\n')
   charges = np.loadtxt(chargefilename, dtype=int)
@@ -51,7 +47,7 @@ error_sum = 0.0
 STD_bl = 0.0
 STD = 0.0
 
-for itest,imol in enumerate(testrange):
+for itest,imol in enumerate(test_configs):
 
     atoms = atomic_numbers[imol]
     N  = sum(atoms) - charges[imol]
@@ -94,7 +90,7 @@ for itest,imol in enumerate(testrange):
     STD_bl    += norm_bl
     STD       += norm
     strg = "mol # %*i (%*i):  %8.3f %%  %.2e %%    ( %.2e )   %8.4f / %8.4f ( %3d )     (corr N: %8.3f %%)"%(
-        len(str(len(testrange))),
+        len(str(ntest)),
         itest,
         len(str(nmol)),
         imol,
@@ -112,6 +108,6 @@ print()
 print("%% RMSE = %.2e %%  %.2e %%    ( %.2e )" % (
       (error_sum/STD_bl)*100.0,
       (error_sum/STD)*100.0,
-      error_sum/len(testrange)
+      error_sum/ntest
 ))
 

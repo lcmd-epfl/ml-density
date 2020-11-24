@@ -3,7 +3,7 @@
 import numpy as np
 from config import Config
 from basis import basis_read
-from functions import moldata_read,get_elements_list,get_atomicindx,basis_info,get_kernel_sizes
+from functions import moldata_read,get_elements_list,get_atomicindx,basis_info,get_kernel_sizes,nao_for_mol,get_training_set
 
 import os
 import sys
@@ -55,28 +55,16 @@ nnmax = max(nmax.values())
 totsize = sum(bsize[ref_elements])
 
 # training set selection
-train_conf_tot = np.loadtxt(trainfilename,int)
-ntrain = int(frac*len(train_conf_tot))
-train_configs = np.array(sorted(train_conf_tot[0:ntrain]))
+ntrain,train_configs = get_training_set(trainfilename, frac)
 natoms_train = natoms[train_configs]
-atomicindx_training = atomicindx[train_configs,:,:]
-
+atomicindx_training = atomicindx[train_configs]
 atom_counting_training = atom_counting[train_configs]
 atomic_elements = np.zeros((ntrain,natmax),int)
-for itrain in range(ntrain):
-    for iat in range(natoms_train[itrain]):
-        atomic_elements[itrain,iat] = element_indices[train_configs[itrain]][iat]
+for itrain,iconf in enumerate(train_configs):
+  atomic_elements[itrain,0:natoms_train[itrain]] = element_indices[iconf]
 
 # sparse overlap and projection indices
-total_sizes = np.zeros(ntrain,int)
-itrain = 0
-for imol in train_configs:
-    atoms = atomic_numbers[imol]
-    for iat in range(natoms[imol]):
-        for l in range(lmax[atoms[iat]]+1):
-            total_sizes[itrain] += (2*l+1) * nmax[(atoms[iat],l)]
-    itrain += 1
-
+total_sizes = np.array([ nao_for_mol(atomic_numbers[imol], lmax, nmax) for imol in train_configs ])
 # sparse kernel indices
 kernel_sizes = get_kernel_sizes(train_configs, ref_elements, el_dict, M, lmax, atom_counting_training)
 

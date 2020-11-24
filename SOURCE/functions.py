@@ -131,7 +131,6 @@ def nao_for_mol(atoms, lmax, nmax):
     return nao
 
 def prediction2coefficients_old(atoms, lmax, nmax, coeff, av_coefs, reorder=1):
-
   size = nao_for_mol(atoms, lmax, nmax)
   rho = np.zeros(size)
   i = 0
@@ -178,4 +177,27 @@ def gpr2pyscf(atoms, lmax, nmax, rho0):
           rho[i  ] = rho0[i+2]
         i+=msize
   return rho
+
+def get_baselined_constraints(av_coefs, basis, atomic_numbers, molcharges):
+  av_charges = np.zeros(max(av_coefs.keys())+1)
+  for q in av_coefs.keys():
+    ch = number_of_electrons_ao(basis, [q])
+    ch = ch[ch!=0.0]
+    av_charges[q] = ch @ av_coefs[q]
+  constraints = np.zeros(len(atomic_numbers))
+  for i,atoms in enumerate(atomic_numbers):
+    constraints[i] = sum(atoms) - sum(av_charges[atoms]) - molcharges[i]
+  return constraints
+
+def get_training_set(filename, fraction):
+  train_selection = np.loadtxt(filename, dtype=int)
+  n = int(fraction*len(train_selection))
+  train_configs = train_selection[0:n]
+  train_configs.sort()
+  return n,train_configs
+
+def get_test_set(filename, nmol):
+  train_selection = np.loadtxt(filename, dtype=int)
+  test_configs = np.setdiff1d(range(nmol),train_selection)
+  return len(test_configs),test_configs
 

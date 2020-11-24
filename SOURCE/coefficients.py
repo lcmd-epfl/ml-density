@@ -3,7 +3,7 @@
 import numpy as np
 from config import Config
 from basis import basis_read_full
-from functions import moldata_read,averages_read,print_progress,prediction2coefficients,gpr2pyscf,number_of_electrons_ao,correct_number_of_electrons
+from functions import moldata_read,averages_read,print_progress,prediction2coefficients,gpr2pyscf,number_of_electrons_ao,correct_number_of_electrons,get_test_set
 
 conf = Config()
 
@@ -33,10 +33,7 @@ if use_charges:
 # basis, elements dictionary, max. angular momenta, number of radial channels
 (basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
 
-# load predicted coefficients for test structures
-trainrangetot = np.loadtxt(trainfilename,int)
-testrange = np.setdiff1d(range(nmol),trainrangetot)
-
+ntest,test_configs = get_test_set(trainfilename, nmol)
 coeff = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 
 av_coefs = averages_read(el_dict.values(), avdir)
@@ -44,8 +41,8 @@ if use_charges:
   print('charge_file:', chargefilename, '\n')
   charges  = np.loadtxt(chargefilename, dtype=int)
 
-for itest,imol in enumerate(testrange):
-  print_progress(itest, len(testrange))
+for itest,imol in enumerate(test_configs):
+  print_progress(itest, ntest)
   atoms = atomic_numbers[imol]
 
   rho  = prediction2coefficients(atoms, lmax, nmax, coeff[itest], av_coefs)

@@ -3,7 +3,7 @@
 import numpy as np
 from basis import basis_read_full
 from config import Config
-from functions import moldata_read,get_elements_list,basis_info,averages_read,number_of_electrons_ao
+from functions import moldata_read,get_elements_list,basis_info,averages_read,number_of_electrons_ao,get_baselined_constraints,get_training_set
 import os
 import sys
 import ctypes
@@ -44,6 +44,7 @@ ref_elements = np.loadtxt(elselfile, int)
 
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 elements = get_elements_list(atomic_numbers)
+atomic_numbers = np.array(atomic_numbers)
 
 # basis, elements dictionary, max. angular momenta, number of radial channels
 (basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
@@ -58,23 +59,10 @@ totsize = sum(bsize[ref_elements])
 
 #===============================================================
 
-trainrangetot = np.loadtxt(trainfilename,int)
-ntrain = int(frac*len(trainrangetot))
-train_configs = np.array(sorted(trainrangetot[0:ntrain]))
-
-av_charges = np.zeros(elements[-1]+1)
+ntrain,train_configs = get_training_set(trainfilename, frac)
 av_coefs = averages_read(el_dict.values(), avdir)
-for q in elements:
-  ch = number_of_electrons_ao(basis, [q])
-  ch = ch[ch!=0.0]
-  av_charges[q] = ch @ av_coefs[q]
-
 molcharges = np.loadtxt(chargefilename, dtype=int)
-constraints = np.zeros(ntrain)
-for i,imol in enumerate(train_configs):
-  atoms = atomic_numbers[imol]
-  constraints[i] = sum(atoms) - sum(av_charges[atoms]) - molcharges[imol]
-
+constraints = get_baselined_constraints(av_coefs, basis, atomic_numbers[train_configs], molcharges[train_configs])
 
 Bmat = np.zeros((totsize,totsize))
 k_MM = np.load(kmmfile)

@@ -14,8 +14,9 @@ qfilebase      = conf.paths['charges_base']
 
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 (basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
-trainrangetot = np.loadtxt(trainfilename, dtype=int)
+train_configs = np.loadtxt(trainfilename, dtype=int)
 
-for imol in trainrangetot:
+for imol in train_configs:
   q = number_of_electrons_ao(basis, atomic_numbers[imol])
   np.savetxt(qfilebase+str(imol)+".dat", q, fmt='%.10e')
+
