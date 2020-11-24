@@ -44,7 +44,6 @@ ref_elements = np.loadtxt(elselfile, int)
 
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 elements = get_elements_list(atomic_numbers)
-atomic_numbers = np.array(atomic_numbers)
 
 # basis, elements dictionary, max. angular momenta, number of radial channels
 (basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
@@ -67,7 +66,7 @@ constraints = get_baselined_constraints(av_coefs, basis, atomic_numbers[train_co
 Bmat = np.zeros((totsize,totsize))
 k_MM = np.load(kmmfile)
 Avec = np.loadtxt(avecfile)
-Kq   = np.fromfile(Kqfile).reshape(ntrain,-1)
+Kq   = np.fromfile(Kqfile).reshape(ntrain,totsize)
 
 array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
 array_2d_int    = npct.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')

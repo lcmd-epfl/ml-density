@@ -39,9 +39,9 @@ av_coefs = averages_read(el_dict.values(), avdir)
 
 if use_charges:
   print('charge_file:', chargefilename, '\n')
-  charges = np.loadtxt(chargefilename, dtype=int)
+  molcharges = np.loadtxt(chargefilename, dtype=int)
 else:
-  charges = np.zeros(nmol, dtype=int)
+  molcharges = np.zeros(nmol, dtype=int)
 
 error_sum = 0.0
 STD_bl = 0.0
@@ -50,10 +50,10 @@ STD = 0.0
 for itest,imol in enumerate(test_configs):
 
     atoms = atomic_numbers[imol]
-    N  = sum(atoms) - charges[imol]
+    N  = sum(atoms) - molcharges[imol]
     S  = np.load(goodoverfilebase+str(imol)+".npy")
     c0 = np.load(goodcoeffilebase+str(imol)+".npy")
-    chvec = number_of_electrons_ao(basis, atoms)
+    qvec = number_of_electrons_ao(basis, atoms)
 
     c_av = np.zeros_like(c0)
     c_bl = np.zeros_like(c0)
@@ -72,15 +72,15 @@ for itest,imol in enumerate(test_configs):
     c     = c_bl + c_av
     dc    = c_bl - c0_bl
 
-    nel_ref = chvec @ c0
-    nel_pr  = chvec @ c
+    nel_ref = qvec @ c0
+    nel_pr  = qvec @ c
 
     error    = dc    @ S @ dc
     norm_bl  = c0_bl @ S @ c0_bl
     norm     = c0    @ S @ c0
 
     if use_charges:
-      cn     = correct_number_of_electrons(c, S, chvec, N)
+      cn     = correct_number_of_electrons(c, S, qvec, N)
       dcn    = cn - c0
       errorn = dcn @ S @ dcn
     else:

@@ -11,7 +11,7 @@ def moldata_read(xyzfilename):
   for i in range(nmol):
       atomic_numbers.append(xyzfile[i].get_atomic_numbers())
       natoms[i] = len(atomic_numbers[i])
-  return (nmol, natoms, atomic_numbers)
+  return (nmol, natoms, np.array(atomic_numbers))
 
 def basis_info(el_dict, lmax, nmax):
     nel = len(el_dict)
@@ -129,25 +129,6 @@ def nao_for_mol(atoms, lmax, nmax):
       for l in range(lmax[q]+1):
         nao += (2*l+1)*nmax[(q,l)]
     return nao
-
-def prediction2coefficients_old(atoms, lmax, nmax, coeff, av_coefs, reorder=1):
-  size = nao_for_mol(atoms, lmax, nmax)
-  rho = np.zeros(size)
-  i = 0
-  for iat,q in enumerate(atoms):
-    for l in range(lmax[q]+1):
-      msize = 2*l+1
-      for n in range(nmax[(q,l)]):
-        if l == 0 :
-          rho[i] = coeff[iat,l,n,0] + av_coefs[q][n]
-        elif l == 1 and reorder:
-          rho[i+1] = coeff[iat,l,n,0]
-          rho[i+2] = coeff[iat,l,n,1]
-          rho[i  ] = coeff[iat,l,n,2]
-        else:
-          rho[i:i+msize] = coeff[iat,l,n,0:msize]
-        i+=msize
-  return rho
 
 def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs):
   size = nao_for_mol(atoms, lmax, nmax)
