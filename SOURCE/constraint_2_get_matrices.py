@@ -19,13 +19,13 @@ def set_variable_values():
 
 [frac,M] = set_variable_values()
 
-xyzfilename      = conf.paths['xyzfile']
-basisfilename    = conf.paths['basisfile']
-trainfilename    = conf.paths['trainingselfile']
-elselfilebase    = conf.paths['spec_sel_base']
-kernelconfbase   = conf.paths['kernel_conf_base']
-Kqfilebase      = 'Kq'
-qfilebase       = 'qvec/mol'
+xyzfilename    = conf.paths['xyzfile']
+basisfilename  = conf.paths['basisfile']
+trainfilename  = conf.paths['trainingselfile']
+elselfilebase  = conf.paths['spec_sel_base']
+kernelconfbase = conf.paths['kernel_conf_base']
+qfilebase      = conf.paths['charges_base']
+Kqfilebase     = conf.paths['kernel_charges_base']
 
 
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
@@ -37,7 +37,7 @@ elements = get_elements_list(atomic_numbers)
 nel = len(elements)
 (atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
 
-#====================================== reference environments
+# reference environments
 ref_elements = np.loadtxt(elselfilebase+str(M)+".txt",int)
 
 # elements dictionary, max. angular momenta, number of radial channels

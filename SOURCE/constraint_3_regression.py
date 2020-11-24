@@ -3,12 +3,11 @@
 import numpy as np
 from basis import basis_read_full
 from config import Config
-from functions import *
+from functions import moldata_read,get_elements_list,basis_info,averages_read,number_of_electrons_ao
 import os
 import sys
 import ctypes
 import numpy.ctypeslib as npct
-from kernels_lib import kernel_nm_sparse_indices,kernel_nm
 
 conf = Config()
 
@@ -28,27 +27,17 @@ weightsfilebase = conf.paths['weights_base']
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
 elselfilebase   = conf.paths['spec_sel_base']
-chargefilename   = conf.paths['chargesfile']
-Kqfilebase      = 'Kq'
-Kqfile          = Kqfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
-avdir            = conf.paths['averages_dir']
+chargefilename  = conf.paths['chargesfile']
+Kqfilebase      = conf.paths['kernel_charges_base']
+avdir           = conf.paths['averages_dir']
+trainfilename   = conf.paths['trainingselfile']
 
 kmmfile     = kmmbase+str(M)+".npy"
 avecfile    = avecfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".txt"
 bmatfile    = bmatfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
 elselfile   = elselfilebase+str(M)+".txt"
 weightsfile = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
-
-# print ("  input:")
-# print ( xyzfilename )
-# print ( basisfilename)
-# print ( elselfile )
-# print ( kmmfile )
-# print ( avecfile )
-# print ( bmatfile )
-# print ("  output:")
-# print (weightsfile)
-# print ()
+Kqfile      = Kqfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
 
 #====================================== reference environments
 ref_elements = np.loadtxt(elselfile, int)
@@ -69,9 +58,28 @@ totsize = sum(bsize[ref_elements])
 
 #===============================================================
 
+trainrangetot = np.loadtxt(trainfilename,int)
+ntrain = int(frac*len(trainrangetot))
+train_configs = np.array(sorted(trainrangetot[0:ntrain]))
+
+av_charges = np.zeros(elements[-1]+1)
+av_coefs = averages_read(el_dict.values(), avdir)
+for q in elements:
+  ch = number_of_electrons_ao(basis, [q])
+  ch = ch[ch!=0.0]
+  av_charges[q] = ch @ av_coefs[q]
+
+molcharges = np.loadtxt(chargefilename, dtype=int)
+constraints = np.zeros(ntrain)
+for i,imol in enumerate(train_configs):
+  atoms = atomic_numbers[imol]
+  constraints[i] = sum(atoms) - sum(av_charges[atoms]) - molcharges[imol]
+
+
+Bmat = np.zeros((totsize,totsize))
 k_MM = np.load(kmmfile)
 Avec = np.loadtxt(avecfile)
-mat  = np.zeros((totsize,totsize))
+Kq   = np.fromfile(Kqfile).reshape(ntrain,-1)
 
 array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
 array_2d_int    = npct.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
@@ -99,59 +107,18 @@ ret = regression.make_matrix(
       ref_elements.astype(np.uint32),
       alnum.astype(np.uint32),
       annum.astype(np.uint32),
-      k_MM, mat, reg, jit,
+      k_MM, Bmat, reg, jit,
       bmatfile.encode('ascii'))
 
 print("problem dimensionality =", totsize)
 
-x0 = np.linalg.solve(mat, Avec)
-print( np.sum(np.abs(mat @ x0 - Avec)))
-
-
-trainfilename    = conf.paths['trainingselfile']
-trainrangetot = np.loadtxt(trainfilename,int)
-ntrain = int(frac*len(trainrangetot))
-train_configs = np.array(sorted(trainrangetot[0:ntrain]))
-natmax = max(natoms)
-natoms_train = natoms[train_configs]
-(atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
-
-atomicindx_training = atomicindx[train_configs,:,:]
-atom_counting_training = atom_counting[train_configs]
-atomic_elements = np.zeros((ntrain,natmax),int)
-for itrain in range(ntrain):
-    for iat in range(natoms_train[itrain]):
-        atomic_elements[itrain,iat] = element_indices[train_configs[itrain]][iat]
-
-
-Kq = np.fromfile(Kqfile)
-Kq = Kq.reshape(ntrain,len(x0))
-
-alpha = np.einsum('ij,j->i', Kq, x0)
-B1Kq = np.linalg.solve(mat, Kq.T)
+x0     = np.linalg.solve(Bmat, Avec)
+B1Kq   = np.linalg.solve(Bmat, Kq.T)
 qKB1Kq = np.einsum('ij,jk->ik', Kq, B1Kq)
-
-#####################################################################
-
-av_charges = np.zeros(elements[-1]+1)
-av_coefs = averages_read(el_dict.values(), avdir)
-for q in elements:
-  ch = number_of_electrons_ao(basis, [q])
-  ch = ch[ch!=0.0]
-  av_charges[q] = ch @ av_coefs[q]
-
-molcharges = np.loadtxt(chargefilename, dtype=int)
-constraints = np.zeros(ntrain)
-for i,imol in enumerate(train_configs):
-    atoms = atomic_numbers[imol]
-    constraints[i] = sum(atoms) - sum(av_charges[atoms]) - molcharges[imol]
-
-#####################################################################
+alpha  = np.einsum('ij,j->i', Kq, x0)
 
 la = np.linalg.solve(qKB1Kq+reg*np.eye(ntrain), alpha-constraints)
-
 dx = np.einsum('ij,j->i', B1Kq, la)
 weights = x0 - dx
-
 np.save(weightsfile, weights)
 

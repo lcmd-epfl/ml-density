@@ -2,7 +2,7 @@
 
 import numpy as np
 from config import Config
-from functions import moldata_read,get_elements_list,get_atomicindx,prediction2coefficients,number_of_electrons,averages_read
+from functions import moldata_read,get_elements_list,get_atomicindx,prediction2coefficients_old,number_of_electrons,averages_read
 from basis import basis_read_full
 from run_prediction import run_prediction
 
@@ -55,8 +55,8 @@ pred = run_prediction(nmol_ex, natmax_ex, natoms_ex,
 av_coefs = averages_read(elements_ex, avdir)
 for imol in range(nmol_ex):
     atoms = atomic_numbers_ex[imol]
-    rho1 = prediction2coefficients(atoms, lmax, nmax, pred[imol], av_coefs, True)
-    rho2 = prediction2coefficients(atoms, lmax, nmax, pred[imol], av_coefs, False)
+    rho1 = prediction2coefficients_old(atoms, lmax, nmax, pred[imol], av_coefs, True)
+    rho2 = prediction2coefficients_old(atoms, lmax, nmax, pred[imol], av_coefs, False)
     nel = number_of_electrons(basis, atoms, rho1)
     strg = "mol # %*i :  %8.4f / %3d (%.1e)"%(
         len(str(nmol_ex)), imol, nel, sum(atoms), nel-sum(atoms) )

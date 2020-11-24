@@ -130,7 +130,7 @@ def nao_for_mol(atoms, lmax, nmax):
         nao += (2*l+1)*nmax[(q,l)]
     return nao
 
-def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs, reorder=1):
+def prediction2coefficients_old(atoms, lmax, nmax, coeff, av_coefs, reorder=1):
 
   size = nao_for_mol(atoms, lmax, nmax)
   rho = np.zeros(size)
@@ -150,7 +150,7 @@ def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs, reorder=1):
         i+=msize
   return rho
 
-def prediction2coefficients_new(atoms, lmax, nmax, coeff, av_coefs):
+def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs):
   size = nao_for_mol(atoms, lmax, nmax)
   rho = np.zeros(size)
   i = 0

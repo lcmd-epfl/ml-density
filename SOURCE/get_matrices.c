@@ -688,10 +688,3 @@ int get_a_for_mol(
   return 0;
 }
 
-
-
-
-
-
-
-

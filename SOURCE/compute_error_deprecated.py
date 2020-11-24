@@ -4,7 +4,7 @@ import numpy as np
 from config import Config
 from ase.data import chemical_symbols
 from basis import basis_read_full
-from functions import moldata_read,averages_read,number_of_electrons_ao,correct_number_of_electrons
+from functions import moldata_read,averages_read,number_of_electrons_ao
 
 conf = Config()
 
@@ -24,7 +24,6 @@ predictfilebase  = conf.paths['predict_base']
 goodcoeffilebase = conf.paths['goodcoef_base']
 goodoverfilebase = conf.paths['goodover_base']
 avdir            = conf.paths['averages_dir']
-chargefilename   = conf.paths['chargesfile']
 
 # number of molecules, number of atoms in each molecule, atomic numbers
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
@@ -39,7 +38,6 @@ testrange = np.setdiff1d(range(nmol),trainrangetot)
 coeffs_unraveled = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
 
 av_coefs = averages_read(el_dict.values(), avdir)
-charges  = np.loadtxt(chargefilename, dtype=int)
 
 error_sum = 0.0
 STD_bl = 0.0
@@ -48,7 +46,6 @@ STD = 0.0
 for itest,imol in enumerate(testrange):
 
     atoms = atomic_numbers[imol]
-    N  = sum(atoms) - charges[imol]
     S  = np.load(goodoverfilebase+str(imol)+".npy")
     c0 = np.load(goodcoeffilebase+str(imol)+".npy")
     q  = number_of_electrons_ao(basis, atoms)
@@ -77,14 +74,10 @@ for itest,imol in enumerate(testrange):
     norm_bl  = c0_bl @ S @ c0_bl
     norm     = c0    @ S @ c0
 
-    cn     = correct_number_of_electrons(c, S, q, N)
-    dcn    = cn - c0
-    errorn = dcn @ S @ dcn
-
     error_sum += error
     STD_bl    += norm_bl
     STD       += norm
-    strg = "mol # %*i (%*i):  %8.3f %%  %.2e %%    ( %.2e )   %8.4f / %8.4f ( %3d )     (N %8.3f %%)"%(
+    strg = "mol # %*i (%*i):  %8.3f %%  %.2e %%    ( %.2e )   %8.4f / %8.4f ( %3d )"%(
         len(str(len(testrange))),
         itest,
         len(str(nmol)),
@@ -94,8 +87,7 @@ for itest,imol in enumerate(testrange):
         error,
         nel_pr,
         nel_ref,
-        N,
-        (errorn/norm_bl)*100.0
+        sum(atoms),
         )
     print(strg)
 
