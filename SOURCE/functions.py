@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 import ase.io
 from ase.data import chemical_symbols
@@ -10,7 +11,7 @@ def moldata_read(xyzfilename):
   for i in range(nmol):
       atomic_numbers.append(xyzfile[i].get_atomic_numbers())
       natoms[i] = len(atomic_numbers[i])
-  return (nmol, natoms, atomic_numbers)
+  return (nmol, natoms, np.array(atomic_numbers))
 
 def basis_info(el_dict, lmax, nmax):
     nel = len(el_dict)
@@ -99,6 +100,23 @@ def number_of_electrons(basis, atoms, c):
         i+=2*l+1
   return nel
 
+def number_of_electrons_ao(basis, atoms):
+  nel = []
+  for q in atoms:
+    for [l,gto] in basis[q]:
+      if l==0:
+        t = 0.0
+        for [a,w] in gto:
+          t += w * nel_contrib(a)
+        nel.append(t)
+      else:
+        nel.extend([0]*(2*l+1))
+  return np.array(nel)
+
+def correct_number_of_electrons(c, S, q, N):
+  S1q  = np.linalg.solve(S, q)
+  return c + S1q * (N - c@q)/(q@S1q)
+
 def averages_read(elements, avdir):
   av_coefs = {}
   for q in elements:
@@ -112,23 +130,55 @@ def nao_for_mol(atoms, lmax, nmax):
         nao += (2*l+1)*nmax[(q,l)]
     return nao
 
-def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs, reorder=1):
+def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs):
+  size = nao_for_mol(atoms, lmax, nmax)
+  rho = np.zeros(size)
+  i = 0
+  for iat,q in enumerate(atoms):
+    for l in range(lmax[q]+1):
+      msize = 2*l+1
+      for n in range(nmax[(q,l)]):
+        if l == 0 :
+          rho[i] = coeff[iat,l,n,0] + av_coefs[q][n]
+        else:
+          rho[i:i+msize] = coeff[iat,l,n,0:msize]
+        i+=msize
+  return rho
 
-    size = nao_for_mol(atoms, lmax, nmax)
-    rho = np.zeros(size)
-    i = 0
-    for iat,q in enumerate(atoms):
-      for l in range(lmax[q]+1):
-        msize = 2*l+1
-        for n in range(nmax[(q,l)]):
-          if l == 0 :
-            rho[i] = coeff[iat,l,n,0] + av_coefs[q][n]
-          elif l == 1 and reorder:
-            rho[i+1] = coeff[iat,l,n,0]
-            rho[i+2] = coeff[iat,l,n,1]
-            rho[i  ] = coeff[iat,l,n,2]
-          else:
-            rho[i:i+msize] = coeff[iat,l,n,0:msize]
-          i+=msize
-    return rho
+def gpr2pyscf(atoms, lmax, nmax, rho0):
+  rho = copy.deepcopy(rho0)
+  i = 0
+  for iat,q in enumerate(atoms):
+    for l in range(lmax[q]+1):
+      msize = 2*l+1
+      for n in range(nmax[(q,l)]):
+        if l == 1:
+          rho[i+1] = rho0[i+0]
+          rho[i+2] = rho0[i+1]
+          rho[i  ] = rho0[i+2]
+        i+=msize
+  return rho
+
+def get_baselined_constraints(av_coefs, basis, atomic_numbers, molcharges):
+  av_charges = np.zeros(max(av_coefs.keys())+1)
+  for q in av_coefs.keys():
+    ch = number_of_electrons_ao(basis, [q])
+    ch = ch[ch!=0.0]
+    av_charges[q] = ch @ av_coefs[q]
+  constraints = np.zeros(len(atomic_numbers))
+  for i,atoms in enumerate(atomic_numbers):
+    constraints[i] = sum(atoms) - sum(av_charges[atoms]) - molcharges[i]
+  return constraints
+
+def get_training_set(filename, fraction):
+  train_selection = np.loadtxt(filename, dtype=int)
+  n = int(fraction*len(train_selection))
+  train_configs = train_selection[0:n]
+  train_configs.sort()
+  return n,train_configs
+
+def get_test_set(filename, nmol):
+  train_selection = np.loadtxt(filename, dtype=int)
+  test_configs = np.setdiff1d(range(nmol),train_selection)
+  return len(test_configs),test_configs
 

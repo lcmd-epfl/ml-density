@@ -3,7 +3,7 @@
 import numpy as np
 from config import Config
 from basis import basis_read
-from functions import moldata_read,get_elements_list,get_atomicindx
+from functions import moldata_read,get_elements_list,get_atomicindx,get_test_set
 from run_prediction import run_prediction
 
 conf = Config()
@@ -33,18 +33,12 @@ elements = get_elements_list(atomic_numbers)
 nel = len(elements)
 (atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
 
-# dataset partitioning
-trainrangetot = np.loadtxt(trainfilename,int)
-ntrain = int(frac*len(trainrangetot))
-test_configs = np.setdiff1d(range(nmol),trainrangetot)
-ntest = len(test_configs)
+ntest,test_configs = get_test_set(trainfilename, nmol)
 natoms_test = natoms[test_configs]
-print("Number of training molecules =", ntrain)
-print("Number of testing molecules =", ntest)
-
-# define testing indices
-atomicindx_test = atomicindx[test_configs,:,:]
+atomicindx_test = atomicindx[test_configs]
 atom_counting_test = atom_counting[test_configs]
+
+print("Number of testing molecules =", ntest)
 
 run_prediction(ntest, natmax, natoms_test,
     atom_counting_test, atomicindx_test, test_configs,

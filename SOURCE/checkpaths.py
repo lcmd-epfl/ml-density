@@ -10,6 +10,7 @@ paths0 = [
   'basisfile',
   'ex_xyzfile',
   'ps0file',
+  'chargesfile',
   ]
 
 paths1 = [
@@ -35,6 +36,8 @@ paths1 = [
   'weights_base',
   'trainingselfile',
   'ex_ps_base',
+  'charges_base',
+  'kernel_charges_base',
   ]
 
 for key in paths0:

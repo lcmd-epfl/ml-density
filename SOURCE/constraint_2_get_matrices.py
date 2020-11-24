@@ -19,15 +19,13 @@ def set_variable_values():
 
 [frac,M] = set_variable_values()
 
-xyzfilename      = conf.paths['xyzfile']
-basisfilename    = conf.paths['basisfile']
-trainfilename    = conf.paths['trainingselfile']
-elselfilebase    = conf.paths['spec_sel_base']
-kernelconfbase   = conf.paths['kernel_conf_base']
-baselinedwbase   = conf.paths['baselined_w_base']
-goodoverfilebase = conf.paths['goodover_base']
-avecfilebase     = conf.paths['avec_base']
-bmatfilebase     = conf.paths['bmat_base']
+xyzfilename    = conf.paths['xyzfile']
+basisfilename  = conf.paths['basisfile']
+trainfilename  = conf.paths['trainingselfile']
+elselfilebase  = conf.paths['spec_sel_base']
+kernelconfbase = conf.paths['kernel_conf_base']
+qfilebase      = conf.paths['charges_base']
+Kqfilebase     = conf.paths['kernel_charges_base']
 
 
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
@@ -99,57 +97,28 @@ argtypes = [
   ctypes.c_char_p,
   ctypes.c_char_p ]
 
+get_matrices.get_a_for_mol.restype = ctypes.c_int
+get_matrices.get_a_for_mol.argtypes = argtypes
 
-if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
-
-  get_matrices.get_b.restype = ctypes.c_int
-  get_matrices.get_b.argtypes = argtypes
-
-  ret = get_matrices.get_b(
-      totsize ,
-      nel     ,
-      llmax   ,
-      nnmax   ,
-      M       ,
-      ntrain  ,
-      natmax  ,
-      atomicindx_training.astype(np.uint32)   ,
-      atom_counting_training.astype(np.uint32),
-      train_configs.astype(np.uint32)         ,
-      natoms_train.astype(np.uint32)          ,
-      total_sizes.astype(np.uint32)           ,
-      kernel_sizes.astype(np.uint32)          ,
-      atomic_elements.astype(np.uint32)       ,
-      ref_elements.astype(np.uint32)          ,
-      alnum.astype(np.uint32)                 ,
-      annum.astype(np.uint32)                 ,
-      goodoverfilebase.encode('ascii'),
-      kernelconfbase.encode('ascii'),
-      (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii'))
-
-else:
-  get_matrices.get_a.restype = ctypes.c_int
-  get_matrices.get_a.argtypes = argtypes
-
-  ret = get_matrices.get_a(
-      totsize ,
-      nel     ,
-      llmax   ,
-      nnmax   ,
-      M       ,
-      ntrain  ,
-      natmax  ,
-      atomicindx_training.astype(np.uint32)   ,
-      atom_counting_training.astype(np.uint32),
-      train_configs.astype(np.uint32)         ,
-      natoms_train.astype(np.uint32)          ,
-      total_sizes.astype(np.uint32)           ,
-      kernel_sizes.astype(np.uint32)          ,
-      atomic_elements.astype(np.uint32)       ,
-      ref_elements.astype(np.uint32)          ,
-      alnum.astype(np.uint32)                 ,
-      annum.astype(np.uint32)                 ,
-      baselinedwbase.encode('ascii'),
-      kernelconfbase.encode('ascii'),
-      (avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt").encode('ascii'))
+ret = get_matrices.get_a_for_mol(
+    totsize ,
+    nel     ,
+    llmax   ,
+    nnmax   ,
+    M       ,
+    ntrain  ,
+    natmax  ,
+    atomicindx_training.astype(np.uint32)   ,
+    atom_counting_training.astype(np.uint32),
+    train_configs.astype(np.uint32)         ,
+    natoms_train.astype(np.uint32)          ,
+    total_sizes.astype(np.uint32)           ,
+    kernel_sizes.astype(np.uint32)          ,
+    atomic_elements.astype(np.uint32)       ,
+    ref_elements.astype(np.uint32)          ,
+    alnum.astype(np.uint32)                 ,
+    annum.astype(np.uint32)                 ,
+    qfilebase.encode('ascii'),
+    kernelconfbase.encode('ascii'),
+    (Kqfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii'))
 
