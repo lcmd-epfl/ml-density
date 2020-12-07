@@ -38,10 +38,8 @@ coeffs_unraveled = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+
 av_coefs = averages_read(el_dict.values(), avdir)
 
 if use_charges:
-  print('charge_file:', chargefilename, '\n')
+  print('charge_file:', chargefilename, 'mode:', use_charges, '\n')
   molcharges = np.loadtxt(chargefilename, dtype=int)
-else:
-  molcharges = np.zeros(nmol, dtype=int)
 
 error_sum = 0.0
 STD_bl = 0.0
@@ -50,7 +48,13 @@ STD = 0.0
 for itest,imol in enumerate(test_configs):
 
     atoms = atomic_numbers[imol]
-    N  = sum(atoms) - molcharges[imol]
+    if use_charges==0:
+      N  = sum(atoms)
+    elif use_charges==1:
+      N  = sum(atoms) - molcharges[imol]
+    elif use_charges==2:
+      N  = molcharges[imol]
+
     S  = np.load(goodoverfilebase+str(imol)+".npy")
     c0 = np.load(goodcoeffilebase+str(imol)+".npy")
     qvec = number_of_electrons_ao(basis, atoms)

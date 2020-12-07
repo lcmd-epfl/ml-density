@@ -159,7 +159,7 @@ def gpr2pyscf(atoms, lmax, nmax, rho0):
         i+=msize
   return rho
 
-def get_baselined_constraints(av_coefs, basis, atomic_numbers, molcharges):
+def get_baselined_constraints(av_coefs, basis, atomic_numbers, molcharges, charges_mode):
   av_charges = np.zeros(max(av_coefs.keys())+1)
   for q in av_coefs.keys():
     ch = number_of_electrons_ao(basis, [q])
@@ -167,7 +167,11 @@ def get_baselined_constraints(av_coefs, basis, atomic_numbers, molcharges):
     av_charges[q] = ch @ av_coefs[q]
   constraints = np.zeros(len(atomic_numbers))
   for i,atoms in enumerate(atomic_numbers):
-    constraints[i] = sum(atoms) - sum(av_charges[atoms]) - molcharges[i]
+    if charges_mode==1:
+      constraints[i] = sum(atoms) - molcharges[i]
+    elif charges_mode==2:
+      constraints[i] = molcharges[i]
+    constraints[i] -= sum(av_charges[atoms])
   return constraints
 
 def get_training_set(filename, fraction):

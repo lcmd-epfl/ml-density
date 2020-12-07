@@ -38,7 +38,7 @@ coeff = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(
 
 av_coefs = averages_read(el_dict.values(), avdir)
 if use_charges:
-  print('charge_file:', chargefilename, '\n')
+  print('charge_file:', chargefilename, 'mode:', use_charges, '\n')
   charges  = np.loadtxt(chargefilename, dtype=int)
 
 for itest,imol in enumerate(test_configs):
@@ -51,7 +51,10 @@ for itest,imol in enumerate(test_configs):
   np.savetxt(outfilebase+'pyscf_'+str(imol)+'.dat', rho1)
 
   if use_charges:
-    N  = sum(atoms) - charges[imol]
+    if use_charges == 1:
+      N  = sum(atoms) - charges[imol]
+    elif use_charges == 2:
+      N  = charges[imol]
     S  = np.load(goodoverfilebase+str(imol)+".npy")
     q  = number_of_electrons_ao(basis, atoms)
     rho_n  = correct_number_of_electrons(rho, S, q, N)

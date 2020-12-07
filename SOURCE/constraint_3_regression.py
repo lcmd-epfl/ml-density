@@ -16,9 +16,10 @@ def set_variable_values():
     m  = conf.get_option('m'           ,  100,   int  )
     r  = conf.get_option('regular'     ,  1e-6,  float)
     j  = conf.get_option('jitter'      ,  1e-10, float)
-    return [f,m,r,j]
+    q  = conf.get_option('charges'     ,  0,     int  )  # compatibility
+    return [f,m,r,j,q]
 
-[frac,M,reg,jit] = set_variable_values()
+[frac,M,reg,jit,use_charges] = set_variable_values()
 
 kmmbase         = conf.paths['kmm_base']
 avecfilebase    = conf.paths['avec_base']
@@ -61,7 +62,8 @@ totsize = sum(bsize[ref_elements])
 ntrain,train_configs = get_training_set(trainfilename, frac)
 av_coefs = averages_read(el_dict.values(), avdir)
 molcharges = np.loadtxt(chargefilename, dtype=int)
-constraints = get_baselined_constraints(av_coefs, basis, atomic_numbers[train_configs], molcharges[train_configs])
+constraints = get_baselined_constraints(av_coefs, basis, atomic_numbers[train_configs], molcharges[train_configs], use_charges)
+print('charge_file:', chargefilename, 'mode:', use_charges, '\n')
 
 Bmat = np.zeros((totsize,totsize))
 k_MM = np.load(kmmfile)
