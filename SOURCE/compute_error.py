@@ -44,6 +44,7 @@ if use_charges:
 error_sum = 0.0
 STD_bl = 0.0
 STD = 0.0
+dn_av = 0.0
 
 for itest,imol in enumerate(test_configs):
 
@@ -87,6 +88,7 @@ for itest,imol in enumerate(test_configs):
       cn     = correct_number_of_electrons(c, S, qvec, N)
       dcn    = cn - c0
       errorn = dcn @ S @ dcn
+      dn_av += abs(nel_pr - N)
     else:
       errorn = np.nan
 
@@ -114,4 +116,7 @@ print("%% RMSE = %.2e %%  %.2e %%    ( %.2e )" % (
       (error_sum/STD)*100.0,
       error_sum/ntest
 ))
+
+if use_charges:
+  print(dn_av/ntest)
 
