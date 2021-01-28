@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from config import Config
+from config import Config,get_config_path
 from basis import basis_read
 from functions import moldata_read,get_elements_list,get_atomicindx,get_test_set
 from run_prediction import run_prediction
 
-conf = Config()
+path = get_config_path(sys.argv)
+conf = Config(config_path=path)
 
 def set_variable_values():
     f   = conf.get_option('trainfrac'   ,  1.0,   float)

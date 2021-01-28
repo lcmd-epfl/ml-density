@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from config import Config
+from config import Config,get_config_path
 from ase.data import chemical_symbols
 from basis import basis_read_full
 from functions import moldata_read,averages_read,number_of_electrons_ao,correct_number_of_electrons,get_test_set
 
-conf = Config()
+path = get_config_path(sys.argv)
+conf = Config(config_path=path)
 
 def set_variable_values():
     f   = conf.get_option('trainfrac'   ,  1.0,   float)
