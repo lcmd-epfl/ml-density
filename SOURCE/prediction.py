@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import numpy as np
 from config import Config,get_config_path
 from basis import basis_read
