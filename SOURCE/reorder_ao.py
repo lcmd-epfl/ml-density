@@ -16,12 +16,8 @@ goodcoeffilebase = conf.paths['goodcoef_base']
 goodoverfilebase = conf.paths['goodover_base']
 
 
-only_c = False
-reorder = True
-if 'c' in sys.argv[1:]:
-  only_c = True
-if 'noreorder' in sys.argv[1:]:
-  reorder = False
+only_c = 'c' in sys.argv[1:]
+reorder = not 'noreorder' in sys.argv[1:]
 print('only_c =', only_c)
 print('reorder =', reorder)
 

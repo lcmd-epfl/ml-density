@@ -5,7 +5,7 @@ import numpy as np
 from config import Config,get_config_path
 from ase.data import chemical_symbols
 from basis import basis_read_full
-from functions import moldata_read,averages_read,number_of_electrons_ao,correct_number_of_electrons,get_test_set
+from functions import moldata_read,averages_read,number_of_electrons_ao,correct_number_of_electrons,get_test_set,get_training_set
 
 path = get_config_path(sys.argv)
 conf = Config(config_path=path)
@@ -30,13 +30,21 @@ avdir            = conf.paths['averages_dir']
 if use_charges:
   chargefilename = conf.paths['chargesfile']
 
+training = 'training' in sys.argv[1:]
+
 # number of molecules, number of atoms in each molecule, atomic numbers
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 # basis, elements dictionary, max. angular momenta, number of radial channels
 (basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
 
-ntest,test_configs = get_test_set(trainfilename, nmol)
-coeffs_unraveled = np.load(predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy")
+if not training:
+  ntest,test_configs = get_test_set(trainfilename, nmol)
+  predictfile = predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
+else:
+  ntest,test_configs = get_training_set(trainfilename, frac)
+  predictfile = predictfilebase + "_training_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
+
+coeffs_unraveled = np.load(predictfile)
 av_coefs = averages_read(el_dict.values(), avdir)
 
 if use_charges:
