@@ -2,11 +2,12 @@
 
 import sys
 import numpy as np
-from config import Config
+from config import Config,get_config_path
 from basis import basis_read
 from functions import moldata_read,print_progress,nao_for_mol
 
-conf = Config()
+path = get_config_path(sys.argv)
+conf = Config(config_path=path)
 
 xyzfilename      = conf.paths['xyzfile']
 basisfilename    = conf.paths['basisfile']
@@ -16,12 +17,8 @@ goodcoeffilebase = conf.paths['goodcoef_base']
 goodoverfilebase = conf.paths['goodover_base']
 
 
-only_c = False
-reorder = True
-if 'c' in sys.argv[1:]:
-  only_c = True
-if 'noreorder' in sys.argv[1:]:
-  reorder = False
+only_c = 'c' in sys.argv[1:]
+reorder = not 'noreorder' in sys.argv[1:]
 print('only_c =', only_c)
 print('reorder =', reorder)
 

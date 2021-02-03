@@ -2,14 +2,15 @@
 
 import numpy as np
 from basis import basis_read_full
-from config import Config
+from config import Config,get_config_path
 from functions import moldata_read,get_elements_list,basis_info,averages_read,number_of_electrons_ao,get_baselined_constraints,get_training_set
 import os
 import sys
 import ctypes
 import numpy.ctypeslib as npct
 
-conf = Config()
+path = get_config_path(sys.argv)
+conf = Config(config_path=path)
 
 def set_variable_values():
     f  = conf.get_option('trainfrac'   ,  1.0,   float)

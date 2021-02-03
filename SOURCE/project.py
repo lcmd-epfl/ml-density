@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
+import sys
 import numpy as np
-from config import Config
+from config import Config,get_config_path
 from basis import basis_read
 from ase.data import chemical_symbols
 from functions import moldata_read,print_progress
 
-conf = Config()
+path = get_config_path(sys.argv)
+conf = Config(config_path=path)
 
 xyzfilename      = conf.paths['xyzfile']
 basisfilename    = conf.paths['basisfile']
