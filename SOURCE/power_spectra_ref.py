@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
+import sys
 import numpy as np
-from config import Config
+from config import Config,get_config_path
 from basis import basis_read
 from functions import moldata_read,get_elements_list,get_atomicindx
 from power_spectra_lib import read_ps_1mol
 
-conf = Config()
+path = get_config_path(sys.argv)
+conf = Config(config_path=path)
 
 def set_variable_values():
   m   = conf.get_option('m'           ,  100, int  )

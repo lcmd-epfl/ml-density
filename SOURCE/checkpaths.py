@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import sys
 import os.path
-from config import Config
+from config import Config,get_config_path
 
-conf = Config()
+path = get_config_path(sys.argv)
+conf = Config(config_path=path)
 
 paths0 = [
   'xyzfile',

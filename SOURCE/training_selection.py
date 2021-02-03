@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+import sys
 import numpy as np
+from config import Config,get_config_path
 import ase.io
-from config import Config
 
-conf = Config()
+path = get_config_path(sys.argv)
+conf = Config(config_path=path)
 
 def set_variable_values():
     seed  = conf.get_option('seed'        ,    1, int  )

@@ -2,11 +2,12 @@
 
 import sys
 import numpy as np
-from config import Config
+from config import Config,get_config_path
 from basis import basis_read
 from functions import moldata_read,print_progress,nao_for_mol
 
-conf = Config()
+path = get_config_path(sys.argv)
+conf = Config(config_path=path)
 
 xyzfilename      = conf.paths['xyzfile']
 basisfilename    = conf.paths['basisfile']
