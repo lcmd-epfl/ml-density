@@ -59,8 +59,19 @@ for itest,imol in enumerate(test_configs):
       N  = charges[imol]
     S  = np.load(goodoverfilebase+str(imol)+".npy")
     q  = number_of_electrons_ao(basis, atoms)
+
     rho_n  = correct_number_of_electrons(rho, S, q, N)
     rho_n1 = gpr2pyscf(atoms, lmax, nmax, rho_n)
     np.savetxt(outfilebase+'gpr_'  +str(imol)+'.N.dat', rho_n)
     np.savetxt(outfilebase+'pyscf_'+str(imol)+'.N.dat', rho_n1)
+
+    rho_u = rho + q * (N-q@rho) / (q@q)
+    rho_u1 = gpr2pyscf(atoms, lmax, nmax, rho_u)
+    np.savetxt(outfilebase+'gpr_'  +str(imol)+'.unit.dat', rho_u)
+    np.savetxt(outfilebase+'pyscf_'+str(imol)+'.unit.dat', rho_u1)
+
+    rho_s = rho * N / (q@rho)
+    rho_s1 = gpr2pyscf(atoms, lmax, nmax, rho_s)
+    np.savetxt(outfilebase+'gpr_'  +str(imol)+'.scaled.dat', rho_s)
+    np.savetxt(outfilebase+'pyscf_'+str(imol)+'.scaled.dat', rho_s1)
 
