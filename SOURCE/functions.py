@@ -181,6 +181,12 @@ def get_training_set(filename, fraction=1.0):
   train_configs.sort()
   return n,train_configs
 
+def get_training_sets(filename, fractions):
+  train_selection = np.loadtxt(filename, dtype=int)
+  n = (fractions*len(train_selection)).astype(int)
+  train_configs = train_selection[0:n[-1]]
+  return len(n),n,train_configs
+
 def get_test_set(filename, nmol):
   train_selection = np.loadtxt(filename, dtype=int)
   test_configs = np.setdiff1d(range(nmol),train_selection)

@@ -1,7 +1,9 @@
 import os.path
 import configparser
+import numpy
 
 DEFAULT_PATH = 'config.txt'
+
 
 class Config(object):
   def __init__(self, config_path=DEFAULT_PATH):
@@ -22,6 +24,9 @@ class Config(object):
       return ttype(self.options[key])
     else:
       return default
+
+  def floats(self, x):
+    return numpy.array(list(map(float, x.split(','))))
 
 
 def get_config_path(argv):

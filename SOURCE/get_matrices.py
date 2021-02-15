@@ -4,21 +4,21 @@ import sys
 import numpy as np
 from config import Config,get_config_path
 from basis import basis_read
-from functions import moldata_read,get_elements_list,get_atomicindx,basis_info,get_kernel_sizes,nao_for_mol,get_training_set
+from functions import moldata_read,get_elements_list,get_atomicindx,basis_info,get_kernel_sizes,nao_for_mol,get_training_sets
 
 import os
 import ctypes
-import numpy.ctypeslib as npct
+import ctypes_def
 
 path = get_config_path(sys.argv)
 conf = Config(config_path=path)
 
 def set_variable_values():
-    f  = conf.get_option('trainfrac'   ,  1.0,  float)
+    f  = conf.get_option('trainfrac'   ,  1.0,  conf.floats) # can be changed to lambda
     m  = conf.get_option('m'           ,  100,  int  )
     return [f,m]
 
-[frac,M] = set_variable_values()
+[fracs,M] = set_variable_values()
 
 xyzfilename      = conf.paths['xyzfile']
 basisfilename    = conf.paths['basisfile']
@@ -29,7 +29,6 @@ baselinedwbase   = conf.paths['baselined_w_base']
 goodoverfilebase = conf.paths['goodover_base']
 avecfilebase     = conf.paths['avec_base']
 bmatfilebase     = conf.paths['bmat_base']
-
 
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
 natmax = max(natoms)
@@ -57,8 +56,12 @@ nnmax = max(nmax.values())
 # problem dimensionality
 totsize = sum(bsize[ref_elements])
 
+
 # training set selection
-ntrain,train_configs = get_training_set(trainfilename, frac)
+fracs.sort()     #####
+frac = fracs[-1] #####
+nfrac,ntrains,train_configs = get_training_sets(trainfilename, fracs)
+ntrain = ntrains[-1]
 natoms_train = natoms[train_configs]
 atomicindx_training = atomicindx[train_configs]
 atom_counting_training = atom_counting[train_configs]
@@ -66,16 +69,15 @@ atomic_elements = np.zeros((ntrain,natmax),int)
 for itrain,iconf in enumerate(train_configs):
   atomic_elements[itrain,0:natoms_train[itrain]] = element_indices[iconf]
 
+
 # sparse overlap and projection indices
 total_sizes = np.array([ nao_for_mol(atomic_numbers[imol], lmax, nmax) for imol in train_configs ])
 # sparse kernel indices
 kernel_sizes = get_kernel_sizes(train_configs, ref_elements, el_dict, M, lmax, atom_counting_training)
 
+
 ################################################################################
 
-array_1d_int = npct.ndpointer(dtype=np.uint32, ndim=1, flags='CONTIGUOUS')
-array_2d_int = npct.ndpointer(dtype=np.uint32, ndim=2, flags='CONTIGUOUS')
-array_3d_int = npct.ndpointer(dtype=np.uint32, ndim=3, flags='CONTIGUOUS')
 get_matrices = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/get_matrices.so")
 
 argtypes = [
@@ -86,22 +88,29 @@ argtypes = [
   ctypes.c_int,
   ctypes.c_int,
   ctypes.c_int,
-  array_3d_int,
-  array_2d_int,
-  array_1d_int,
-  array_1d_int,
-  array_1d_int,
-  array_1d_int,
-  array_2d_int,
-  array_1d_int,
-  array_1d_int,
-  array_2d_int,
+  ctypes.c_int,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_3d_int,
+  ctypes_def.array_2d_int,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_2d_int,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_2d_int,
   ctypes.c_char_p,
   ctypes.c_char_p,
-  ctypes.c_char_p ]
+  ctypes.POINTER(ctypes.c_char_p)
+  ]
 
 
 if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
+
+  bmatfiles = (ctypes.c_char_p * nfrac)()
+  for i in range(nfrac):
+    bmatfiles[i] = (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(fracs[i])+".txt").encode('ascii')
 
   get_matrices.get_b.restype = ctypes.c_int
   get_matrices.get_b.argtypes = argtypes
@@ -114,6 +123,8 @@ if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
       M       ,
       ntrain  ,
       natmax  ,
+      # nfrac, TODO
+      # ntrains, TODO
       atomicindx_training.astype(np.uint32)   ,
       atom_counting_training.astype(np.uint32),
       train_configs.astype(np.uint32)         ,
@@ -126,9 +137,16 @@ if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
       annum.astype(np.uint32)                 ,
       goodoverfilebase.encode('ascii'),
       kernelconfbase.encode('ascii'),
-      (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii'))
+      bmatfiles,
+      # (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii') ######## change to names array TODO
+      )
 
 else:
+
+  avecfiles = (ctypes.c_char_p * nfrac)()
+  for i in range(nfrac):
+    avecfiles[i] = (avecfilebase + "_M"+str(M)+"_trainfrac"+str(fracs[i])+".txt").encode('ascii')
+
   get_matrices.get_a.restype = ctypes.c_int
   get_matrices.get_a.argtypes = argtypes
 
@@ -140,6 +158,8 @@ else:
       M       ,
       ntrain  ,
       natmax  ,
+      nfrac   ,
+      ntrains.astype(np.uint32)               ,
       atomicindx_training.astype(np.uint32)   ,
       atom_counting_training.astype(np.uint32),
       train_configs.astype(np.uint32)         ,
@@ -152,5 +172,5 @@ else:
       annum.astype(np.uint32)                 ,
       baselinedwbase.encode('ascii'),
       kernelconfbase.encode('ascii'),
-      (avecfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".txt").encode('ascii'))
+      avecfiles)
 

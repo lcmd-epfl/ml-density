@@ -47,8 +47,22 @@ static void print_nodes(FILE * f){
       fputs(buf, f);
     }
     fputs("\n", f);
+    fflush(f);
   }
+  MPI_Barrier(MPI_COMM_WORLD);
   return;
+}
+
+static void print_batches(FILE * f, int nfrac, const unsigned int * const ntrains, const char ** const paths){
+
+  if(!nproc){
+    for(int i=0; i<nfrac; i++){
+      fprintf(f, "batch %2d [%d--%d):\t %s\n", i, (i==0?0:ntrains[i-1]), ntrains[i], paths[i]);
+    }
+    fprintf(f, "\n");
+    fflush(f);
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
 }
 
 static void send_jobs(const int ntrain){
@@ -57,6 +71,18 @@ static void send_jobs(const int ntrain){
     int p[2];
     MPI_Recv(p, 2, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
     p[1] = (imol<ntrain) ? imol : -1;
+    MPI_Send(p, 2, MPI_INT, p[0], 0, MPI_COMM_WORLD);
+    printf("%4d: %4d\n", p[0], p[1]);
+  }
+  return;
+}
+
+static void send_jobs_new(const int bra, const int ket){
+  for(int imol=bra; imol<ket+(Nproc-1); imol++){
+    MPI_Status status;
+    int p[2];
+    MPI_Recv(p, 2, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+    p[1] = (imol<ket) ? imol : -1;
     MPI_Send(p, 2, MPI_INT, p[0], 0, MPI_COMM_WORLD);
     printf("%4d: %4d\n", p[0], p[1]);
   }
@@ -321,6 +347,8 @@ int get_a(
     const unsigned int M,
     const unsigned int ntrain,
     const unsigned int natmax,
+    const unsigned int nfrac,
+    const unsigned int const ntrains   [nfrac],                  //  nfrac
     const unsigned int const atomicindx[ntrain][nelem][natmax],  //  ntrain*nelem*natmax
     const unsigned int const atomcount [ntrain][nelem],          //  ntrain*nelem
     const unsigned int const trrange   [ntrain],                 //  ntrain
@@ -333,8 +361,16 @@ int get_a(
     const unsigned int const annum     [nelem][llmax+1],         //  nelem*(llmax+1)
     const char * const path_proj,
     const char * const path_kern,
-    const char * const path_avec
+    const char ** const paths_avec
     ){
+
+ // for(int i=0; i<nfrac; i++){
+ //   printf("%2d (%6d mols) : %s\n\t", i, ntrains[i], paths_avec[i]);
+ //   for(int j=(i==0?0:ntrains[i-1]); j<ntrains[i]; j++){
+ //     printf("%d ", j);
+ //   }
+ //   printf("\n");
+ // }
 
 #ifdef USE_MPI
   int argc = 1;
@@ -344,6 +380,7 @@ int get_a(
   MPI_Comm_size (MPI_COMM_WORLD, &Nproc);
   MPI_Comm_rank (MPI_COMM_WORLD, &nproc);
   print_nodes(stdout);
+  print_batches(stdout, nfrac, ntrains, paths_avec);
 #else
   nproc = 0;
   Nproc = 1;
@@ -361,43 +398,9 @@ int get_a(
   ao_t * aoref = ao_fill(totsize, llmax, M, ref_elem, alnum, annum);
 
   if(Nproc==1){
-    for(int imol=0; imol<ntrain; imol++){
-      printf("%4d: %4d\n", nproc, imol);
-      do_work_a(
-          totsize,
-          nelem  ,
-          llmax  ,
-          nnmax  ,
-          M      ,
-          natmax ,
-          natoms    [imol],
-          trrange   [imol],
-          totalsizes[imol],
-          kernsizes [imol],
-          atomicindx[imol],
-          atomcount [imol],
-          atom_elem [imol],
-          ref_elem  ,
-          alnum     ,
-          annum     ,
-          aoref     ,
-          path_proj,
-          path_kern,
-          Avec);
-    }
-  }
-#ifdef USE_MPI
-  else{
-    if(!nproc){
-      send_jobs(ntrain);
-    }
-    else{
-      int imol = -1;
-      while(1){
-        imol = receive_job(imol);
-        if(imol<0){
-          break;
-        }
+    for(int ifrac=0; ifrac<nfrac; ifrac++){
+      for(int imol=(ifrac==0?0:ntrains[ifrac-1]); imol<ntrains[ifrac]; imol++){
+        printf("%4d: %4d\n", nproc, imol);
         do_work_a(
             totsize,
             nelem  ,
@@ -420,38 +423,74 @@ int get_a(
             path_kern,
             Avec);
       }
-      printf("%4d: finished work\n", nproc);
+      vec_print(totsize, Avec, "w", paths_avec[ifrac]);
     }
-  }
-#endif
-  free(aoref);
-
 #ifdef USE_MPI
-  MPI_Barrier(MPI_COMM_WORLD);
-  if(!nproc){
     t = MPI_Wtime () - t;
     fprintf(stderr, "t=%4.2lf\n", t);
-  }
 #endif
-
-  if(Nproc==1){
-    vec_print(totsize, Avec, "w", path_avec);
   }
+
 #ifdef USE_MPI
   else{
+
     double * AVEC = NULL;
     if(!nproc){
       AVEC = calloc(sizeof(double)*totsize, 1);
     }
 
-    MPI_Reduce (Avec, nproc?NULL:AVEC, totsize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-    if(!nproc){
-      vec_print(totsize, AVEC, "w", path_avec);
-    }
+    for(int ifrac=0; ifrac<nfrac; ifrac++){
+      if(!nproc){
+        send_jobs_new(ifrac==0?0:ntrains[ifrac-1], ntrains[ifrac]);
+      }
+      else{
+        int imol = -1;
+        while(1){
+          imol = receive_job(imol);
+          if(imol<0){
+            break;
+          }
+          do_work_a(
+              totsize,
+              nelem  ,
+              llmax  ,
+              nnmax  ,
+              M      ,
+              natmax ,
+              natoms    [imol],
+              trrange   [imol],
+              totalsizes[imol],
+              kernsizes [imol],
+              atomicindx[imol],
+              atomcount [imol],
+              atom_elem [imol],
+              ref_elem  ,
+              alnum     ,
+              annum     ,
+              aoref     ,
+              path_proj,
+              path_kern,
+              Avec);
+        }
+        printf("%4d: finished work\n", nproc);
+      }
 
+      MPI_Barrier(MPI_COMM_WORLD);
+      if(!nproc){
+        double tt = MPI_Wtime();
+        fprintf(stderr, "batch%d: t=%4.2lf\n", ifrac, tt-t);
+        t = tt;
+      }
+      MPI_Reduce (Avec, nproc?NULL:AVEC, totsize, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+      if(!nproc){
+        vec_print(totsize, AVEC, "w", paths_avec[ifrac]);
+      }
+    }
     free(AVEC);
   }
 #endif
+
+  free(aoref);
   free(Avec);
 
 #ifdef USE_MPI
