@@ -54,7 +54,6 @@ static void print_nodes(FILE * f){
 }
 
 static void print_batches(FILE * f, int nfrac, const unsigned int * const ntrains, const char ** const paths){
-
   if(!nproc){
     for(int i=0; i<nfrac; i++){
       fprintf(f, "batch %2d [%d--%d):\t %s\n", i, (i==0?0:ntrains[i-1]), ntrains[i], paths[i]);
@@ -62,7 +61,9 @@ static void print_batches(FILE * f, int nfrac, const unsigned int * const ntrain
     fprintf(f, "\n");
     fflush(f);
   }
+#ifdef USE_MPI
   MPI_Barrier(MPI_COMM_WORLD);
+#endif
 }
 
 static void send_jobs(const int bra, const int ket){
@@ -360,11 +361,11 @@ int get_a(
   MPI_Comm_size (MPI_COMM_WORLD, &Nproc);
   MPI_Comm_rank (MPI_COMM_WORLD, &nproc);
   print_nodes(stdout);
-  print_batches(stdout, nfrac, ntrains, paths_avec);
 #else
   nproc = 0;
   Nproc = 1;
 #endif
+  print_batches(stdout, nfrac, ntrains, paths_avec);
 
 #ifdef USE_MPI
   double t = 0.0;
@@ -512,11 +513,11 @@ int get_b(
   MPI_Comm_size (MPI_COMM_WORLD, &Nproc);
   MPI_Comm_rank (MPI_COMM_WORLD, &nproc);
   print_nodes(stdout);
-  print_batches(stdout, nfrac, ntrains, paths_bmat);
 #else
   nproc = 0;
   Nproc = 1;
 #endif
+  print_batches(stdout, nfrac, ntrains, paths_bmat);
 
 #ifdef USE_MPI
   size_t bufsize = (1<<30)/sizeof(double);  // number of doubles to take 1 GiB
@@ -632,7 +633,7 @@ int get_b(
         }
         MPI_Reduce (Bmat+i*bufsize, nproc?NULL:BMAT, size, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
         if(!nproc){
-          vec_write(size, BMAT, i?"a":"w", paths_bmat[i]);
+          vec_write(size, BMAT, i?"a":"w", paths_bmat[ifrac]);
           printf("chunk #%d/%d written\n", i+1, rem?(div+1):div);
         }
       }
