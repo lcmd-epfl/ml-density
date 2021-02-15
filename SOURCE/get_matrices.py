@@ -14,8 +14,8 @@ path = get_config_path(sys.argv)
 conf = Config(config_path=path)
 
 def set_variable_values():
-    f  = conf.get_option('trainfrac'   ,  1.0,  conf.floats) # can be changed to lambda
-    m  = conf.get_option('m'           ,  100,  int  )
+    f  = conf.get_option('trainfrac', np.array([1.0]), conf.floats) # can be changed to lambda
+    m  = conf.get_option('m'        , 100,             int  )
     return [f,m]
 
 [fracs,M] = set_variable_values()
