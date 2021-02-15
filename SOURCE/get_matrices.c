@@ -65,19 +65,7 @@ static void print_batches(FILE * f, int nfrac, const unsigned int * const ntrain
   MPI_Barrier(MPI_COMM_WORLD);
 }
 
-static void send_jobs(const int ntrain){
-  for(int imol=0; imol<ntrain+Nproc-1; imol++){
-    MPI_Status status;
-    int p[2];
-    MPI_Recv(p, 2, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-    p[1] = (imol<ntrain) ? imol : -1;
-    MPI_Send(p, 2, MPI_INT, p[0], 0, MPI_COMM_WORLD);
-    printf("%4d: %4d\n", p[0], p[1]);
-  }
-  return;
-}
-
-static void send_jobs_new(const int bra, const int ket){
+static void send_jobs(const int bra, const int ket){
   for(int imol=bra; imol<ket+(Nproc-1); imol++){
     MPI_Status status;
     int p[2];
@@ -364,14 +352,6 @@ int get_a(
     const char ** const paths_avec
     ){
 
- // for(int i=0; i<nfrac; i++){
- //   printf("%2d (%6d mols) : %s\n\t", i, ntrains[i], paths_avec[i]);
- //   for(int j=(i==0?0:ntrains[i-1]); j<ntrains[i]; j++){
- //     printf("%d ", j);
- //   }
- //   printf("\n");
- // }
-
 #ifdef USE_MPI
   int argc = 1;
   char * argv0 = "get_matrices";
@@ -441,7 +421,7 @@ int get_a(
 
     for(int ifrac=0; ifrac<nfrac; ifrac++){
       if(!nproc){
-        send_jobs_new(ifrac==0?0:ntrains[ifrac-1], ntrains[ifrac]);
+        send_jobs(ifrac==0?0:ntrains[ifrac-1], ntrains[ifrac]);
       }
       else{
         int imol = -1;
@@ -507,6 +487,8 @@ int get_b(
     const unsigned int M      ,
     const unsigned int ntrain ,
     const unsigned int natmax ,
+    const unsigned int nfrac,
+    const unsigned int const ntrains   [nfrac],                  //  nfrac
     const unsigned int const atomicindx[ntrain][nelem][natmax], // ntrain*nelem*natmax
     const unsigned int const atomcount [ntrain][nelem],         // ntrain*nelem
     const unsigned int const trrange   [ntrain],                // ntrain
@@ -519,7 +501,7 @@ int get_b(
     const unsigned int const annum     [nelem][llmax+1],        // nelem*(llmax+1)
     const char * const path_over,
     const char * const path_kern,
-    const char * const path_bmat
+    const char ** const paths_bmat
     ){
 
 #ifdef USE_MPI
@@ -530,6 +512,7 @@ int get_b(
   MPI_Comm_size (MPI_COMM_WORLD, &Nproc);
   MPI_Comm_rank (MPI_COMM_WORLD, &nproc);
   print_nodes(stdout);
+  print_batches(stdout, nfrac, ntrains, paths_bmat);
 #else
   nproc = 0;
   Nproc = 1;
@@ -556,43 +539,9 @@ int get_b(
   ao_t * aoref = ao_fill(totsize, llmax, M, ref_elem, alnum, annum);
 
   if(Nproc==1){
-    for(int imol=0; imol<ntrain; imol++){
-      printf("%4d: %4d\n", nproc, imol);
-      do_work_b(
-          totsize,
-          nelem  ,
-          llmax  ,
-          nnmax  ,
-          M      ,
-          natmax ,
-          natoms    [imol],
-          trrange   [imol],
-          totalsizes[imol],
-          kernsizes [imol],
-          atomicindx[imol],
-          atomcount [imol],
-          atom_elem [imol],
-          ref_elem  ,
-          alnum     ,
-          annum     ,
-          aoref     ,
-          path_over,
-          path_kern,
-          Bmat);
-    }
-  }
-#ifdef USE_MPI
-  else{
-    if(!nproc){
-      send_jobs(ntrain);
-    }
-    else{
-      int imol = -1;
-      while(1){
-        imol = receive_job(imol);
-        if(imol<0){
-          break;
-        }
+    for(int ifrac=0; ifrac<nfrac; ifrac++){
+      for(int imol=(ifrac==0?0:ntrains[ifrac-1]); imol<ntrains[ifrac]; imol++){
+        printf("%4d: %4d\n", nproc, imol);
         do_work_b(
             totsize,
             nelem  ,
@@ -615,47 +564,84 @@ int get_b(
             path_kern,
             Bmat);
       }
-      printf("%4d: finished work\n", nproc);
+      vec_write(symsize(totsize), Bmat, "w", paths_bmat[ifrac]);
     }
-  }
-#endif
-  free(aoref);
-
 #ifdef USE_MPI
-  MPI_Barrier(MPI_COMM_WORLD);
-  if(!nproc){
     t = MPI_Wtime () - t;
     fprintf(stderr, "t=%4.2lf\n", t);
-  }
 #endif
-
-  if(Nproc==1){
-    vec_write(symsize(totsize), Bmat, "w", path_bmat);
   }
+
 #ifdef USE_MPI
   else{
+
     double * BMAT = NULL;
     if(!nproc){
       BMAT = calloc(sizeof(double)*bufsize, 1);
     }
 
-    size_t div = symsize(totsize)/bufsize;
-    size_t rem = symsize(totsize)%bufsize;
-    for(size_t i=0; i<=div; i++){
-      size_t size = i<div?bufsize:rem;
-      if(!size){
-        break;
-      }
-      MPI_Reduce (Bmat+i*bufsize, nproc?NULL:BMAT, size, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    for(int ifrac=0; ifrac<nfrac; ifrac++){
       if(!nproc){
-        vec_write(size, BMAT, i?"a":"w", path_bmat);
-        printf("chunk #%d/%d written\n", i+1, rem?(div+1):div);
+        send_jobs(ifrac==0?0:ntrains[ifrac-1], ntrains[ifrac]);
+      }
+      else{
+        int imol = -1;
+        while(1){
+          imol = receive_job(imol);
+          if(imol<0){
+            break;
+          }
+          do_work_b(
+              totsize,
+              nelem  ,
+              llmax  ,
+              nnmax  ,
+              M      ,
+              natmax ,
+              natoms    [imol],
+              trrange   [imol],
+              totalsizes[imol],
+              kernsizes [imol],
+              atomicindx[imol],
+              atomcount [imol],
+              atom_elem [imol],
+              ref_elem  ,
+              alnum     ,
+              annum     ,
+              aoref     ,
+              path_over,
+              path_kern,
+              Bmat);
+        }
+        printf("%4d: finished work\n", nproc);
+      }
+
+      MPI_Barrier(MPI_COMM_WORLD);
+      if(!nproc){
+        double tt = MPI_Wtime();
+        fprintf(stderr, "batch%d: t=%4.2lf\n", ifrac, tt-t);
+        t = tt;
+      }
+
+      size_t div = symsize(totsize)/bufsize;
+      size_t rem = symsize(totsize)%bufsize;
+      for(size_t i=0; i<=div; i++){
+        size_t size = i<div?bufsize:rem;
+        if(!size){
+          break;
+        }
+        MPI_Reduce (Bmat+i*bufsize, nproc?NULL:BMAT, size, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+        if(!nproc){
+          vec_write(size, BMAT, i?"a":"w", paths_bmat[i]);
+          printf("chunk #%d/%d written\n", i+1, rem?(div+1):div);
+        }
       }
     }
-
     free(BMAT);
   }
 #endif
+
+  free(aoref);
   free(Bmat);
 
 #ifdef USE_MPI

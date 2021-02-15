@@ -110,7 +110,7 @@ if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
 
   bmatfiles = (ctypes.c_char_p * nfrac)()
   for i in range(nfrac):
-    bmatfiles[i] = (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(fracs[i])+".txt").encode('ascii')
+    bmatfiles[i] = (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(fracs[i])+".dat").encode('ascii')
 
   get_matrices.get_b.restype = ctypes.c_int
   get_matrices.get_b.argtypes = argtypes
@@ -123,8 +123,8 @@ if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
       M       ,
       ntrain  ,
       natmax  ,
-      # nfrac, TODO
-      # ntrains, TODO
+      nfrac,
+      ntrains.astype(np.uint32)               ,
       atomicindx_training.astype(np.uint32)   ,
       atom_counting_training.astype(np.uint32),
       train_configs.astype(np.uint32)         ,
@@ -137,9 +137,7 @@ if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
       annum.astype(np.uint32)                 ,
       goodoverfilebase.encode('ascii'),
       kernelconfbase.encode('ascii'),
-      bmatfiles,
-      # (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(frac)+".dat").encode('ascii') ######## change to names array TODO
-      )
+      bmatfiles)
 
 else:
 
