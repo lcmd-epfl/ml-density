@@ -13,13 +13,13 @@ path = get_config_path(sys.argv)
 conf = Config(config_path=path)
 
 def set_variable_values():
-    f  = conf.get_option('trainfrac'   ,  1.0,   float)
-    m  = conf.get_option('m'           ,  100,   int  )
-    r  = conf.get_option('regular'     ,  1e-6,  float)
-    j  = conf.get_option('jitter'      ,  1e-10, float)
+    f  = conf.get_option('trainfrac', np.array([1.0]), conf.floats)
+    m  = conf.get_option('m'        , 100,             int  )
+    r  = conf.get_option('regular'  , 1e-6,            float)
+    j  = conf.get_option('jitter'   , 1e-10,           float)
     return [f,m,r,j]
 
-[frac,M,reg,jit] = set_variable_values()
+[fracs,M,reg,jit] = set_variable_values()
 
 kmmbase         = conf.paths['kmm_base']
 avecfilebase    = conf.paths['avec_base']
@@ -30,10 +30,7 @@ basisfilename   = conf.paths['basisfile']
 elselfilebase   = conf.paths['spec_sel_base']
 
 kmmfile     = kmmbase+str(M)+".npy"
-avecfile    = avecfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".txt"
-bmatfile    = bmatfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
 elselfile   = elselfilebase+str(M)+".txt"
-weightsfile = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
 
 #====================================== reference environments
 ref_elements = np.loadtxt(elselfile, int)
@@ -51,12 +48,9 @@ if list(elements) != list(el_dict.values()):
 llmax = max(lmax.values())
 [bsize, alnum, annum] = basis_info(el_dict, lmax, nmax);
 totsize = sum(bsize[ref_elements])
-
-#===============================================================
+print("problem dimensionality =", totsize)
 
 k_MM = np.load(kmmfile)
-Avec = np.loadtxt(avecfile)
-mat  = np.zeros((totsize,totsize))
 
 regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/regression.so")
 regression.make_matrix.restype = ctypes.c_int
@@ -73,18 +67,25 @@ regression.make_matrix.argtypes = [
   ctypes.c_double,
   ctypes.c_char_p ]
 
-ret = regression.make_matrix(
-      totsize,
-      llmax  ,
-      M      ,
-      ref_elements.astype(np.uint32),
-      alnum.astype(np.uint32),
-      annum.astype(np.uint32),
-      k_MM, mat, reg, jit,
-      bmatfile.encode('ascii'))
+for frac in fracs:
 
-print("problem dimensionality =", totsize)
+  avecfile    = avecfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".txt"
+  bmatfile    = bmatfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
+  weightsfile = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
 
-weights = np.linalg.solve(mat, Avec)
-np.save(weightsfile, weights)
+  Avec = np.loadtxt(avecfile)
+  mat  = np.zeros((totsize,totsize))
+
+  ret = regression.make_matrix(
+        totsize,
+        llmax  ,
+        M      ,
+        ref_elements.astype(np.uint32),
+        alnum.astype(np.uint32),
+        annum.astype(np.uint32),
+        k_MM, mat, reg, jit,
+        bmatfile.encode('ascii'))
+
+  weights = np.linalg.solve(mat, Avec)
+  np.save(weightsfile, weights)
 
