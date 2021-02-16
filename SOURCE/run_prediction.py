@@ -4,7 +4,7 @@ from functions import basis_info,get_kernel_sizes,unravel_weights
 import os
 import sys
 import ctypes
-import numpy.ctypeslib as npct
+import ctypes_def
 
 def run_prediction(
     nmol, natmax, natoms,
@@ -38,12 +38,6 @@ def run_prediction(
   weights = np.load(weightsfilename)
   w = unravel_weights(M, llmax, nnmax, ref_elements, annum, alnum, weights)
 
-  array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
-  array_2d_int    = npct.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
-  array_3d_int    = npct.ndpointer(dtype=np.uint32,  ndim=3, flags='CONTIGUOUS')
-  array_4d_double = npct.ndpointer(dtype=np.float64, ndim=4, flags='CONTIGUOUS')
-  array_5d_double = npct.ndpointer(dtype=np.float64, ndim=5, flags='CONTIGUOUS')
-
   prediction = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/prediction.so")
   prediction.prediction.restype = ctypes.c_int
   prediction.prediction.argtypes = [
@@ -53,16 +47,16 @@ def run_prediction(
     ctypes.c_int,
     ctypes.c_int,
     ctypes.c_int,
-    array_3d_int,
-    array_2d_int,
-    array_1d_int,
-    array_1d_int,
-    array_1d_int,
-    array_1d_int,
-    array_1d_int,
-    array_2d_int,
-    array_4d_double,
-    array_5d_double,
+    ctypes_def.array_3d_int,
+    ctypes_def.array_2d_int,
+    ctypes_def.array_1d_int,
+    ctypes_def.array_1d_int,
+    ctypes_def.array_1d_int,
+    ctypes_def.array_1d_int,
+    ctypes_def.array_1d_int,
+    ctypes_def.array_2d_int,
+    ctypes_def.array_4d_double,
+    ctypes_def.array_5d_double,
     ctypes.c_char_p ]
 
   coeffs = np.zeros((nmol, natmax, llmax+1, nnmax, 2*llmax+1))

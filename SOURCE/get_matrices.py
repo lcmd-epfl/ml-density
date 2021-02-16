@@ -5,7 +5,6 @@ import numpy as np
 from config import Config,get_config_path
 from basis import basis_read
 from functions import moldata_read,get_elements_list,get_atomicindx,basis_info,get_kernel_sizes,nao_for_mol,get_training_sets
-
 import os
 import ctypes
 import ctypes_def

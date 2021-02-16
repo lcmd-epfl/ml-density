@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
+import sys
 import numpy as np
 from basis import basis_read
 from config import Config,get_config_path
 from functions import moldata_read,get_elements_list,basis_info
 import os
-import sys
 import ctypes
-import numpy.ctypeslib as npct
+import ctypes_def
 
 path = get_config_path(sys.argv)
 conf = Config(config_path=path)
@@ -35,17 +35,6 @@ bmatfile    = bmatfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
 elselfile   = elselfilebase+str(M)+".txt"
 weightsfile = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
 
-# print ("  input:")
-# print ( xyzfilename )
-# print ( basisfilename)
-# print ( elselfile )
-# print ( kmmfile )
-# print ( avecfile )
-# print ( bmatfile )
-# print ("  output:")
-# print (weightsfile)
-# print ()
-
 #====================================== reference environments
 ref_elements = np.loadtxt(elselfile, int)
 
@@ -69,21 +58,17 @@ k_MM = np.load(kmmfile)
 Avec = np.loadtxt(avecfile)
 mat  = np.zeros((totsize,totsize))
 
-array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
-array_2d_int    = npct.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
-array_2d_double = npct.ndpointer(dtype=np.float64, ndim=2, flags='CONTIGUOUS')
-array_3d_double = npct.ndpointer(dtype=np.float64, ndim=3, flags='CONTIGUOUS')
 regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/regression.so")
 regression.make_matrix.restype = ctypes.c_int
 regression.make_matrix.argtypes = [
   ctypes.c_int,
   ctypes.c_int,
   ctypes.c_int,
-  array_1d_int,
-  array_1d_int,
-  array_2d_int,
-  array_3d_double,
-  array_2d_double,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_2d_int,
+  ctypes_def.array_3d_double,
+  ctypes_def.array_2d_double,
   ctypes.c_double,
   ctypes.c_double,
   ctypes.c_char_p ]

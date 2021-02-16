@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
+import sys
 import numpy as np
 from basis import basis_read_full
 from config import Config,get_config_path
 from functions import moldata_read,get_elements_list,basis_info,averages_read,number_of_electrons_ao,get_baselined_constraints,get_training_set
 import os
-import sys
 import ctypes
-import numpy.ctypeslib as npct
+import ctypes_def
 
 path = get_config_path(sys.argv)
 conf = Config(config_path=path)
@@ -39,7 +39,7 @@ avecfile    = avecfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".txt"
 bmatfile    = bmatfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
 elselfile   = elselfilebase+str(M)+".txt"
 weightsfile = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
-Kqfile      = Kqfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
+Kqfile      = Kqfilebase+"_M"+str(M)+".dat"
 
 #====================================== reference environments
 ref_elements = np.loadtxt(elselfile, int)
@@ -60,7 +60,7 @@ totsize = sum(bsize[ref_elements])
 
 #===============================================================
 
-ntrain,train_configs = get_training_set(trainfilename, frac)
+ntrain,train_configs = get_training_set(trainfilename, fraction=frac, sort=False)
 av_coefs = averages_read(el_dict.values(), avdir)
 molcharges = np.loadtxt(chargefilename, dtype=int)
 constraints = get_baselined_constraints(av_coefs, basis, atomic_numbers[train_configs], molcharges[train_configs], use_charges)
@@ -69,23 +69,20 @@ print('charge_file:', chargefilename, 'mode:', use_charges, '\n')
 Bmat = np.zeros((totsize,totsize))
 k_MM = np.load(kmmfile)
 Avec = np.loadtxt(avecfile)
-Kq   = np.fromfile(Kqfile).reshape(ntrain,totsize)
+Kq   = np.fromfile(Kqfile).reshape(-1,totsize)
+Kq   = Kq[:ntrain]
 
-array_1d_int    = npct.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
-array_2d_int    = npct.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
-array_2d_double = npct.ndpointer(dtype=np.float64, ndim=2, flags='CONTIGUOUS')
-array_3d_double = npct.ndpointer(dtype=np.float64, ndim=3, flags='CONTIGUOUS')
 regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/regression.so")
 regression.make_matrix.restype = ctypes.c_int
 regression.make_matrix.argtypes = [
   ctypes.c_int,
   ctypes.c_int,
   ctypes.c_int,
-  array_1d_int,
-  array_1d_int,
-  array_2d_int,
-  array_3d_double,
-  array_2d_double,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_1d_int,
+  ctypes_def.array_2d_int,
+  ctypes_def.array_3d_double,
+  ctypes_def.array_2d_double,
   ctypes.c_double,
   ctypes.c_double,
   ctypes.c_char_p ]
@@ -106,8 +103,15 @@ x0     = np.linalg.solve(Bmat, Avec)
 B1Kq   = np.linalg.solve(Bmat, Kq.T)
 qKB1Kq = np.einsum('ij,jk->ik', Kq, B1Kq)
 alpha  = np.einsum('ij,j->i', Kq, x0)
+v      = alpha-constraints
 
-la = np.linalg.solve(qKB1Kq+reg*np.eye(ntrain), alpha-constraints)
+if 0:
+  qKB1Kq_reg = qKB1Kq+reg*np.eye(ntrain)
+  la = np.linalg.solve(qKB1Kq_reg, v)
+else:
+  la, residuals, rank, s = np.linalg.lstsq(qKB1Kq, v, rcond=None)
+  print('Δrank =', ntrain-rank)
+
 dx = np.einsum('ij,j->i', B1Kq, la)
 weights = x0 - dx
 np.save(weightsfile, weights)
