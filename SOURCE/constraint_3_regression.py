@@ -113,10 +113,12 @@ for ntrain,frac in zip(ntrains,fracs):
   alpha  = np.einsum('ij,j->i', Kq, x0)
   v      = alpha-constraints
 
-  if 0:
+  if 1:
     qKB1Kq_reg = qKB1Kq+reg*np.eye(ntrain)
     la = np.linalg.solve(qKB1Kq_reg, v)
+    print('cond =', np.linalg.cond(qKB1Kq), np.linalg.cond(qKB1Kq_reg))
   else:
+    # why when I use this the constraints are also ok but errors much higher?
     la, residuals, rank, s = np.linalg.lstsq(qKB1Kq, v, rcond=None)
     print('Δrank =', ntrain-rank)
 
