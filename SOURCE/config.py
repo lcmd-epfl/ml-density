@@ -26,7 +26,7 @@ class Config(object):
       return default
 
   def floats(self, x):
-    return numpy.array(list(map(float, x.split(','))))
+    return (numpy.array(sorted(list(map(float, x.split(','))))))
 
 
 def get_config_path(argv):
