@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import gc
 import sys
 import numpy as np
 from basis import basis_read_full
@@ -8,6 +9,8 @@ from functions import moldata_read,get_elements_list,basis_info,averages_read,nu
 import os
 import ctypes
 import ctypes_def
+
+use_old_solver = 1
 
 path = get_config_path(sys.argv)
 conf = Config(config_path=path)
@@ -113,7 +116,7 @@ for ntrain,frac in zip(ntrains,fracs):
   alpha  = np.einsum('ij,j->i', Kq, x0)
   v      = alpha-constraints
 
-  if 1:
+  if use_old_solver:
     qKB1Kq_reg = qKB1Kq+reg*np.eye(ntrain)
     la = np.linalg.solve(qKB1Kq_reg, v)
     print('cond =', np.linalg.cond(qKB1Kq), np.linalg.cond(qKB1Kq_reg))
@@ -125,4 +128,20 @@ for ntrain,frac in zip(ntrains,fracs):
   dx = np.einsum('ij,j->i', B1Kq, la)
   weights = x0 - dx
   np.save(weightsfile, weights)
+
+  del constraints
+  del Kq
+  del Avec
+  del Bmat
+  del x0
+  del B1Kq
+  del qKB1Kq
+  del alpha
+  del v
+  if use_old_solver:
+    del qKB1Kq_reg
+  del la
+  del dx
+  del weights
+  gc.collect()
 
