@@ -4,11 +4,12 @@ source /home/afabrizi/MyQuantumChemSoftwares/SOAPfast/SOAPFAST-master/env.sh
 
 # 1) Generate power spectra
 
-XYZPATH="quantum-chemistry/geometries_dimers/*.xyz quantum-chemistry/geometries_monomers/*.xyz"
+XYZPATH=$(ls quantum-chemistry/geometries/*.xyz | sort -V)
+OUTPUT=PS/PS
 ALLMOL=ALL.xyz
 SPECIES="H C N O"
+
 LOUTMAX=5
-OUTPUT=PS/PS
 RCUT=4.0
 SIGMA=0.3
 LCUT=6
