@@ -11,11 +11,11 @@ path = get_config_path(sys.argv)
 conf = Config(config_path=path)
 
 def set_variable_values():
-    f  = conf.get_option('trainfrac', np.array([1.0]), conf.floats)
-    m  = conf.get_option('m'        , 100,             int  )
-    r  = conf.get_option('regular'  , 1e-6,            float)
-    j  = conf.get_option('jitter'   , 1e-10,           float)
-    q  = conf.get_option('charges'  , 0,               int  )  # compatibility
+    f = conf.get_option('trainfrac', np.array([1.0]), conf.floats)
+    m = conf.get_option('m'        , 100,             int  )
+    r = conf.get_option('regular'  , 1e-6,            float)
+    j = conf.get_option('jitter'   , 1e-10,           float)
+    q = conf.get_option('charges'  , 0,               int  )  # compatibility
     return [f,m,r,j,q]
 
 [fracs,M,reg,jit,use_charges] = set_variable_values()
