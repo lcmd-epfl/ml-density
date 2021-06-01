@@ -34,7 +34,8 @@ if 'ex_charges' in conf.paths:
   correct_n      = True
   exchargesfiles = conf.paths['ex_charges']
   charges        = np.loadtxt(exchargesfiles, dtype=int)
-  print(charges)
+  if charges.shape==():
+    charges = [int(charges)]
 else:
   correct_n      = False
 
