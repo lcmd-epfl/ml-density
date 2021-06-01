@@ -2,10 +2,12 @@
 
 import sys
 import numpy as np
+import scipy.linalg as spl
 from basis import basis_read
 from config import Config,get_config_path
 from functions import moldata_read,get_elements_list,basis_info
 import os
+import gc
 import ctypes
 import ctypes_def
 
@@ -67,6 +69,9 @@ regression.make_matrix.argtypes = [
   ctypes.c_double,
   ctypes.c_char_p ]
 
+
+mat  = np.ndarray((totsize,totsize))
+
 for frac in fracs:
 
   avecfile    = avecfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".txt"
@@ -74,8 +79,9 @@ for frac in fracs:
   weightsfile = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
 
   Avec = np.loadtxt(avecfile)
-  mat  = np.zeros((totsize,totsize))
 
+  mat[:] = 0
+  
   ret = regression.make_matrix(
         totsize,
         llmax  ,
@@ -85,7 +91,12 @@ for frac in fracs:
         annum.astype(np.uint32),
         k_MM, mat, reg, jit,
         bmatfile.encode('ascii'))
+  print(ret)
 
-  weights = np.linalg.solve(mat, Avec)
+  weights = spl.solve(mat, Avec, assume_a='sym', overwrite_a=True, overwrite_b=True)
+  del Avec
   np.save(weightsfile, weights)
+  del weights
+  gc.collect()
+
 
