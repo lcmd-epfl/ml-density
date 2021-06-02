@@ -67,7 +67,7 @@ av_coefs = averages_read(elements_ex, avdir)
 for imol in range(nmol_ex):
     atoms = atomic_numbers_ex[imol]
     nel_exact = sum(atoms)
-    if correct_n!=None:
+    if correct_n:
       nel_exact -= charges[imol]
 
     rho  = prediction2coefficients(atoms, lmax, nmax, pred[imol], av_coefs)
@@ -79,7 +79,7 @@ for imol in range(nmol_ex):
     np.savetxt(outfilebase+'gpr_'  +str(imol)+'.dat', rho)
     np.savetxt(outfilebase+'pyscf_'+str(imol)+'.dat', rho1)
 
-    if correct_n!=None:
+    if correct_n:
       q  = number_of_electrons_ao(basis, atoms)
       rho_u = rho + q * (nel_exact-q@rho) / (q@q)
       rho_u1 = gpr2pyscf(atoms, lmax, nmax, rho_u)
