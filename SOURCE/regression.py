@@ -53,6 +53,9 @@ totsize = sum(bsize[ref_elements])
 print("problem dimensionality =", totsize)
 
 k_MM = np.load(kmmfile)
+if k_MM.shape[0] < llmax+1:
+    print("k_MM file doesn't have a high enough Lmax!", file=sys.stderr)
+    exit(1)
 
 regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/regression.so")
 regression.make_matrix.restype = ctypes.c_int
@@ -81,7 +84,7 @@ for frac in fracs:
   Avec = np.loadtxt(avecfile)
 
   mat[:] = 0
-  
+
   ret = regression.make_matrix(
         totsize,
         llmax  ,

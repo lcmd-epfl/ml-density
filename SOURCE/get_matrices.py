@@ -24,6 +24,7 @@ basisfilename    = conf.paths['basisfile']
 trainfilename    = conf.paths['trainingselfile']
 elselfilebase    = conf.paths['spec_sel_base']
 kernelconfbase   = conf.paths['kernel_conf_base']
+kernelsizebase   = conf.paths['kernel_size_base']
 baselinedwbase   = conf.paths['baselined_w_base']
 goodoverfilebase = conf.paths['goodover_base']
 avecfilebase     = conf.paths['avec_base']
@@ -94,11 +95,11 @@ argtypes = [
   ctypes_def.array_1d_int,
   ctypes_def.array_1d_int,
   ctypes_def.array_1d_int,
-  ctypes_def.array_1d_int,
   ctypes_def.array_2d_int,
   ctypes_def.array_1d_int,
   ctypes_def.array_1d_int,
   ctypes_def.array_2d_int,
+  ctypes.c_char_p,
   ctypes.c_char_p,
   ctypes.c_char_p,
   ctypes.POINTER(ctypes.c_char_p)
@@ -129,13 +130,13 @@ if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
       train_configs.astype(np.uint32)         ,
       natoms_train.astype(np.uint32)          ,
       total_sizes.astype(np.uint32)           ,
-      kernel_sizes.astype(np.uint32)          ,
       atomic_elements.astype(np.uint32)       ,
       ref_elements.astype(np.uint32)          ,
       alnum.astype(np.uint32)                 ,
       annum.astype(np.uint32)                 ,
       goodoverfilebase.encode('ascii'),
       kernelconfbase.encode('ascii'),
+      kernelsizebase.encode('ascii'),
       bmatfiles)
 
 else:
@@ -162,12 +163,12 @@ else:
       train_configs.astype(np.uint32)         ,
       natoms_train.astype(np.uint32)          ,
       total_sizes.astype(np.uint32)           ,
-      kernel_sizes.astype(np.uint32)          ,
       atomic_elements.astype(np.uint32)       ,
       ref_elements.astype(np.uint32)          ,
       alnum.astype(np.uint32)                 ,
       annum.astype(np.uint32)                 ,
       baselinedwbase.encode('ascii'),
       kernelconfbase.encode('ascii'),
+      kernelsizebase.encode('ascii'),
       avecfiles)
 

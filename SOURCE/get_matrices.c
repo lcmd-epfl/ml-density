@@ -138,6 +138,32 @@ static double * npy_read(int n, const char * fname){
   return v;
 }
 
+inline int * vec_readtxt_2columns_and_finalline(int n, const char * fname, int *const kfile_size){
+  // yes, I copied this code from vec_readtxt
+  int * v = malloc(sizeof(int)*n*2);
+  int * v2 = v+n;
+
+  FILE   * f = fopen(fname, "r");
+  if(!f){
+    fprintf(stderr, "cannot open file %s", fname);
+    GOTOHELL;
+  }
+  for(int i=0; i<n; i++){
+    if(fscanf(f, "%d %d", v+i, v2+i)!=2){
+      fprintf(stderr, "cannot read file %s line %d", fname, i+1);
+      GOTOHELL;
+    }
+  }
+  if(fscanf(f, "%d %*d", kfile_size)!=1){
+    fprintf(stderr, "cannot read file %s, final line", fname);
+    GOTOHELL;
+  }
+
+  fclose(f);
+  return v;
+}
+
+
 static int * sparseindices_fill(
     const int nat,
     const int llmax,
@@ -170,14 +196,27 @@ static int * kernsparseindices_fill(
     const int M,
     const unsigned int const atomcount[],  // nelem
     const unsigned int const ref_elem[M],
-    const unsigned int const alnum[]       // nelem
+    const unsigned int const alnum[],       // nelem
+    const char * const path_ksize,
+    int *const kfile_size
     ){
 
+  int * kfile_natoms = vec_readtxt_2columns_and_finalline(M, path_ksize, kfile_size);
+  int * kfile_llmax = kfile_natoms + M;
+
   int * kernsparseindices = calloc(sizeof(int) *M *(llmax+1) *(2*llmax+1) * nat, 1);
-  int i = 0;
+  int i_base = 0;
   for(int iref=0; iref<M; iref++){
+    int i=i_base;
     int a = ref_elem[iref];
     int al = alnum[a];
+    if (atomcount[a] != kfile_natoms[iref]){
+      fprintf(stderr, "this kernel file doesn't have the right number of atoms!");
+      GOTOHELL;
+    } else if (kfile_llmax[iref]+1 < al) {
+      fprintf(stderr, "bad kernel file: does not have a high enough Lmax");
+      GOTOHELL;
+    }
     for(int l=0; l<al; l++){
       int msize = 2*l+1;
       for(int im=0; im<msize; im++){
@@ -187,7 +226,11 @@ static int * kernsparseindices_fill(
         }
       }
     }
+    for (int l=0; l<=kfile_llmax[iref];l++){
+        i_base += atomcount[a]*  (2*l+1)*(2*l+1);
+    }
   }
+  free(kfile_natoms);
   return kernsparseindices;
 }
 
@@ -201,7 +244,6 @@ static void do_work_a(
     const unsigned int nat,
     const unsigned int conf,
     const unsigned int nao,
-    const unsigned int kernsize,
     const unsigned int const atomicindx[nelem][natmax],
     const unsigned int const atomcount [nelem],
     const unsigned int const atom_elem [natmax],
@@ -211,17 +253,22 @@ static void do_work_a(
     const ao_t         const aoref     [totsize],
     const char * const path_proj,
     const char * const path_kern,
+    const char * const path_ksize,
     double * Avec){
 
-  char file_proj[512], file_kern[512];
-  sprintf(file_proj, "%s%d.dat", path_proj, conf);
-  sprintf(file_kern, "%s%d.dat", path_kern, conf);
+  char file_proj[512], file_kern[512], file_ksize[512];
+  int kfile_size;
+  snprintf(file_proj, 512, "%s%d.dat", path_proj, conf);
+  snprintf(file_kern, 512, "%s%d.dat", path_kern, conf);
+  snprintf(file_ksize, 512, "%s%d.dat", path_ksize, conf);
+
+  // note: the kernels need to have a separate file telling their size so that they don't depend on the basis set.
+  // this trick is not needed for the projections, as they depend on the decomposed field, and therefore the basis set, anyway
+  int * sparseindices = sparseindices_fill(nat, llmax, nnmax, alnum, annum, atom_elem);
+  int * kernsparseindices = kernsparseindices_fill(nat, llmax , M, atomcount, ref_elem, alnum, file_ksize, &kfile_size);
 
   double * projections = vec_readtxt(nao, file_proj);
-  double * kernels     = vec_readtxt(kernsize, file_kern);
-
-  int * sparseindices = sparseindices_fill(nat, llmax, nnmax, alnum, annum, atom_elem);
-  int * kernsparseindices = kernsparseindices_fill(nat, llmax , M, atomcount, ref_elem , alnum);
+  double * kernels     = vec_readtxt(kfile_size, file_kern);
 
 #pragma omp parallel shared(Avec)
 #pragma omp for schedule(dynamic)
@@ -261,7 +308,6 @@ static void do_work_b(
     const unsigned int nat,
     const unsigned int conf,
     const unsigned int nao,
-    const unsigned int kernsize,
     const unsigned int const atomicindx[nelem][natmax],
     const unsigned int const atomcount [nelem],
     const unsigned int const atom_elem [natmax],
@@ -271,17 +317,20 @@ static void do_work_b(
     const ao_t         const aoref     [totsize],
     const char * const path_over,
     const char * const path_kern,
+    const char * const path_ksize,
     double * Bmat){
 
-  char file_over[512], file_kern[512];
-  sprintf(file_over, "%s%d.npy", path_over, conf);
-  sprintf(file_kern, "%s%d.dat", path_kern, conf);
-
-  double * overlaps = npy_read(nao*nao, file_over);
-  double * kernels  = vec_readtxt(kernsize, file_kern);
+  char file_over[512], file_kern[512], file_ksize[512];
+  int kfile_size;
+  snprintf(file_over,512, "%s%d.npy", path_over, conf);
+  snprintf(file_kern,512, "%s%d.dat", path_kern, conf);
+  snprintf(file_ksize,512, "%s%d.dat", path_ksize, conf);
 
   int * sparseindices = sparseindices_fill(nat, llmax, nnmax, alnum, annum, atom_elem);
-  int * kernsparseindices = kernsparseindices_fill(nat, llmax , M, atomcount, ref_elem , alnum);
+  int * kernsparseindices = kernsparseindices_fill(nat, llmax , M, atomcount, ref_elem, alnum, file_ksize, &kfile_size);
+
+  double * overlaps = npy_read(nao*nao, file_over);
+  double * kernels  = vec_readtxt(kfile_size, file_kern);
 
 #pragma omp parallel shared(Bmat)
 #pragma omp for schedule(dynamic)
@@ -343,13 +392,13 @@ int get_a(
     const unsigned int const trrange   [ntrain],                 //  ntrain
     const unsigned int const natoms    [ntrain],                 //  ntrain
     const unsigned int const totalsizes[ntrain],                 //  ntrain
-    const unsigned int const kernsizes [ntrain],                 //  ntrain
     const unsigned int const atom_elem [ntrain][natmax],         //  ntrain*natmax
     const unsigned int const ref_elem  [M],                      //  M
     const unsigned int const alnum     [nelem],                  //  nelem
     const unsigned int const annum     [nelem][llmax+1],         //  nelem*(llmax+1)
     const char * const path_proj,
     const char * const path_kern,
+    const char * const path_ksize,
     const char ** const paths_avec
     ){
 
@@ -392,7 +441,6 @@ int get_a(
             natoms    [imol],
             trrange   [imol],
             totalsizes[imol],
-            kernsizes [imol],
             atomicindx[imol],
             atomcount [imol],
             atom_elem [imol],
@@ -402,6 +450,7 @@ int get_a(
             aoref     ,
             path_proj,
             path_kern,
+	    path_ksize,
             Avec);
       }
       vec_print(totsize, Avec, "w", paths_avec[ifrac]);
@@ -441,7 +490,6 @@ int get_a(
               natoms    [imol],
               trrange   [imol],
               totalsizes[imol],
-              kernsizes [imol],
               atomicindx[imol],
               atomcount [imol],
               atom_elem [imol],
@@ -451,6 +499,7 @@ int get_a(
               aoref     ,
               path_proj,
               path_kern,
+	      path_ksize,
               Avec);
         }
         printf("%4d: finished work\n", nproc);
@@ -495,13 +544,13 @@ int get_b(
     const unsigned int const trrange   [ntrain],                // ntrain
     const unsigned int const natoms    [ntrain],                // ntrain
     const unsigned int const totalsizes[ntrain],                // ntrain
-    const unsigned int const kernsizes [ntrain],                // ntrain
     const unsigned int const atom_elem [ntrain][natmax],        // ntrain*natmax
     const unsigned int const ref_elem  [M],                     // M
     const unsigned int const alnum     [nelem],                 // nelem
     const unsigned int const annum     [nelem][llmax+1],        // nelem*(llmax+1)
     const char * const path_over,
     const char * const path_kern,
+    const char * const path_ksize,
     const char ** const paths_bmat
     ){
 
@@ -553,7 +602,6 @@ int get_b(
             natoms    [imol],
             trrange   [imol],
             totalsizes[imol],
-            kernsizes [imol],
             atomicindx[imol],
             atomcount [imol],
             atom_elem [imol],
@@ -563,6 +611,7 @@ int get_b(
             aoref     ,
             path_over,
             path_kern,
+	    path_ksize,
             Bmat);
       }
       vec_write(symsize(totsize), Bmat, "w", paths_bmat[ifrac]);
@@ -602,7 +651,6 @@ int get_b(
               natoms    [imol],
               trrange   [imol],
               totalsizes[imol],
-              kernsizes [imol],
               atomicindx[imol],
               atomcount [imol],
               atom_elem [imol],
@@ -612,6 +660,7 @@ int get_b(
               aoref     ,
               path_over,
               path_kern,
+	      path_ksize,
               Bmat);
         }
         printf("%4d: finished work\n", nproc);
@@ -664,13 +713,13 @@ int get_a_for_mol(
     const unsigned int const trrange   [ntrain],                 //  ntrain
     const unsigned int const natoms    [ntrain],                 //  ntrain
     const unsigned int const totalsizes[ntrain],                 //  ntrain
-    const unsigned int const kernsizes [ntrain],                 //  ntrain
     const unsigned int const atom_elem [ntrain][natmax],         //  ntrain*natmax
     const unsigned int const ref_elem  [M],                      //  M
     const unsigned int const alnum     [nelem],                  //  nelem
     const unsigned int const annum     [nelem][llmax+1],         //  nelem*(llmax+1)
     const char * const path_proj,
     const char * const path_kern,
+    const char * const path_ksize,
     const char * const path_avec
     ){
 
@@ -693,7 +742,6 @@ int get_a_for_mol(
           natoms    [imol],
           trrange   [imol],
           totalsizes[imol],
-          kernsizes [imol],
           atomicindx[imol],
           atomcount [imol],
           atom_elem [imol],
@@ -703,6 +751,7 @@ int get_a_for_mol(
           aoref     ,
           path_proj,
           path_kern,
+	  path_ksize,
           Avec+imol*totsize);
     }
   }

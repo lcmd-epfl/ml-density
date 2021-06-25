@@ -23,6 +23,7 @@ xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
 elselfilebase   = conf.paths['spec_sel_base']
 kernelconfbase  = conf.paths['kernel_conf_base']
+kernelsizebase  = conf.paths['kernel_size_base']
 powerrefbase    = conf.paths['ps_ref_base']
 splitpsfilebase = conf.paths['ps_split_base']
 
@@ -54,7 +55,7 @@ for l in range(llmax+1):
 
 def kernel_for_mol(imol):
 
-    kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(M, natoms[imol], llmax, lmax, ref_elements, el_dict, atom_counting[imol])
+    kernel_size, kernel_sparse_indices, kernel_size_indicators = kernel_nm_sparse_indices(M, natoms[imol], llmax, lmax, ref_elements, el_dict, atom_counting[imol])
 
     power_mol = {}
     for l in range(llmax+1):
@@ -62,6 +63,7 @@ def kernel_for_mol(imol):
 
     k_NM = kernel_nm(M, llmax, lmax, nel, el_dict, ref_elements, kernel_size, kernel_sparse_indices, power_mol, power_ref, atom_counting[imol], atomicindx[imol])
     np.savetxt(kernelconfbase+str(imol)+".dat", k_NM,fmt='%.06e')
+    np.savetxt(kernelsizebase+str(imol)+".dat", kernel_size_indicators, fmt="%d")
 
 #------------------------------------------------------------------------
 

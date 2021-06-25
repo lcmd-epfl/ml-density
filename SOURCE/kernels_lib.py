@@ -10,17 +10,21 @@ def kernel_nm_sparse_indices(M, natoms, llmax, lmax,
 
     kernel_size = 0
     kernel_sparse_indices = np.zeros((M,natoms,llmax+1,2*llmax+1,2*llmax+1),int)
+    kernel_size_indicators = np.zeros((M+1,2),int)
     for iref in range(M):
         iel = ref_elements[iref]
         q   = el_dict[iel]
-        for l in range(lmax[q]+1):
+        local_lmax = lmax[q]
+        kernel_size_indicators[iref] = (atom_counting[iel], local_lmax) #, values_per_atom)
+        for l in range(local_lmax+1):
             msize = 2*l+1
             for im in range(msize):
                 for iat in range(atom_counting[iel]):
                     for imm in range(msize):
                         kernel_sparse_indices[iref,iat,l,im,imm] = kernel_size
                         kernel_size += 1
-    return kernel_size, kernel_sparse_indices
+    kernel_size_indicators[-1] = (kernel_size, 0)
+    return kernel_size, kernel_sparse_indices, kernel_size_indicators
 
 def kernel_nm(M, llmax, lmax, nel,
     el_dict, ref_elements,
