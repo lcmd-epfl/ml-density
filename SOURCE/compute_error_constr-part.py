@@ -61,6 +61,9 @@ for frac_base in [fracs[0]]:
     STD = 0.0
     dn_av = 0.0
 
+    error_rel_bl_sum = 0.0
+    error_rel_sum    = 0.0
+
     for itest,imol in enumerate(test_configs):
 
         atoms = atomic_numbers[imol]
@@ -110,6 +113,10 @@ for frac_base in [fracs[0]]:
         error_sum += error
         STD_bl    += norm_bl
         STD       += norm
+
+        error_rel_bl_sum += error/norm_bl
+        error_rel_sum    += error/norm
+
         strg = "mol # %*i (%*i):  %8.3f %%  %.2e %%    ( %.2e )   %8.4f / %8.4f ( %3d )     (corr N: %8.3f %%)"%(
             len(str(ntest)),
             itest,
@@ -130,6 +137,11 @@ for frac_base in [fracs[0]]:
           (error_sum/STD_bl)*100.0,
           (error_sum/STD)*100.0,
           error_sum/ntest
+    ))
+    print("%% MAE = %.2e %%  %.2e %%    ( %.2e )" % (
+          error_rel_bl_sum / ntest * 100.0,
+          error_rel_sum    / ntest * 100.0,
+          error_sum        / ntest
     ))
 
     if use_charges:

@@ -22,7 +22,6 @@ def set_variable_values():
 xyzfilename     = conf.paths['xyzfile']
 basisfilename   = conf.paths['basisfile']
 elselfilebase   = conf.paths['spec_sel_base']
-kernelconfbase  = conf.paths['kernel_conf_base']
 weightsfilebase = conf.paths['weights_base']
 avdir           = conf.paths['averages_dir']
 xyzexfilename   = conf.paths['ex_xyzfile']
