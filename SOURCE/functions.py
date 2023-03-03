@@ -175,7 +175,7 @@ def get_baselined_constraints(av_coefs, basis, atomic_numbers, molcharges, charg
   return constraints
 
 def get_training_set(filename, fraction=1.0, sort=True):
-  train_selection = np.loadtxt(filename, dtype=int)
+  train_selection = np.loadtxt(filename, dtype=int, ndmin=1)
   n = int(fraction*len(train_selection))
   train_configs = train_selection[0:n]
   if sort:
@@ -183,7 +183,7 @@ def get_training_set(filename, fraction=1.0, sort=True):
   return n,train_configs
 
 def get_training_sets(filename, fractions):
-  train_selection = np.loadtxt(filename, dtype=int)
+  train_selection = np.loadtxt(filename, dtype=int, ndmin=1)
   n = (fractions*len(train_selection)).astype(int)
   train_configs = train_selection[0:n[-1]]
   return len(n),n,train_configs
