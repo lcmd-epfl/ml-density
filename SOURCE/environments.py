@@ -5,7 +5,7 @@ import numpy as np
 from config import Config,get_config_path
 from ase.data import chemical_symbols
 from functions import moldata_read,get_atomicindx,get_elements_list
-from power_spectra_lib import reorder_ps
+from power_spectra_lib import reorder_ps, read_ps_1mol
 
 path = get_config_path(sys.argv)
 conf = Config(config_path=path)
@@ -18,6 +18,7 @@ def set_variable_values():
 
 xyzfilename     = conf.paths['xyzfile']
 ps0file         = conf.paths['ps0file']
+splitpsfilebase = conf.paths['ps_split_base']
 refsselfilebase = conf.paths['refs_sel_base']
 elselfilebase   = conf.paths['spec_sel_base']
 
@@ -49,13 +50,16 @@ nel = len(elements)
 (atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
 
 #====================== environmental power spectrum
-power = np.load(ps0file)
-nfeat = power.shape[-1]
-power_env = np.zeros((nenv,nfeat),float)
-ienv = 0
-for imol in range(nmol):
-    reorder_ps(power_env[ienv:ienv+natoms[imol]], power[imol], nel, atom_counting[imol], atomicindx[imol])
-    ienv += natoms[imol]
+try:
+    power = np.load(ps0file)
+    nfeat = power.shape[-1]
+    power_env = np.zeros((nenv,nfeat),float)
+    ienv = 0
+    for imol in range(nmol):
+        reorder_ps(power_env[ienv:ienv+natoms[imol]], power[imol], nel, atom_counting[imol], atomicindx[imol])
+        ienv += natoms[imol]
+except:
+    power_env = np.vstack([read_ps_1mol(f"{splitpsfilebase}0_{imol}.npy", nel, atom_counting[imol], atomicindx[imol])[1] for imol in range(nmol)])
 
 ref_indices, distances = do_fps(power_env,M)
 ref_elements = np.concatenate(element_indices)[ref_indices]
