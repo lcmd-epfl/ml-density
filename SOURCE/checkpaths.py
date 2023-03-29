@@ -40,6 +40,7 @@ paths1 = [
   'ex_ps_base',
   'charges_base',
   'kernel_charges_base',
+  'pca_dir',
   ]
 
 for key in paths0:

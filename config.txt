@@ -38,4 +38,4 @@ ex_kernel_base  = GLYGLY/KERNELS/kernel
 ex_predict_base = GLYGLY/prediction
 ex_output_base  = GLYGLY/rho_
 ex_charges      = GLYGLY_charges.dat
-
+pca_dir = INNER/pca/

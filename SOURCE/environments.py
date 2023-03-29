@@ -21,6 +21,7 @@ ps0file         = conf.paths['ps0file']
 splitpsfilebase = conf.paths['ps_split_base']
 refsselfilebase = conf.paths['refs_sel_base']
 elselfilebase   = conf.paths['spec_sel_base']
+pcadir          = conf.paths['pca_dir']
 
 def do_fps(x, d=0):
     # Code from Giulio Imbalzano
@@ -38,6 +39,23 @@ def do_fps(x, d=0):
         nd = n2 + n2[iy[i]] - 2.0*np.dot(x,x[iy[i]])
         dl = np.minimum(dl,nd)
     return iy, measure
+
+def svd(nel, power_env, ref_indices, ref_elements):
+    lambda2 = []
+    weights = []
+    for iq in range(nel):
+        ridx  = ref_indices[np.where(ref_elements==iq)]
+        A     = power_env[ridx]
+        A2    = A@A.T
+        l2, u = np.linalg.eigh(A2)   # PCA of A.T
+        idx   = l2.argsort()[::-1]
+        l2    = l2[idx]
+        u     = u[:,idx]
+        lut   = (u / np.sqrt(l2)).T  # to save the norm
+        #A_new = lut @ A
+        weights.append(lut)
+        lambda2.append(l2)
+    return lambda2, weights
 
 # number of molecules, number of atoms in each molecule, atomic numbers
 (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
@@ -62,66 +80,33 @@ try:
 except:
     power_env = np.vstack([read_ps_1mol(f"{splitpsfilebase}0_{imol}.npy", nel, atom_counting[imol], atomicindx[imol])[1] for imol in range(nmol)])
 
-#########################################################
 
-vectors_for_elements = []
-for i in range(nel):
-  idx = np.where(element_indices==i)
-  vectors_for_elements.append(power_env[idx])
 
-nrefenv = [61, 39]
-#nrefenv = [2000, 1000]
-
-for i in range(nel):
-  symb = chemical_symbols[elements[i]]
-  print(symb)
-  n    = nrefenv[i]
-  At   = vectors_for_elements[i]
-
-  l2,w = np.linalg.eigh(At@At.T)
-  idx  = l2.argsort()[::-1]
-  l2   = l2 [idx[:n]]
-  wt   = w.T[idx[:n]]
-  lwt = np.diag(1.0/np.sqrt(l2))@wt
-
-  #l2,u = np.linalg.eigh(At.T@At)
-  #idx  = l2.argsort()[::-1]
-  #l2   = l2 [idx[:n]]
-  #ut   = u.T[idx[:n]]
-  #x1  = lwt@At
-  #x2  = ut
-  #for j in range(n):
-  #  print(min(np.sum(abs(x1[j]-x2[j])), np.sum(abs(x1[j]+x2[j]))))
-  #  #print(x1[j])
-  #  #print(x2[j])
-
-  for j in l2:
-    print(j)
-  np.save(symb+'.npy', lwt)
-
-  print()
-  print()
-
-#########################################################
-exit()
-
-ref_indices, distances = do_fps(power_env,M)
+ref_indices, distances = do_fps(power_env, M)
 ref_elements = element_indices[ref_indices]
 
-np.savetxt(refsselfilebase+str(M)+".txt",ref_indices,fmt='%i')
-np.savetxt(elselfilebase+str(M)+".txt",ref_elements,fmt='%i')
-
 for i,d in enumerate(distances):
-  print(i+1, d)
+    print(i+1, d)
 
 el_count_total = sum(atom_counting)
 el_count_ref = dict(zip( *np.unique(ref_elements, return_counts=True)))
+el_count_ref = [el_count_ref[i] for i in range(nel)]
 for i in range(nel):
-  n1 = el_count_ref[i]
-  n2 = el_count_total[i]
-  print('#', chemical_symbols[elements[i]]+':', n1, '/', n2, "(%.1f%%)"%(100.0*n1/n2) )
+    n1 = el_count_ref[i]
+    n2 = el_count_total[i]
+    print('#', chemical_symbols[elements[i]]+':', n1, '/', n2, "(%.1f%%)"%(100.0*n1/n2) )
 
 nuniq = len(np.unique(ref_indices))
 if nuniq != len(ref_indices):
-    print('warning: i have found only', nuniq, 'unique environments')
+    print(f'warning: I have found only {nuniq} unique environments')
 
+
+lambda2, weights = svd(nel, power_env, ref_indices, ref_elements)
+for iq in range(nel):
+    symb  = chemical_symbols[elements[iq]]
+    print(symb, lambda2[iq])
+    np.save(f'{pcadir}/{symb}.npy', weights[iq])
+
+
+np.savetxt(refsselfilebase+str(M)+".txt",ref_indices,fmt='%i')
+np.savetxt(elselfilebase+str(M)+".txt",ref_elements,fmt='%i')
