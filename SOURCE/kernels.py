@@ -2,11 +2,12 @@
 
 import sys
 import numpy as np
+import equistore
 from config import Config,get_config_path
 from basis import basis_read
 from functions import moldata_read,get_elements_list,get_atomicindx,print_progress
 from power_spectra_lib import read_ps_1mol
-from kernels_lib import kernel_nm_sparse_indices,kernel_nm
+from kernels_lib import kernel_nm_sparse_indices,kernel_nm_new
 
 USEMPI = 1
 
@@ -33,44 +34,32 @@ natmax = max(natoms)
 # elements array and atomic indices sorted by elements
 elements = get_elements_list(atomic_numbers)
 nel = len(elements)
-(atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
+atomicindx, atom_counting, _ = get_atomicindx(elements, atomic_numbers, natmax)
 
-#====================================== reference environments
-ref_elements = np.loadtxt(elselfilebase+str(M)+".txt",int)
+ref_elements = np.loadtxt(f'{elselfilebase}{M}.txt', dtype=int)
+power_ref_new = equistore.load(f'{powerrefbase}_{M}.npz');
 
-# elements dictionary, max. angular momenta, number of radial channels
 (el_dict, lmax, nmax) = basis_read(basisfilename)
 if list(elements) != list(el_dict.values()):
     print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
     exit(1)
 llmax = max(lmax.values())
 
-# load power spectra
-power_ref = {}
-for l in range(llmax+1):
-    power_ref[l] = np.load(powerrefbase+str(l)+"_"+str(M)+".npy");
 
 #------------------------------------------------------------------------
 
 def kernel_for_mol(imol):
-
     kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(M, natoms[imol], llmax, lmax, ref_elements, el_dict, atom_counting[imol])
+    power_mol_new = equistore.load(f'{splitpsfilebase}_{imol}.npz')
+    k_NM = kernel_nm_new(lmax, nel, el_dict, ref_elements, kernel_size, kernel_sparse_indices, power_mol_new, power_ref_new, atom_counting[imol], atomicindx[imol])
+    np.savetxt(f'{kernelconfbase}{imol}.dat', k_NM, fmt='%.06e')
 
-    power_mol = {}
-    for l in range(llmax+1):
-        (dummy, power_mol[l]) = read_ps_1mol(splitpsfilebase+str(l)+"_"+str(imol)+".npy", nel, atom_counting[imol], atomicindx[imol])
+def single_process():
+    for imol in range(nmol):
+        print_progress(imol, nmol)
+        kernel_for_mol(imol)
 
-    k_NM = kernel_nm(M, llmax, lmax, nel, el_dict, ref_elements, kernel_size, kernel_sparse_indices, power_mol, power_ref, atom_counting[imol], atomicindx[imol])
-    np.savetxt(kernelconfbase+str(imol)+".dat", k_NM,fmt='%.06e')
-
-#------------------------------------------------------------------------
-
-if USEMPI==0:
-  for imol in range(nmol):
-    print_progress(imol, nmol)
-    kernel_for_mol(imol)
-
-else:
+def multi_process():
   from mpi4py import MPI
   comm = MPI.COMM_WORLD
   Nproc = comm.Get_size()
@@ -110,4 +99,11 @@ else:
           break
         kernel_for_mol(imol)
       print(nproc, ':', 'finished')
+
+#------------------------------------------------------------------------
+
+if USEMPI==0:
+    single_process()
+else:
+    multi_process()
 
