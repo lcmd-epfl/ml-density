@@ -1,5 +1,5 @@
 import numpy as np
-from power_spectra_lib import read_ps_1mol
+import equistore
 
 # SOAP parameters
 zeta = 2.0
@@ -57,22 +57,30 @@ def kernel_nm(M, llmax, lmax, nel,
     return k_NM
 
 
-def kernel_mm(M, llmax, powerrefbase):
 
-  k_MM = np.zeros((llmax+1,M*(2*llmax+1),M*(2*llmax+1)),float)
 
-  for l in range(llmax+1):
-      power_ref = np.load(powerrefbase+str(l)+"_"+str(M)+".npy");
-      if l==0:
-          for iref1 in range(M):
-              for iref2 in range(M):
-                  k_MM[l,iref1,iref2] = np.dot(power_ref[iref1],power_ref[iref2].T)**zeta
-      else:
-          nfeat = power_ref.shape[2]
-          power_ref = power_ref.reshape(M*(2*l+1),nfeat)
+def kernel_mm_new(M, lmax, powerrefbase, ref_elements):
+
+  llmax = max(lmax.values())
+  k_MM = np.zeros((llmax+1, M*(2*llmax+1), M*(2*llmax+1)))
+  power_ref = equistore.load(f'{powerrefbase}_{M}.npz')
+
+  for q in set(ref_elements):
+      for l in range(lmax[q]+1):
           ms = 2*l+1
-          for iref1 in range(M):
-              for iref2 in range(M):
-                  k_MM[l, iref1*ms:(iref1+1)*ms, iref2*ms:(iref2+1)*ms] = np.dot(power_ref[iref1*ms:(iref1+1)*ms], power_ref[iref2*ms:(iref2+1)*ms].T) *  k_MM[0,iref1,iref2]**((zeta-1.0)/zeta)
-  return k_MM
+          block = power_ref.block(spherical_harmonics_l=l, species_center=q)
+          for iref1 in block.samples:
+              pos1 = block.samples.position(iref1)
+              vec1 = block.values[pos1]
+              for iref2 in block.samples:
+                  pos2 = block.samples.position(iref2)
+                  vec2 = block.values[pos2]
+                  k_MM[l, iref1[0]*ms:(iref1[0]+1)*ms, iref2[0]*ms:(iref2[0]+1)*ms] = vec1 @ vec2.T
 
+  for l in range(llmax, -1, -1):
+      ms = 2*l+1
+      for iref1 in range(M):
+          for iref2 in range(M):
+              k_MM[l, iref1*ms:(iref1+1)*ms, iref2*ms:(iref2+1)*ms] *= k_MM[0, iref1, iref2]
+
+  return k_MM
