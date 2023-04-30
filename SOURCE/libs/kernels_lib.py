@@ -4,17 +4,15 @@ import equistore
 
 def kernel_nm_sparse_indices(natoms, lmax, ref_elements, el_dict, atom_counting):
     llmax = max(lmax.values())
-    kernel_sparse_indices = np.zeros((len(ref_elements), natoms, llmax+1, 2*llmax+1, 2*llmax+1), dtype=int)
+    kernel_sparse_indices = np.zeros((len(ref_elements), natoms, llmax+1), dtype=int)
     kernel_size = 0
     for iref, iel in enumerate(ref_elements):
         q = el_dict[iel]
         for l in range(lmax[q]+1):
             msize = 2*l+1
-            for im in range(msize):
-                for iat in range(atom_counting[iel]):
-                    for imm in range(msize):
-                        kernel_sparse_indices[iref,iat,l,im,imm] = kernel_size
-                        kernel_size += 1
+            for iat in range(atom_counting[iel]):
+                kernel_sparse_indices[iref,iat,l] = kernel_size
+                kernel_size += msize*msize
     return kernel_size, kernel_sparse_indices
 
 
@@ -30,7 +28,7 @@ def kernel_nm(lmax, el_dict, ref_elements, kernel_size, kernel_sparse_indices,
                 vec_ref = block_ref.values[pos1]
                 for iatq in range(atom_counting[iq]):
                     iat = atomicindx[iq,iatq]
-                    ik0 = kernel_sparse_indices[iref,iatq,0,0,0]
+                    ik0 = kernel_sparse_indices[iref,iatq,0]
 
                     block = power.block(spherical_harmonics_l=l, species_center=q)
                     pos2 = block.samples.position((imol,iat))
@@ -43,9 +41,8 @@ def kernel_nm(lmax, el_dict, ref_elements, kernel_size, kernel_sparse_indices,
 
                     msize = 2*l+1
                     for im1 in range(msize):
-                        for im2 in range(msize):
-                            ik = kernel_sparse_indices[iref,iatq,l,im1,im2]
-                            k_NM[ik] = kern[im2,im1]
+                        ik = kernel_sparse_indices[iref,iatq,l]
+                        k_NM[ik:ik+msize*msize] = kern.T.flatten()
     return k_NM
 
 

@@ -2,10 +2,13 @@
 #include <stdio.h>
 
 #define printalive printf("alive @ %s:%d\n", __FILE__, __LINE__)
+
 #define GOTOHELL { \
   fprintf(stderr, "%s:%d %s() -- ", \
       __FILE__, __LINE__, __FUNCTION__); \
   abort(); }
+
+#define KSPARSEIND(IREF,L,ICSPE) ( ((IREF) * (llmax+1) + (L) ) * nat + (ICSPE) )
 
 static inline size_t mpos(size_t i, size_t j){
   /* A[i+j*(j+1)/2], i <= j, 0 <= j < N */
@@ -35,3 +38,12 @@ ao_t * ao_fill(
 
 double * vec_readtxt(int n, const char * fname);
 
+
+int * kernsparseindices_fill(
+    const int nat,
+    const int llmax ,
+    const int M,
+    const unsigned int const atomcount[],  // nelem
+    const unsigned int const ref_elem[M],
+    const unsigned int const alnum[]       // nelem
+    );

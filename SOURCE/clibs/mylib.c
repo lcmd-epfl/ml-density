@@ -50,3 +50,29 @@ double * vec_readtxt(int n, const char * fname){
   fclose(f);
   return v;
 }
+
+
+int * kernsparseindices_fill(
+    const int nat,
+    const int llmax ,
+    const int M,
+    const unsigned int const atomcount[],  // nelem
+    const unsigned int const ref_elem[M],
+    const unsigned int const alnum[]       // nelem
+    ){
+
+  int * kernsparseindices = calloc(M*(llmax+1)*nat, sizeof(int));
+  int i = 0;
+  for(int iref=0; iref<M; iref++){
+    int a = ref_elem[iref];
+    int al = alnum[a];
+    for(int l=0; l<al; l++){
+      int msize = 2*l+1;
+      for(int iat=0; iat<atomcount[a]; iat++){
+        kernsparseindices[KSPARSEIND(iref,l,iat)] = i;
+        i += msize*msize;
+      }
+    }
+  }
+  return kernsparseindices;
+}

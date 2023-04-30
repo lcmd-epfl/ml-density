@@ -9,7 +9,6 @@ int Nproc;
 int nproc;
 
 #define SPARSEIND(L,N,IAT) ( ((L) * nnmax + (N)) * nat + (IAT) )
-#define KSPARSEIND(IREF,L,M,ICSPE) ( (((IREF) * (llmax+1) + (L)) *(2*llmax+1) + (M)) * nat + (ICSPE) )
 
 static void print_mem(const int totsize, const int ntrain, FILE * f){
 
@@ -164,32 +163,6 @@ static int * sparseindices_fill(
   return sparseindices;
 }
 
-static int * kernsparseindices_fill(
-    const int nat,
-    const int llmax ,
-    const int M,
-    const unsigned int const atomcount[],  // nelem
-    const unsigned int const ref_elem[M],
-    const unsigned int const alnum[]       // nelem
-    ){
-
-  int * kernsparseindices = calloc(sizeof(int) *M *(llmax+1) *(2*llmax+1) * nat, 1);
-  int i = 0;
-  for(int iref=0; iref<M; iref++){
-    int a = ref_elem[iref];
-    int al = alnum[a];
-    for(int l=0; l<al; l++){
-      int msize = 2*l+1;
-      for(int im=0; im<msize; im++){
-        for(int iat=0; iat<atomcount[a]; iat++){
-          kernsparseindices[KSPARSEIND(iref,l,im,iat)] = i;
-          i += msize;
-        }
-      }
-    }
-  }
-  return kernsparseindices;
-}
 
 static void do_work_a(
     const unsigned int totsize,
@@ -235,10 +208,10 @@ static void do_work_a(
     double dA = 0.0;
     for(int icel1=0; icel1<atomcount[a1]; icel1++){
       int iat = atomicindx[a1][icel1];
-      int sk1 = kernsparseindices[KSPARSEIND(iref1,l1,im1,icel1)];
+      int sk1 = kernsparseindices[KSPARSEIND(iref1, l1, icel1)];
       int sp1 = sparseindices    [SPARSEIND(l1,n1,iat)];
       for(int imm1=0; imm1<msize1; imm1++){
-        dA += projections[sp1+imm1] * kernels[sk1+imm1];
+        dA += projections[sp1+imm1] * kernels[sk1 + im1*msize1 + imm1];
       }
     }
     Avec[i1] += dA;
@@ -303,19 +276,19 @@ static void do_work_b(
       double dB = 0.0;
       for(int icel1=0; icel1<atomcount[a1]; icel1++){
         int iat = atomicindx[a1][icel1];
-        int sk1 = kernsparseindices[KSPARSEIND(iref1, l1, im1, icel1)];
+        int sk1 = kernsparseindices[KSPARSEIND(iref1, l1, icel1)];
         int sp1 = sparseindices    [SPARSEIND(l1,n1,iat)];
         for(int imm1=0; imm1<msize1; imm1++){
           double Btemp = 0.0;
           for(int icel2=0; icel2<atomcount[a2]; icel2++){
             int jat = atomicindx[a2][icel2];
-            int sk2 = kernsparseindices[KSPARSEIND(iref2, l2, im2, icel2)];
+            int sk2 = kernsparseindices[KSPARSEIND(iref2, l2, icel2)];
             int sp2 = sparseindices    [SPARSEIND(l2,n2,jat)];
             for(int imm2=0; imm2<msize2; imm2++){
-              Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2+imm2];
+              Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2 + msize2*im2 + imm2];
             }
           }
-          dB += Btemp * kernels[sk1+imm1];
+          dB += Btemp * kernels[sk1 + msize1*im1 + imm1];
         }
       }
       Bmat[mpos(i1,i2)] += dB;
