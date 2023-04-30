@@ -68,7 +68,7 @@ print('charge_file:', chargefilename, 'mode:', use_charges, '\n')
 k_MM = np.load(kmmfile)
 Kq_full = np.fromfile(Kqfile).reshape(-1,totsize)
 
-regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/regression.so")
+regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/regression.so")
 regression.make_matrix.restype = ctypes.c_int
 regression.make_matrix.argtypes = [
   ctypes.c_int,

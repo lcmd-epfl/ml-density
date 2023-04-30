@@ -77,8 +77,8 @@ kernel_sizes = get_kernel_sizes(train_configs, ref_elements, el_dict, M, lmax, a
 
 ################################################################################
 
-get_matrices = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/get_matrices.so")
-#get_matrices = ctypes.CDLL(os.path.dirname(sys.argv[0])+"/get_matrices.so", ctypes.RTLD_GLOBAL)
+get_matrices = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/get_matrices.so")
+#get_matrices = ctypes.CDLL(os.path.dirname(sys.argv[0])+"/clibs/get_matrices.so", ctypes.RTLD_GLOBAL)
 
 argtypes = [
   ctypes.c_int,

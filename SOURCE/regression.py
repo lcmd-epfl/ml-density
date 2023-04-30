@@ -54,7 +54,7 @@ print("problem dimensionality =", totsize)
 
 k_MM = np.load(kmmfile)
 
-regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/regression.so")
+regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/regression.so")
 regression.make_matrix.restype = ctypes.c_int
 regression.make_matrix.argtypes = [
   ctypes.c_int,
@@ -81,7 +81,7 @@ for frac in fracs:
   Avec = np.loadtxt(avecfile)
 
   mat[:] = 0
-  
+
   ret = regression.make_matrix(
         totsize,
         llmax  ,

@@ -38,7 +38,7 @@ def run_prediction(
   weights = np.load(weightsfilename)
   w = unravel_weights(M, llmax, nnmax, ref_elements, annum, alnum, weights)
 
-  prediction = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/prediction.so")
+  prediction = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/prediction.so")
   prediction.prediction.restype = ctypes.c_int
   prediction.prediction.argtypes = [
     ctypes.c_int,
