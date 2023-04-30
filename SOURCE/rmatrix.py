@@ -5,7 +5,7 @@ import numpy as np
 from basis import basis_read
 from config import Config, get_config_path
 from functions import moldata_read, get_elements_list
-from libs.kernels_lib import kernel_mm_new
+from libs.kernels_lib import kernel_mm
 
 
 def set_variable_values(conf):

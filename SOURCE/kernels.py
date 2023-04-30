@@ -6,7 +6,7 @@ import equistore
 from config import Config,get_config_path
 from basis import basis_read
 from functions import moldata_read, get_elements_list, get_atomicindx, print_progress
-from libs.kernels_lib import kernel_nm_sparse_indices, kernel_nm_new
+from libs.kernels_lib import kernel_for_mol
 
 USEMPI = 1
 
@@ -27,18 +27,15 @@ def main():
     splitpsfilebase = conf.paths['ps_split_base']
 
 
-    def kernel_for_mol(imol):
-        kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(M, natoms[imol], llmax, lmax,
-                                                                      ref_elements, el_dict, atom_counting[imol])
-        power_mol_new = equistore.load(f'{splitpsfilebase}_{imol}.npz')
-        k_NM = kernel_nm_new(lmax, nel, el_dict, ref_elements, kernel_size, kernel_sparse_indices,
-                             power_mol_new, power_ref_new, atom_counting[imol], atomicindx[imol])
-        np.savetxt(f'{kernelconfbase}{imol}.dat', k_NM, fmt='%.06e')
+    def do_mol(imol):
+        kernel_for_mol(power_ref, f'{splitpsfilebase}_{imol}.npz', f'{kernelconfbase}{imol}.dat',
+                       lmax, ref_elements, el_dict,
+                       natoms[imol], atom_counting[imol], atomicindx[imol])
 
     def single_process():
         for imol in range(nmol):
             print_progress(imol, nmol)
-            kernel_for_mol(imol)
+            do_mol(imol)
 
     def multi_process():
         from mpi4py import MPI
@@ -58,7 +55,7 @@ def main():
         if Nproc == 1:
             for imol in range(nmol):
                 print_progress(imol, nmol)
-                kernel_for_mol(imol)
+                do_mol(imol)
         else:
             if nproc == 0:
                 for imol in range(nmol+Nproc-1):
@@ -73,7 +70,7 @@ def main():
                     imol = comm.recv(source=0)
                     if(imol<0):
                         break
-                    kernel_for_mol(imol)
+                    do_mol(imol)
                 print(f'{nproc} : finished')
 
 
@@ -86,7 +83,7 @@ def main():
     atomicindx, atom_counting, _ = get_atomicindx(elements, atomic_numbers, natmax)
 
     ref_elements = np.loadtxt(f'{elselfilebase}{M}.txt', dtype=int)
-    power_ref_new = equistore.load(f'{powerrefbase}_{M}.npz');
+    power_ref = equistore.load(f'{powerrefbase}_{M}.npz');
 
     (el_dict, lmax, nmax) = basis_read(basisfilename)
     if list(elements) != list(el_dict.values()):

@@ -2,14 +2,12 @@ import numpy as np
 import equistore
 
 
-def kernel_nm_sparse_indices(M, natoms, llmax, lmax,
-    ref_elements, el_dict, atom_counting):
-
+def kernel_nm_sparse_indices(natoms, lmax, ref_elements, el_dict, atom_counting):
+    llmax = max(lmax.values())
+    kernel_sparse_indices = np.zeros((len(ref_elements), natoms, llmax+1, 2*llmax+1, 2*llmax+1), dtype=int)
     kernel_size = 0
-    kernel_sparse_indices = np.zeros((M,natoms,llmax+1,2*llmax+1,2*llmax+1),int)
-    for iref in range(M):
-        iel = ref_elements[iref]
-        q   = el_dict[iel]
+    for iref, iel in enumerate(ref_elements):
+        q = el_dict[iel]
         for l in range(lmax[q]+1):
             msize = 2*l+1
             for im in range(msize):
@@ -20,14 +18,8 @@ def kernel_nm_sparse_indices(M, natoms, llmax, lmax,
     return kernel_size, kernel_sparse_indices
 
 
-
-
-def kernel_nm_new(lmax, nel,
-    el_dict, ref_elements,
-    kernel_size, kernel_sparse_indices,
-    power, power_ref,
-    atom_counting, atomicindx,
-    imol=0):
+def kernel_nm(lmax, el_dict, ref_elements, kernel_size, kernel_sparse_indices,
+              power, power_ref, atom_counting, atomicindx, imol=0):
 
     k_NM = np.zeros(kernel_size, float)
     for iq, q in el_dict.items():
@@ -57,8 +49,7 @@ def kernel_nm_new(lmax, nel,
     return k_NM
 
 
-
-def kernel_mm_new(M, lmax, powerrefbase, ref_elements):
+def kernel_mm(M, lmax, powerrefbase, ref_elements):
 
   llmax = max(lmax.values())
   k_MM = np.zeros((llmax+1, M*(2*llmax+1), M*(2*llmax+1)))
@@ -83,3 +74,15 @@ def kernel_mm_new(M, lmax, powerrefbase, ref_elements):
               k_MM[l, iref1*ms:(iref1+1)*ms, iref2*ms:(iref2+1)*ms] *= k_MM[0, iref1, iref2]
 
   return k_MM
+
+
+def kernel_for_mol(power_ref, power_file, kernel_file,
+                   lmax, ref_elements, el_dict,
+                   natoms, atom_counting, atomicindx):
+
+    power = equistore.load(power_file)
+    kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(natoms, lmax,
+                                         ref_elements, el_dict, atom_counting)
+    k_NM = kernel_nm(lmax, el_dict, ref_elements, kernel_size, kernel_sparse_indices,
+                     power, power_ref, atom_counting, atomicindx)
+    np.savetxt(kernel_file, k_NM)
