@@ -7,6 +7,7 @@ from config import Config,get_config_path
 from basis import basis_read
 from functions import moldata_read, get_elements_list, get_atomicindx, print_progress
 from libs.kernels_lib import kernel_for_mol
+from libs.multi import multi_process
 
 USEMPI = 1
 
@@ -32,48 +33,6 @@ def main():
                        lmax, ref_elements, el_dict,
                        natoms[imol], atom_counting[imol], atomicindx[imol])
 
-    def single_process():
-        for imol in range(nmol):
-            print_progress(imol, nmol)
-            do_mol(imol)
-
-    def multi_process():
-        from mpi4py import MPI
-        comm = MPI.COMM_WORLD
-        Nproc = comm.Get_size()
-        nproc = comm.Get_rank()
-        msg = f'proc {nproc:3d} : {MPI.Get_processor_name()}'
-        if nproc == 0:
-            print(msg)
-            for i in range(1, Nproc):
-                msg = comm.recv(source=i)
-                print(msg)
-            print(flush=1)
-        else:
-            comm.send(msg, dest=0)
-        comm.barrier()
-        if Nproc == 1:
-            for imol in range(nmol):
-                print_progress(imol, nmol)
-                do_mol(imol)
-        else:
-            if nproc == 0:
-                for imol in range(nmol+Nproc-1):
-                    (npr, im) = comm.recv(source=MPI.ANY_SOURCE)
-                    im = imol if imol<nmol else -1
-                    comm.send(im, dest=npr);
-                    print(f'sent {npr} : {im}', flush=1)
-            else:
-                imol = -1
-                while True:
-                    comm.send((nproc, imol), dest=0)
-                    imol = comm.recv(source=0)
-                    if(imol<0):
-                        break
-                    do_mol(imol)
-                print(f'{nproc} : finished')
-
-
     (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
     natmax = max(natoms)
 
@@ -93,9 +52,11 @@ def main():
 
 
     if USEMPI==0:
-        single_process()
+        for imol in range(nmol):
+            print_progress(imol, nmol)
+            do_mol(imol)
     else:
-        multi_process()
+        multi_process(nmol, do_mol)
 
 
 if __name__=='__main__':
