@@ -5,7 +5,10 @@ train_size = 2000
 trainfrac = 1.0
 regular = 1e-6
 jitter = 1e-8
-
+soap_sigma = 0.3
+soap_rcut  = 4.0
+soap_ncut  = 8
+soap_lcut  = 6
 
 [paths]
 xyzfile          = ALL.xyz

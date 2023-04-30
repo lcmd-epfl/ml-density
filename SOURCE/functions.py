@@ -4,14 +4,14 @@ import ase.io
 from ase.data import chemical_symbols
 
 def moldata_read(xyzfilename):
-  xyzfile = ase.io.read(xyzfilename,":")
-  nmol  = len(xyzfile)
-  natoms = np.zeros(nmol,int)
-  atomic_numbers = []
-  for i in range(nmol):
-      atomic_numbers.append(xyzfile[i].get_atomic_numbers())
-      natoms[i] = len(atomic_numbers[i])
-  return (nmol, natoms, np.array(atomic_numbers))
+    mols = ase.io.read(xyzfilename, ":")
+    nmol = len(mols)
+    natoms = np.zeros(nmol, int)
+    atomic_numbers = []
+    for i, mol in enumerate(mols):
+        atomic_numbers.append(mol.get_atomic_numbers())
+        natoms[i] = mol.get_global_number_of_atoms()
+    return (nmol, natoms, atomic_numbers)
 
 def basis_info(el_dict, lmax, nmax):
     nel = len(el_dict)
