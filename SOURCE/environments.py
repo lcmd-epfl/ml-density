@@ -5,18 +5,18 @@ import numpy as np
 from config import Config, get_config_path
 from ase.data import chemical_symbols
 from functions import moldata_read, get_elements_list, do_fps, get_atomicindx_new
-from power_spectra_lib import read_ps_1mol_l0
+from libs.power_spectra_lib import read_ps_1mol_l0
+
+
+def set_variable_values(conf):
+    m   = conf.get_option('m'           ,  100, int  )
+    return [m]
+
 
 def main():
     path = get_config_path(sys.argv)
     conf = Config(config_path=path)
-
-    def set_variable_values():
-        m   = conf.get_option('m'           ,  100, int  )
-        return [m]
-
-    [M] = set_variable_values()
-
+    [M] = set_variable_values(conf)
     xyzfilename     = conf.paths['xyzfile']
     splitpsfilebase = conf.paths['ps_split_base']
     refsselfilebase = conf.paths['refs_sel_base']
@@ -27,7 +27,7 @@ def main():
     elements = get_elements_list(atomic_numbers)
     element_indices = get_atomicindx_new(elements, atomic_numbers)
 
-    power_env = np.vstack([read_ps_1mol_l0(f"{splitpsfilebase}_{imol}.npz", atnum) for imol, atnum in enumerate(atomic_numbers)])
+    power_env = np.vstack([read_ps_1mol_l0(f'{splitpsfilebase}_{imol}.npz', atnum) for imol, atnum in enumerate(atomic_numbers)])
 
     ref_indices, distances = do_fps(power_env,M)
     ref_elements = np.concatenate(element_indices)[ref_indices]
@@ -45,7 +45,7 @@ def main():
 
     nuniq = len(np.unique(ref_indices))
     if nuniq != len(ref_indices):
-        print('warning: I have found only', nuniq, 'unique environments')
+        print(f'warning: I have found only {nuniq} unique environments')
 
 
 if __name__=='__main__':
