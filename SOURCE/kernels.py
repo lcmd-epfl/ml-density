@@ -50,7 +50,6 @@ def main():
         exit(1)
     llmax = max(lmax.values())
 
-
     if USEMPI==0:
         for imol in range(nmol):
             print_progress(imol, nmol)
