@@ -2,6 +2,7 @@
 
 import sys
 import numpy as np
+import equistore
 from config import Config,get_config_path
 from ase.data import chemical_symbols
 from basis import basis_read_full
@@ -26,7 +27,7 @@ trainfilename    = conf.paths['trainingselfile']
 predictfilebase  = conf.paths['predict_base']
 goodcoeffilebase = conf.paths['goodcoef_base']
 goodoverfilebase = conf.paths['goodover_base']
-avdir            = conf.paths['averages_dir']
+avfile           = conf.paths['averages_file']
 if use_charges:
   chargefilename = conf.paths['chargesfile']
 
@@ -37,7 +38,7 @@ training = 'training' in sys.argv[1:]
 # basis, elements dictionary, max. angular momenta, number of radial channels
 (basis, el_dict, lmax, nmax) = basis_read_full(basisfilename)
 
-av_coefs = averages_read(el_dict.values(), avdir)
+averages = equistore.load(avfile)
 
 if use_charges:
   print('charge_file:', chargefilename, 'mode:', use_charges, '\n')
@@ -80,14 +81,13 @@ for frac in fracs:
       c_av = np.zeros_like(c0)
       c_bl = np.zeros_like(c0)
       icoeff=0
-      for iat,q in enumerate(atoms):
-        for l in range(lmax[q]+1):
-          msize=2*l+1
-          for n in range(nmax[(q,l)]):
-            if l==0:
-              c_av[icoeff] = av_coefs[q][n]
-            c_bl[icoeff:icoeff+msize] = coeffs_unraveled[itest,iat,l,n,0:msize]
-            icoeff+=msize
+      for iat, q in enumerate(atoms):
+          c_av[icoeff:icoeff+nmax[(q,0)]] = averages.block(spherical_harmonics_l=0, species_center=q).values
+          for l in range(lmax[q]+1):
+              msize = 2*l+1
+              nsize = nmax[(q,l)]
+              c_bl[icoeff:icoeff+nsize*msize] = coeffs_unraveled[itest, iat, l, 0:nsize, 0:msize].flatten()
+              icoeff+=nsize*msize
 
       #================================================
       c0_bl = c0   - c_av

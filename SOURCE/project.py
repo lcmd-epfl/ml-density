@@ -2,79 +2,61 @@
 
 import sys
 import numpy as np
+import equistore
 from config import Config,get_config_path
 from basis import basis_read
-from ase.data import chemical_symbols
-from functions import moldata_read,print_progress
-
-path = get_config_path(sys.argv)
-conf = Config(config_path=path)
-
-xyzfilename      = conf.paths['xyzfile']
-basisfilename    = conf.paths['basisfile']
-goodcoeffilebase = conf.paths['goodcoef_base']
-goodoverfilebase = conf.paths['goodover_base']
-avdir            = conf.paths['averages_dir']
-baselinedwbase   = conf.paths['baselined_w_base']
+from functions import moldata_read, print_progress, get_elements_list
+from libs.tmap import averages2tmap
 
 
-(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
+def main():
+    path = get_config_path(sys.argv)
+    conf = Config(config_path=path)
+    xyzfilename      = conf.paths['xyzfile']
+    basisfilename    = conf.paths['basisfile']
+    goodcoeffilebase = conf.paths['goodcoef_base']
+    goodoverfilebase = conf.paths['goodover_base']
+    avfile           = conf.paths['averages_file']
+    baselinedwbase   = conf.paths['baselined_w_base']
 
-# how many atoms of each element we have
-nenv = {}
-atomic_numbers_joined = [item for sublist in atomic_numbers for item in sublist]
-elements_in_set = list(set(atomic_numbers_joined))
-elements_in_set.sort()
-for q in elements_in_set:
-    nenv[q] = atomic_numbers_joined.count(q)
-    print(chemical_symbols[q], nenv[q])
 
-# elements dictionary, max. angular momenta, number of radial channels
-(el_dict, lmax, nmax) = basis_read(basisfilename)
+    (nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
+    elements, counts = get_elements_list(atomic_numbers, return_counts=True)
+    nenv = dict(zip(elements, counts))
+    (el_dict, lmax, nmax) = basis_read(basisfilename)
 
-if elements_in_set != list(el_dict.values()):
-  print("different elements in the molecules and in the basis:", elements_in_set, "and", list(el_dict.values()) )
-  exit(1)
+    if list(elements) != list(el_dict.values()):
+      print("different elements in the molecules and in the basis:", elements_in_set, "and", list(el_dict.values()) )
+      exit(1)
 
-av_coefs = {}
-for q in el_dict.values():
-    av_coefs[q] = np.zeros(nmax[(q,0)],float)
+    av_coefs = {q: np.zeros(nmax[(q, 0)]) for q in elements}
 
-print("computing averages:")
-for imol in range(nmol):
-    print_progress(imol, nmol)
-    atoms = atomic_numbers[imol]
-    coef = np.load(goodcoeffilebase+str(imol)+".npy")
-    i = 0
-    for iat in range(natoms[imol]):
-        q = atoms[iat]
-        for n in range(nmax[(q,0)]):
-            av_coefs[q][n] += coef[i]
-            i += 1
-        for l in range(1,lmax[q]+1):
-            i += (2*l+1)*nmax[(q,l)]
-for q in el_dict.values():
-    av_coefs[q] /= nenv[q]
-    np.save(avdir+chemical_symbols[q]+".npy",av_coefs[q])
+    for imol in range(nmol):
+        coef = np.load(f'{goodcoeffilebase}{imol}.npy')
+        atoms = atomic_numbers[imol]
+        i = 0
+        for q in atoms:
+            av_coefs[q] += coef[i:i+nmax[(q,0)]]
+            for l in range(lmax[q]+1):
+                i += (2*l+1)*nmax[(q,l)]
+    for q in el_dict.values():
+        av_coefs[q] /= nenv[q]
 
-print()
-print("computing baselined projections:")
-for imol in range(nmol):
-    print_progress(imol, nmol)
-    atoms = atomic_numbers[imol]
+    for imol in range(nmol):
+        print_progress(imol, nmol)
+        atoms = atomic_numbers[imol]
+        coef = np.load(f'{goodcoeffilebase}{imol}.npy')
+        over = np.load(f'{goodoverfilebase}{imol}.npy')
+        i = 0
+        for q in atoms:
+            coef[i:i+nmax[(q,0)]] -= av_coefs[q]
+            for l in range(lmax[q]+1):
+                i += (2*l+1)*nmax[(q,l)]
+        proj = over @ coef
+        np.savetxt(f'{baselinedwbase}{imol}.dat', proj)
 
-    coef = np.load(goodcoeffilebase+str(imol)+".npy")
-    over = np.load(goodoverfilebase+str(imol)+".npy")
+    equistore.save(avfile, averages2tmap(av_coefs))
 
-    i = 0
-    for iat in range(natoms[imol]):
-        q = atoms[iat]
-        for n in range(nmax[(q,0)]):
-            coef[i] -= av_coefs[q][n]
-            i += 1
-        for l in range(1,lmax[q]+1):
-            i += (2*l+1)*nmax[(q,l)]
 
-    proj = np.dot(over,coef)
-    np.savetxt(baselinedwbase+str(imol)+".dat",proj, fmt='%.10e')
-
+if __name__=='__main__':
+    main()

@@ -42,8 +42,8 @@ def get_kernel_sizes(myrange, ref_elements, el_dict, M, lmax, atom_counting):
         i += 1
     return kernel_sizes
 
-def get_elements_list(atomic_numbers):
-    return np.unique(np.concatenate(atomic_numbers))
+def get_elements_list(atomic_numbers, return_counts=False):
+    return np.unique(np.concatenate(atomic_numbers), return_counts=return_counts)
 
 def get_atomicindx(elements,atomic_numbers,natmax):
     nmol = len(atomic_numbers)
