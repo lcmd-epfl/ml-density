@@ -34,7 +34,7 @@ def main():
 
     ref_indices = np.loadtxt(refsselfilebase+str(M)+".txt", dtype=int)
     ref_elements = np.hstack(atomic_numbers)[ref_indices]
-    k_MM = kernel_mm_new(M, lmax, powerrefbase, ref_elements)
+    k_MM = kernel_mm(M, lmax, powerrefbase, ref_elements)
     np.save(f'{kmmbase}{M}.npy', k_MM )
 
 
