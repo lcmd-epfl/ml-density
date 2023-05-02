@@ -4,7 +4,7 @@ import sys
 import numpy as np
 from config import Config, get_config_path
 from ase.data import chemical_symbols
-from functions import moldata_read, get_elements_list, do_fps, get_atomicindx_new
+from functions import moldata_read, get_elements_list, do_fps, get_atomicindx_new, print_progress
 from libs.power_spectra_lib import read_ps_1mol_l0
 
 
@@ -23,11 +23,15 @@ def main():
     elselfilebase   = conf.paths['spec_sel_base']
 
 
-    _, _, atomic_numbers = moldata_read(xyzfilename)
+    nmol, _, atomic_numbers = moldata_read(xyzfilename)
     elements = get_elements_list(atomic_numbers)
     element_indices = get_atomicindx_new(elements, atomic_numbers)
 
-    power_env = np.vstack([read_ps_1mol_l0(f'{splitpsfilebase}_{imol}.npz', atnum) for imol, atnum in enumerate(atomic_numbers)])
+    power_env = []
+    for imol, atnum in enumerate(atomic_numbers):
+        print_progress(imol, nmol)
+        power_env.append(read_ps_1mol_l0(f'{splitpsfilebase}_{imol}.npz', atnum))
+    power_env = np.vstack(power_env)
 
     ref_indices, distances = do_fps(power_env,M)
     ref_elements = np.concatenate(element_indices)[ref_indices]

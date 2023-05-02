@@ -25,7 +25,9 @@ def read_ps_1mol_l0(psfilename, atomic_numbers):
         block = power.block(spherical_harmonics_l=0, species_center=q)
         if power_sorted is None:
             power_sorted = np.zeros((len(atomic_numbers), block.values.shape[-1]))
-        power_sorted[idx] = block.values[:,0,:]
+        power_sorted[idx] = np.copy(block.values[:,0,:])
+    del power
+    gc.collect()
     return power_sorted
 
 ###################################################
