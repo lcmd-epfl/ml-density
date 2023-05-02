@@ -1,48 +1,71 @@
 import numpy as np
 import equistore
+from libs.tmap import kernels2tmap
 
 
-def kernel_nm_sparse_indices(natoms, lmax, ref_elements, el_dict, atom_counting):
+def kernel_nm_sparse_indices(lmax, el_dict_inv, ref_elements, atomic_numbers):
     llmax = max(lmax.values())
-    kernel_sparse_indices = np.zeros((len(ref_elements), natoms, llmax+1), dtype=int)
+    kernel_sparse_indices = np.zeros((len(ref_elements), len(atomic_numbers), llmax+1), dtype=int)
     kernel_size = 0
-    for iref, iel in enumerate(ref_elements):
-        q = el_dict[iel]
+    for iref, q in enumerate(ref_elements):
+        iel = el_dict_inv[q]
+        nq  = np.count_nonzero(atomic_numbers==q)
         for l in range(lmax[q]+1):
             msize = 2*l+1
-            for iat in range(atom_counting[iel]):
+            for iat in range(nq):
                 kernel_sparse_indices[iref,iat,l] = kernel_size
                 kernel_size += msize*msize
     return kernel_size, kernel_sparse_indices
 
 
-def kernel_nm(lmax, el_dict, ref_elements, kernel_size, kernel_sparse_indices,
-              power, power_ref, atom_counting, atomicindx, imol=0):
+def kernel_nm(atom_charges, soap, soap_ref, imol=0):
+    keys1 = set([tuple(key) for key in soap.keys])
+    keys2 = set([tuple(key) for key in soap_ref.keys])
+    keys  = sorted(keys1 & keys2, key=lambda x: x[::-1])
+    kernel = {key: [] for key in keys}
 
-    k_NM = np.zeros(kernel_size, float)
-    for iq, q in el_dict.items():
-        for l in range(lmax[q]+1):
-            msize = 2*l+1
-            for iref in np.where(ref_elements==iq)[0]:
-                block_ref = power_ref.block(spherical_harmonics_l=l, species_center=q)
-                pos1 = block_ref.samples.position((iref,))
-                vec_ref = block_ref.values[pos1]
-                for iatq in range(atom_counting[iq]):
-                    iat = atomicindx[iq,iatq]
+    for iat, q in enumerate(atom_charges):
+        for (l,q_) in keys:
+            if q_!=q: continue
+            block = soap.block(spherical_harmonics_l=l, species_center=q)
+            isamp = block.samples.position((imol, iat))
+            vals  = block.values[isamp,:,:]
+            block_ref = soap_ref.block(spherical_harmonics_l=l, species_center=q)
+            vals_ref  = block_ref.values
+            pre_kernel = np.einsum('rmx,Mx->rMm', vals_ref, vals)
+            # Normalize with zeta=2
+            if l==0:
+                factor = pre_kernel
+            kernel[(l,q)].append(pre_kernel * factor)
+    kernel = kernels2tmap(atom_charges, kernel)
+    return kernel
 
-                    block = power.block(spherical_harmonics_l=l, species_center=q)
-                    pos2 = block.samples.position((imol,iat))
-                    vec = block.values[pos2]
 
-                    if l==0:
-                        kern = np.dot(vec, vec_ref.T)**2
-                    else:
-                        ik0 = kernel_sparse_indices[iref,iatq,0]
-                        kern = np.dot(vec, vec_ref.T) * k_NM[ik0]**0.5
+def kernel_nm_flatten(kernel_size, kernel_sparse_indices,
+                      ref_elements, atomic_numbers, k_NM, imol=0):
 
-                    ik = kernel_sparse_indices[iref,iatq,l]
-                    k_NM[ik:ik+msize*msize] = kern.T.flatten()
-    return k_NM
+    k_NM_flat = np.zeros(kernel_size)
+    for (l, q) in k_NM.keys:
+        nq = np.count_nonzero(atomic_numbers==q)
+        msize = 2*l+1
+        kblock = k_NM.block(spherical_harmonics_l=l, species_center=q)
+        for iiref, iref in enumerate(np.where(ref_elements==q)[0]):
+            for iatq in range(nq):
+                ik = kernel_sparse_indices[iref,iatq,l]
+                k_NM_flat[ik:ik+msize*msize] = kblock.values[iatq,:,:,iiref].T.flatten()
+    return k_NM_flat
+
+
+def kernel_for_mol(lmax, el_dict, ref_elements, atomic_numbers, power_ref, power_file, kernel_file):
+
+    power = equistore.load(power_file)
+    k_NM = kernel_nm(atomic_numbers, power, power_ref)
+    equistore.save(f'{kernel_file}.npz', k_NM)
+
+    el_dict_inv = {v: k for k, v in el_dict.items()}
+    kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(lmax, el_dict_inv, ref_elements, atomic_numbers)
+    k_NM_flat = kernel_nm_flatten(kernel_size, kernel_sparse_indices, ref_elements, atomic_numbers, k_NM)
+    np.savetxt(kernel_file, k_NM_flat)
 
 
 def kernel_mm(M, lmax, powerrefbase, ref_elements):
@@ -70,15 +93,3 @@ def kernel_mm(M, lmax, powerrefbase, ref_elements):
               k_MM[l, iref1*ms:(iref1+1)*ms, iref2*ms:(iref2+1)*ms] *= k_MM[0, iref1, iref2]
 
   return k_MM
-
-
-def kernel_for_mol(power_ref, power_file, kernel_file,
-                   lmax, ref_elements, el_dict,
-                   natoms, atom_counting, atomicindx):
-
-    power = equistore.load(power_file)
-    kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(natoms, lmax,
-                                         ref_elements, el_dict, atom_counting)
-    k_NM = kernel_nm(lmax, el_dict, ref_elements, kernel_size, kernel_sparse_indices,
-                     power, power_ref, atom_counting, atomicindx)
-    np.savetxt(kernel_file, k_NM)

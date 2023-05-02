@@ -19,7 +19,7 @@ def main():
     [M] = set_variable_values(conf)
     xyzfilename   = conf.paths['xyzfile']
     basisfilename = conf.paths['basisfile']
-    elselfilebase = conf.paths['spec_sel_base']
+    refsselfilebase = conf.paths['refs_sel_base']
     powerrefbase  = conf.paths['ps_ref_base']
     xyzexfilename = conf.paths['ex_xyzfile']
     kernelexbase  = conf.paths['ex_kernel_base']
@@ -27,15 +27,12 @@ def main():
 
 
     _, _, atomic_numbers = moldata_read(xyzfilename)
-    (nmol_ex, natoms_ex, atomic_numbers_ex) = moldata_read(xyzexfilename)
-    natmax_ex = max(natoms_ex)
+    nmol_ex, _, atomic_numbers_ex = moldata_read(xyzexfilename)
 
-    # elements array and atomic indices sorted by elements
     elements = get_elements_list(atomic_numbers)
-    nel = len(elements)
-    (atomicindx_ex, atom_counting_ex, _) = get_atomicindx(elements, atomic_numbers_ex, natmax_ex)
 
-    ref_elements = np.loadtxt(f'{elselfilebase}{M}.txt', dtype=int)
+    ref_indices = np.loadtxt(f'{refsselfilebase}{M}.txt', dtype=int)
+    ref_elements = np.hstack(atomic_numbers)[ref_indices]
 
     # elements dictionary, max. angular momenta, number of radial channels
     (el_dict, lmax, _) = basis_read(basisfilename)
@@ -47,9 +44,8 @@ def main():
 
     for imol in range(nmol_ex):
         print_progress(imol, nmol_ex)
-        kernel_for_mol(power_ref, f'{powerexbase}_{imol}.npz', f'{kernelexbase}{imol}.dat',
-                       lmax, ref_elements, el_dict,
-                       natoms_ex[imol], atom_counting_ex[imol], atomicindx_ex[imol])
+        kernel_for_mol(lmax, el_dict, ref_elements, atomic_numbers_ex[imol],
+                       power_ref, f'{powerexbase}_{imol}.npz', f'{kernelexbase}{imol}.dat')
 
 
 if __name__=='__main__':

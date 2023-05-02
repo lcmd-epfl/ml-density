@@ -32,7 +32,7 @@ def main():
         print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
         exit(1)
 
-    ref_indices = np.loadtxt(refsselfilebase+str(M)+".txt", dtype=int)
+    ref_indices = np.loadtxt(f'{refsselfilebase}{M}.txt', dtype=int)
     ref_elements = np.hstack(atomic_numbers)[ref_indices]
     k_MM = kernel_mm(M, lmax, powerrefbase, ref_elements)
     np.save(f'{kmmbase}{M}.npy', k_MM )
