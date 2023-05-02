@@ -9,6 +9,8 @@ soap_sigma = 0.3
 soap_rcut  = 4.0
 soap_ncut  = 8
 soap_lcut  = 6
+reorder_ao = 1
+copy_metric = 1
 
 [paths]
 xyzfile          = ALL.xyz
