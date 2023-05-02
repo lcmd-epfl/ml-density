@@ -50,3 +50,73 @@ def kernels2tmap(atom_charges, kernel):
     tm_labels = equistore.Labels(vector_label_names.tm, np.array(tm_label_vals))
     tensor = equistore.TensorMap(keys=tm_labels, blocks=tensor_blocks)
     return tensor
+
+
+
+def vector2tmap(atom_charges, lmax, nmax, c):
+
+    elements = np.unique(atom_charges)
+
+    tm_label_vals = []
+    block_prop_label_vals = {}
+    block_samp_label_vals = {}
+    block_comp_label_vals = {}
+
+    blocks = {}
+
+    # Create labels for TensorMap, lables for blocks, and empty blocks
+
+    for q in elements:
+        for l in range(lmax[q]+1):
+            label = (l, q)
+            tm_label_vals.append(label)
+            samples_count    = np.count_nonzero(atom_charges==q)
+            components_count = 2*l+1
+            properties_count = nmax[(q,l)]
+            blocks[label] = np.zeros((samples_count, components_count, properties_count))
+            block_comp_label_vals[label] = np.arange(-l, l+1).reshape(-1,1)
+            block_prop_label_vals[label] = np.arange(properties_count).reshape(-1,1)
+            block_samp_label_vals[label] = np.where(atom_charges==q)[0].reshape(-1,1)
+
+    tm_labels = equistore.Labels(vector_label_names.tm, np.array(tm_label_vals))
+
+    block_comp_labels = {key: equistore.Labels(vector_label_names.block_comp, block_comp_label_vals[key]) for key in blocks}
+    block_prop_labels = {key: equistore.Labels(vector_label_names.block_prop, block_prop_label_vals[key]) for key in blocks}
+    block_samp_labels = {key: equistore.Labels(vector_label_names.block_samp, block_samp_label_vals[key]) for key in blocks}
+
+    # Fill in the blocks
+
+    iq = {q:0 for q in elements}
+    i = 0
+    for iat, q in enumerate(atom_charges):
+        for l in range(lmax[q]+1):
+            msize = 2*l+1
+            nsize = blocks[(l,q)].shape[-1]
+            cslice = c[i:i+nsize*msize].reshape(nsize,msize).T
+            blocks[(l,q)][iq[q],:,:] = cslice
+            i += msize*nsize
+        iq[q] += 1
+    tensor_blocks = [equistore.TensorBlock(values=blocks[key], samples=block_samp_labels[key], components=[block_comp_labels[key]], properties=block_prop_labels[key]) for key in tm_label_vals]
+    tensor = equistore.TensorMap(keys=tm_labels, blocks=tensor_blocks)
+    return tensor
+
+
+def _get_tsize(tensor):
+    return sum([np.prod(tensor.block(key).values.shape) for key in tensor.keys])
+
+
+def tmap2vector(atom_charges, lmax, nmax, tensor):
+    nao = _get_tsize(tensor)
+    c = np.zeros(nao)
+    i = 0
+    for iat, q in enumerate(atom_charges):
+        for l in range(lmax[q]+1):
+            for n in range(nmax[(q,l)]):
+                block = tensor.block(spherical_harmonics_l=l, species_center=q)
+                id_samp = block.samples.position((iat,))
+                id_prop = block.properties.position((n,))
+                for m in range(-l,l+1):
+                    id_comp = block.components[0].position((m,))
+                    c[i] = block.values[id_samp,id_comp,id_prop]
+                    i += 1
+    return c

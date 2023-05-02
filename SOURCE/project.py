@@ -6,7 +6,7 @@ import equistore
 from config import Config, get_config_path
 from basis import basis_read
 from functions import moldata_read, print_progress, get_elements_list, nao_for_mol
-from libs.tmap import averages2tmap
+from libs.tmap import averages2tmap, vector2tmap
 
 
 def set_variable_values(conf):
@@ -69,6 +69,8 @@ def main():
                 i += (2*l+1)*nmax[(q,l)]
         proj = over @ coef
         np.savetxt(f'{baselinedwbase}{imol}.dat', proj)
+        proj_tmap = vector2tmap(atoms, lmax, nmax, proj)
+        equistore.save(f'{baselinedwbase}{imol}.npz', proj_tmap)
 
     equistore.save(avfile, averages2tmap(av_coefs))
 
