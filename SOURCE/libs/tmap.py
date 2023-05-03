@@ -10,7 +10,7 @@ vector_label_names = SimpleNamespace(
     )
 
 matrix_label_names = SimpleNamespace(
-    tm = ['spherical_harmonics_l1', 'spherical_harmonics_l2', 'element1', 'element2'],
+    tm = ['spherical_harmonics_l1', 'spherical_harmonics_l2', 'species_center1', 'species_center2'],
     block_prop = ['radial_channel1', 'radial_channel2'],
     block_samp = ['atom_id1', 'atom_id2'],
     block_comp = ['spherical_harmonics_m1', 'spherical_harmonics_m2']
