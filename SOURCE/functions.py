@@ -3,6 +3,7 @@ import numpy as np
 import ase.io
 from ase.data import chemical_symbols
 
+
 def moldata_read(xyzfilename):
     mols = ase.io.read(xyzfilename, ":")
     nmol = len(mols)
@@ -126,8 +127,8 @@ def averages_read(elements, avdir):
 def nao_for_mol(atoms, lmax, nmax):
     nao = 0
     for q in atoms:
-      for l in range(lmax[q]+1):
-        nao += (2*l+1)*nmax[(q,l)]
+        for l in range(lmax[q]+1):
+            nao += (2*l+1)*nmax[(q,l)]
     return nao
 
 def prediction2coefficients(atoms, lmax, nmax, coeff, av_coefs):
