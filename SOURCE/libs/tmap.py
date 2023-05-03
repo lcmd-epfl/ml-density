@@ -120,3 +120,109 @@ def tmap2vector(atom_charges, lmax, nmax, tensor):
                     c[i] = block.values[id_samp,id_comp,id_prop]
                     i += 1
     return c
+
+
+def matrix2tmap(atom_charges, lmax, nmax, dm):
+
+    def pairs(list1, list2):
+        return np.array([(i,j) for i in list1 for j in list2])
+
+    elements = sorted(set(atom_charges))
+
+    tm_label_vals = []
+    block_prop_label_vals = {}
+    block_samp_label_vals = {}
+    block_comp_label_vals = {}
+
+    blocks = {}
+
+    # Create labels for TensorMap, lables for blocks, and empty blocks
+
+    for q1 in elements:
+        for q2 in elements:
+            for l1 in range(lmax[q1]+1):
+                for l2 in range(lmax[q2]+1):
+                    label = (l1, l2, q1, q2)
+                    tm_label_vals.append(label)
+
+                    samples_count1    = np.count_nonzero(atom_charges==q1)
+                    components_count1 = 2*l1+1
+                    properties_count1 = nmax[(q1,l1)]
+
+                    samples_count2    = np.count_nonzero(atom_charges==q2)
+                    components_count2 = 2*l2+1
+                    properties_count2 = nmax[(q2,l2)]
+
+                    blocks[label] = np.zeros((samples_count1*samples_count2, components_count1, components_count2, properties_count1*properties_count2))
+                    block_comp_label_vals[label] = (np.arange(-l1, l1+1).reshape(-1,1), np.arange(-l2, l2+1).reshape(-1,1))
+                    block_prop_label_vals[label] = pairs(np.arange(properties_count1), np.arange(properties_count2))
+                    block_samp_label_vals[label] = pairs(np.where(atom_charges==q1)[0],np.where(atom_charges==q2)[0])
+
+    tm_labels = equistore.Labels(matrix_label_names.tm, np.array(tm_label_vals))
+
+    block_prop_labels = {key: equistore.Labels(matrix_label_names.block_prop, block_prop_label_vals[key]) for key in blocks}
+    block_samp_labels = {key: equistore.Labels(matrix_label_names.block_samp, block_samp_label_vals[key]) for key in blocks}
+    block_comp_labels = {key: [equistore.Labels([name], vals) for name, vals in zip(matrix_label_names.block_comp, block_comp_label_vals[key])] for key in blocks}
+
+    # Build tensor blocks
+    tensor_blocks = [equistore.TensorBlock(values=blocks[key], samples=block_samp_labels[key], components=block_comp_labels[key], properties=block_prop_labels[key]) for key in tm_label_vals]
+
+    # Fill in the blocks
+
+    iq1 = {q1: 0 for q1 in elements}
+    i1 = 0
+    for iat1, q1 in enumerate(atom_charges):
+        for l1 in range(lmax[q1]+1):
+            msize1 = 2*l1+1
+            nsize1 = nmax[(q1,l1)]
+            iq2 = {q2: 0 for q2 in elements}
+            i2 = 0
+            for iat2, q2 in enumerate(atom_charges):
+                for l2 in range(lmax[q2]+1):
+                    msize2 = 2*l2+1
+                    nsize2 = nmax[(q2,l2)]
+                    dmslice = dm[i1:i1+nsize1*msize1,i2:i2+nsize2*msize2].reshape(nsize1,msize1,nsize2,msize2)
+                    dmslice = np.transpose(dmslice, axes=[1,3,0,2]).reshape(msize1,msize2,-1)
+                    block = tensor_blocks[tm_label_vals.index((l1,l2,q1,q2))]
+                    at_p = block.samples.position((iat1,iat2))
+                    blocks[(l1,l2,q1,q2)][at_p,:,:,:] = dmslice
+                    i2 += msize2*nsize2
+                iq2[q2] += 1
+            i1 += msize1*nsize1
+        iq1[q1] += 1
+
+    # Build tensor map
+    tensor_blocks = [equistore.TensorBlock(values=blocks[key], samples=block_samp_labels[key], components=block_comp_labels[key], properties=block_prop_labels[key]) for key in tm_label_vals]
+    tensor = equistore.TensorMap(keys=tm_labels, blocks=tensor_blocks)
+
+    return tensor
+
+def sparseindices_fill(atoms, lmax, nmax):
+    sparseindices = np.zeros((max(lmax.values())+1, max(nmax.values()), len(atoms)), dtype=int)
+    i = 0;
+    for iat, q in enumerate(atoms):
+        for l in range(lmax[q]+1):
+            msize = 2*l+1;
+            for n in range(nmax[(q,l)]):
+                sparseindices[l,n,iat] = i;
+                i += msize;
+    return sparseindices;
+
+
+def tmap2matrix(atom_charges, lmax, nmax, tensor):
+    nao = int(round(np.sqrt(_get_tsize(tensor))))
+    dm = np.zeros((nao, nao))
+    idx = sparseindices_fill(atom_charges, lmax, nmax)
+    for (l1, l2, q1, q2), block in tensor:
+        msize1 = 2*l1+1
+        msize2 = 2*l2+1
+        for iat1 in np.where(atom_charges==q1)[0]:
+            for iat2 in np.where(atom_charges==q2)[0]:
+                id_samp = block.samples.position((iat1, iat2))
+                for n1 in range(nmax[(q1,l1)]):
+                    for n2 in range(nmax[(q2,l2)]):
+                        id_prop = block.properties.position((n1, n2))
+                        i1 = idx[l1,n1,iat1]
+                        i2 = idx[l2,n2,iat2]
+                        dm[i1:i1+msize1,i2:i2+msize2] = block.values[id_samp,:,:,id_prop]
+    return dm

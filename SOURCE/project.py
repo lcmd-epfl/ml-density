@@ -6,7 +6,8 @@ import equistore
 from config import Config, get_config_path
 from basis import basis_read
 from functions import moldata_read, print_progress, get_elements_list, nao_for_mol
-from libs.tmap import averages2tmap, vector2tmap
+from libs.tmap import averages2tmap, vector2tmap, matrix2tmap
+from libs.tmap import tmap2matrix
 
 
 def set_variable_values(conf):
@@ -56,6 +57,9 @@ def main():
             over      = np.load(f'{overfilebase}{imol}.npy')
             good_over = over[np.ix_(idx,idx)]
             np.save(f'{goodoverfilebase}{imol}.npy', good_over)
+            over_tmap = matrix2tmap(atoms, lmax, nmax, good_over)
+            equistore.save(f'{goodoverfilebase}{imol}.npz', over_tmap)
+
 
     av_coefs = get_averages(lmax, nmax, coefficients, atomic_numbers)
 
