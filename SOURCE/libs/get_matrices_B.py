@@ -1,6 +1,6 @@
-import sys
 import numpy as np
 import equistore
+from libs.get_matrices_A import print_batches
 from libs.multi import print_nodes, scatter_jobs
 USE_MPI = 1
 if USE_MPI:
@@ -16,15 +16,6 @@ def print_mem(totsize, ntrain):
       Number of training molecules = {ntrain}\n\
       output: {size:16d} bytes ({size*b2mib:10.2f} MiB, {size*b2gib:6.2f} GiB)\n""", flush=True)
   return
-
-
-def print_batches(nproc, nfrac, ntrains, paths):
-    if nproc==0:
-        for i in range(nfrac):
-           print(f"batch {i:2d} [{ntrains[i-1]}--{ntrains[i]}):\t {paths[i]}")
-        print(flush=True)
-    if USE_MPI:
-        MPI.COMM_WORLD.barrier()
 
 
 def symsize(M):
@@ -48,8 +39,8 @@ def sparseindices_fill(lmax, nmax, atoms):
 
 def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
 
-  over = equistore.load(f"{path_over}{conf}.npz")
-  k_NM = equistore.load(f"{path_kern}{conf}.dat.npz")
+  over = equistore.load(f'{path_over}{conf}.npz')
+  k_NM = equistore.load(f'{path_kern}{conf}.dat.npz')
 
   for (l1, l2, q1, q2), oblock in over:
       msize1 = 2*l1+1
@@ -106,7 +97,10 @@ def get_b(lmax, nmax, totsize, ref_elem,
       nproc = 0
       Nproc = 1
 
-  print_batches(nproc, nfrac, ntrains, paths_bmat)
+  if nproc==0:
+      print_batches(nfrac, ntrains, paths_bmat)
+  if USE_MPI:
+      MPI.COMM_WORLD.barrier()
 
   if Nproc==1:
       for ifrac in range(nfrac):

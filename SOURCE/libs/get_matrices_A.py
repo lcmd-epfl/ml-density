@@ -1,26 +1,17 @@
-import sys
 import numpy as np
 import equistore
 from libs.tmap import vector2tmap, tmap2vector
 
 
-USE_MPI=0
-Nproc = 1
-nproc = 0
-
-
-def print_batches(f, nfrac, ntrains, paths):
-    if nproc==0:
-        for i in range(nfrac):
-           print(f"batch {i:2d} [{ntrains[i-1]}--{ntrains[i]}):\t {paths[i]}", file=f)
-        print(flush=True, file=f)
-    if USE_MPI:
-        MPI_Barrier(MPI_COMM_WORLD)
+def print_batches(nfrac, ntrains, paths):
+    for i in range(nfrac):
+       print(f'batch {i:2d} [{ntrains[i-1]}--{ntrains[i]}):\t {paths[i]}')
+    print(flush=True)
 
 
 def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
-    proj = equistore.load(f"{path_proj}{conf}.npz")
-    k_NM = equistore.load(f"{path_kern}{conf}.dat.npz")
+    proj = equistore.load(f'{path_proj}{conf}.npz')
+    k_NM = equistore.load(f'{path_kern}{conf}.dat.npz')
     for (l1, q1), pblock in proj:
         msize1 = 2*l1+1
         kblock = k_NM.block(spherical_harmonics_l=l1, species_center=q1)
@@ -36,13 +27,13 @@ def get_a(lmax, nmax,
           path_proj, path_kern, paths_avec):
 
     ntrains = np.pad(ntrains, (0, 1), 'constant', constant_values=0)
-    print_batches(sys.stdout, nfrac, ntrains, paths_avec)
+    print_batches(nfrac, ntrains, paths_avec)
 
     Avec = np.zeros(totsize)
     A1 = vector2tmap(ref_elem, lmax, nmax, Avec)
     for ifrac in range(nfrac):
         for imol in range(ntrains[ifrac-1], ntrains[ifrac]):
-            print(f'{nproc:4d}: {imol:4d}')
+            print(f'{0:4d}: {imol:4d}')
             do_work_a(trrange[imol], ref_elem, path_proj, path_kern, A1)
         Avec = tmap2vector(ref_elem, lmax, nmax, A1)
         np.savetxt(paths_avec[ifrac], Avec)
