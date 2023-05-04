@@ -2,173 +2,62 @@
 
 import sys
 import numpy as np
-from config import Config,get_config_path
+from config import Config, get_config_path
 from basis import basis_read
-from functions import moldata_read,get_elements_list,get_atomicindx,basis_info,get_kernel_sizes,nao_for_mol,get_training_sets
-import os
-import ctypes
-import ctypes_def
+from functions import moldata_read, get_elements_list, nao_for_mol, get_training_sets
+from libs.get_matrices_A import get_a
+from libs.get_matrices_B import get_b
 
-path = get_config_path(sys.argv)
-conf = Config(config_path=path)
 
-def set_variable_values():
+def set_variable_values(conf):
     f  = conf.get_option('trainfrac', np.array([1.0]), conf.floats)
     m  = conf.get_option('m'        , 100,             int  )
-    return [f,m]
-
-[fracs,M] = set_variable_values()
-
-xyzfilename      = conf.paths['xyzfile']
-basisfilename    = conf.paths['basisfile']
-trainfilename    = conf.paths['trainingselfile']
-elselfilebase    = conf.paths['spec_sel_base']
-kernelconfbase   = conf.paths['kernel_conf_base']
-baselinedwbase   = conf.paths['baselined_w_base']
-goodoverfilebase = conf.paths['goodover_base']
-avecfilebase     = conf.paths['avec_base']
-bmatfilebase     = conf.paths['bmat_base']
-
-(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
-natmax = max(natoms)
-nenv = sum(natoms)
-
-# elements array and atomic indices sorted by elements
-elements = get_elements_list(atomic_numbers)
-nel = len(elements)
-(atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
-
-# reference environments
-ref_elements = np.loadtxt(elselfilebase+str(M)+".txt",int)
-
-# elements dictionary, max. angular momenta, number of radial channels
-(el_dict, lmax, nmax) = basis_read(basisfilename)
-if list(elements) != list(el_dict.values()):
-    print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
-    exit(1)
-
-# basis set size
-llmax = max(lmax.values())
-nnmax = max(nmax.values())
-[bsize, alnum, annum] = basis_info(el_dict, lmax, nmax);
-
-# problem dimensionality
-totsize = sum(bsize[ref_elements])
+    return [f, m]
 
 
-# training set selection
-fracs.sort()     #####
-frac = fracs[-1] #####
-nfrac,ntrains,train_configs = get_training_sets(trainfilename, fracs)
-ntrain = ntrains[-1]
-natoms_train = natoms[train_configs]
-atomicindx_training = atomicindx[train_configs]
-atom_counting_training = atom_counting[train_configs]
-atomic_elements = np.zeros((ntrain,natmax),int)
-for itrain,iconf in enumerate(train_configs):
-  atomic_elements[itrain,0:natoms_train[itrain]] = element_indices[iconf]
+def main():
+    path = get_config_path(sys.argv)
+    conf = Config(config_path=path)
+    [fracs, M] = set_variable_values(conf)
+    xyzfilename      = conf.paths['xyzfile']
+    basisfilename    = conf.paths['basisfile']
+    trainfilename    = conf.paths['trainingselfile']
+    refsselfilebase  = conf.paths['refs_sel_base']
+    kernelconfbase   = conf.paths['kernel_conf_base']
+    baselinedwbase   = conf.paths['baselined_w_base']
+    goodoverfilebase = conf.paths['goodover_base']
+    avecfilebase     = conf.paths['avec_base']
+    bmatfilebase     = conf.paths['bmat_base']
+
+    _, _, atomic_numbers = moldata_read(xyzfilename)
+    elements = get_elements_list(atomic_numbers)
+
+    # elements dictionary, max. angular momenta, number of radial channels
+    (el_dict, lmax, nmax) = basis_read(basisfilename)
+    if list(elements) != list(el_dict.values()):
+        print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
+        exit(1)
+
+    # reference environments
+    ref_indices = np.loadtxt(f'{refsselfilebase}{M}.txt', dtype=int)
+    ref_elements = np.hstack(atomic_numbers)[ref_indices]
+    totsize = nao_for_mol(ref_elements, lmax, nmax)
+
+    # training set selection
+    fracs.sort()
+    nfrac, ntrains, train_configs = get_training_sets(trainfilename, fracs)
+
+    if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
+        bmatfiles= [f'{bmatfilebase}_M{M}_trainfrac{fracs[i]}.dat' for i in range(nfrac)]
+        get_b(lmax, nmax, totsize, ref_elements,
+              nfrac, ntrains, train_configs,
+              goodoverfilebase, kernelconfbase, bmatfiles)
+    else:
+        avecfiles = [f'{avecfilebase}_M{M}_trainfrac{fracs[i]}.txt' for i in range(nfrac)]
+        get_a(lmax, nmax, totsize, ref_elements,
+              nfrac, ntrains, train_configs,
+              baselinedwbase, kernelconfbase, avecfiles)
 
 
-# sparse overlap and projection indices
-total_sizes = np.array([ nao_for_mol(atomic_numbers[imol], lmax, nmax) for imol in train_configs ])
-# sparse kernel indices
-kernel_sizes = get_kernel_sizes(train_configs, ref_elements, el_dict, M, lmax, atom_counting_training)
-
-
-################################################################################
-
-get_matrices = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/get_matrices.so")
-#get_matrices = ctypes.CDLL(os.path.dirname(sys.argv[0])+"/clibs/get_matrices.so", ctypes.RTLD_GLOBAL)
-
-argtypes = [
-  ctypes.c_int,
-  ctypes.c_int,
-  ctypes.c_int,
-  ctypes.c_int,
-  ctypes.c_int,
-  ctypes.c_int,
-  ctypes.c_int,
-  ctypes.c_int,
-  ctypes_def.array_1d_int,
-  ctypes_def.array_3d_int,
-  ctypes_def.array_2d_int,
-  ctypes_def.array_1d_int,
-  ctypes_def.array_1d_int,
-  ctypes_def.array_1d_int,
-  ctypes_def.array_1d_int,
-  ctypes_def.array_2d_int,
-  ctypes_def.array_1d_int,
-  ctypes_def.array_1d_int,
-  ctypes_def.array_2d_int,
-  ctypes.c_char_p,
-  ctypes.c_char_p,
-  ctypes.POINTER(ctypes.c_char_p)
-  ]
-
-
-if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
-
-  bmatfiles = (ctypes.c_char_p * nfrac)()
-  for i in range(nfrac):
-    bmatfiles[i] = (bmatfilebase + "_M"+str(M)+"_trainfrac"+str(fracs[i])+".dat").encode('ascii')
-
-  get_matrices.get_b.restype = ctypes.c_int
-  get_matrices.get_b.argtypes = argtypes
-
-  ret = get_matrices.get_b(
-      totsize ,
-      nel     ,
-      llmax   ,
-      nnmax   ,
-      M       ,
-      ntrain  ,
-      natmax  ,
-      nfrac,
-      ntrains.astype(np.uint32)               ,
-      atomicindx_training.astype(np.uint32)   ,
-      atom_counting_training.astype(np.uint32),
-      train_configs.astype(np.uint32)         ,
-      natoms_train.astype(np.uint32)          ,
-      total_sizes.astype(np.uint32)           ,
-      kernel_sizes.astype(np.uint32)          ,
-      atomic_elements.astype(np.uint32)       ,
-      ref_elements.astype(np.uint32)          ,
-      alnum.astype(np.uint32)                 ,
-      annum.astype(np.uint32)                 ,
-      goodoverfilebase.encode('ascii'),
-      kernelconfbase.encode('ascii'),
-      bmatfiles)
-
-else:
-
-  avecfiles = (ctypes.c_char_p * nfrac)()
-  for i in range(nfrac):
-    avecfiles[i] = (avecfilebase + "_M"+str(M)+"_trainfrac"+str(fracs[i])+".txt").encode('ascii')
-
-  get_matrices.get_a.restype = ctypes.c_int
-  get_matrices.get_a.argtypes = argtypes
-
-  ret = get_matrices.get_a(
-      totsize ,
-      nel     ,
-      llmax   ,
-      nnmax   ,
-      M       ,
-      ntrain  ,
-      natmax  ,
-      nfrac   ,
-      ntrains.astype(np.uint32)               ,
-      atomicindx_training.astype(np.uint32)   ,
-      atom_counting_training.astype(np.uint32),
-      train_configs.astype(np.uint32)         ,
-      natoms_train.astype(np.uint32)          ,
-      total_sizes.astype(np.uint32)           ,
-      kernel_sizes.astype(np.uint32)          ,
-      atomic_elements.astype(np.uint32)       ,
-      ref_elements.astype(np.uint32)          ,
-      alnum.astype(np.uint32)                 ,
-      annum.astype(np.uint32)                 ,
-      baselinedwbase.encode('ascii'),
-      kernelconfbase.encode('ascii'),
-      avecfiles)
-
+if __name__=='__main__':
+    main()
