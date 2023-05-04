@@ -2,27 +2,16 @@
 
 import sys
 import numpy as np
-from config import Config, get_config_path
+from config import read_config
 import ase.io
 
 
-def set_variable_values(conf):
-    seed  = conf.get_option('seed'        ,    1, int  )
-    train = conf.get_option('train_size'  , 1000, int  )
-    return [seed, train]
-
 def main():
-    path = get_config_path(sys.argv)
-    conf = Config(config_path=path)
-    [seed, train] = set_variable_values(conf)
-    xyzfilename      = conf.paths['xyzfile']
-    trainfilename    = conf.paths['trainingselfile']
-
-    xyzfile = ase.io.read(xyzfilename,":")
-    nmol = len(xyzfile)
-    np.random.seed(seed)
-    output = np.random.choice(nmol, train, replace=False)
-    np.savetxt(trainfilename, output, fmt='%i')
+    o, p = read_config(sys.argv)
+    np.random.seed(o.seed)
+    nmol = len(ase.io.read(p.xyzfilename, ':'))
+    train = np.random.choice(nmol, o.train, replace=False)
+    np.savetxt(p.trainfilename, train, fmt='%i')
 
 
 if __name__=='__main__':
