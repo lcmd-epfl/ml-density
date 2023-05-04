@@ -2,42 +2,30 @@
 
 import sys
 import numpy as np
-from config import Config, get_config_path
+from config import read_config
 from ase.data import chemical_symbols
 from functions import moldata_read, get_elements_list, do_fps, get_atomicindx_new, print_progress
 from libs.power_spectra_lib import read_ps_1mol_l0
 
 
-def set_variable_values(conf):
-    m   = conf.get_option('m'           ,  100, int  )
-    return [m]
-
-
 def main():
-    path = get_config_path(sys.argv)
-    conf = Config(config_path=path)
-    [M] = set_variable_values(conf)
-    xyzfilename     = conf.paths['xyzfile']
-    splitpsfilebase = conf.paths['ps_split_base']
-    refsselfilebase = conf.paths['refs_sel_base']
-    elselfilebase   = conf.paths['spec_sel_base']
+    o, p = read_config(sys.argv)
 
-
-    nmol, _, atomic_numbers = moldata_read(xyzfilename)
+    nmol, _, atomic_numbers = moldata_read(p.xyzfilename)
     elements = get_elements_list(atomic_numbers)
     element_indices = get_atomicindx_new(elements, atomic_numbers)
 
     power_env = []
     for imol, atnum in enumerate(atomic_numbers):
         print_progress(imol, nmol)
-        power_env.append(read_ps_1mol_l0(f'{splitpsfilebase}_{imol}.npz', atnum))
+        power_env.append(read_ps_1mol_l0(f'{p.splitpsfilebase}_{imol}.npz', atnum))
     power_env = np.vstack(power_env)
 
-    ref_indices, distances = do_fps(power_env,M)
+    ref_indices, distances = do_fps(power_env, o.M)
     ref_elements = np.concatenate(element_indices)[ref_indices]
 
-    np.savetxt(f'{refsselfilebase}{M}.txt', ref_indices,  fmt='%i')
-    np.savetxt(f'{elselfilebase}{M}.txt',   ref_elements, fmt='%i')
+    np.savetxt(f'{p.refsselfilebase}{o.M}.txt', ref_indices,  fmt='%i')
+    np.savetxt(f'{p.elselfilebase}{o.M}.txt',   ref_elements, fmt='%i')
 
     for i, d in enumerate(distances):
         print(i+1, d)

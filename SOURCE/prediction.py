@@ -2,63 +2,40 @@
 
 import sys
 import numpy as np
-from config import Config,get_config_path
+from config import read_config
 from basis import basis_read
-from functions import moldata_read,get_elements_list,get_atomicindx,get_test_set,get_training_set
+from functions import moldata_read, get_elements_list, get_atomicindx, get_test_set, get_training_set
 from run_prediction import run_prediction
 
-path = get_config_path(sys.argv)
-conf = Config(config_path=path)
 
-def set_variable_values():
-    f  = conf.get_option('trainfrac', np.array([1.0]), conf.floats)
-    m  = conf.get_option('m'        , 100,             int  )
-    r  = conf.get_option('regular'  , 1e-6,            float)
-    j  = conf.get_option('jitter'   , 1e-10,           float)
-    return [f,m,r,j]
+def main():
+    o, p = read_config(sys.argv)
+    training = 'training' in sys.argv[1:]
 
-[fracs,M,reg,jit] = set_variable_values()
+    nmol, natoms, atomic_numbers = moldata_read(p.xyzfilename)
+    natmax = max(natoms)
+    elements = get_elements_list(atomic_numbers)
+    (atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
 
-xyzfilename     = conf.paths['xyzfile']
-basisfilename   = conf.paths['basisfile']
-trainfilename   = conf.paths['trainingselfile']
-elselfilebase   = conf.paths['spec_sel_base']
-kernelconfbase  = conf.paths['kernel_conf_base']
-weightsfilebase = conf.paths['weights_base']
-predictfilebase = conf.paths['predict_base']
+    for frac in o.fracs:
 
-training = 'training' in sys.argv[1:]
+        if not training:
+            ntest, test_configs = get_test_set(p.trainfilename, nmol)
+            predictfile = f'{p.predictfilebase}_test_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy'
+        else:
+            ntest, test_configs = get_training_set(p.trainfilename, frac)
+            predictfile = f'{p.predictfilebase}_training_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy'
+        weightsfile = f'{p.weightsfilebase}_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy'
 
-(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
-natmax = max(natoms)
+        natoms_test = natoms[test_configs]
+        atomicindx_test = atomicindx[test_configs]
+        atom_counting_test = atom_counting[test_configs]
 
-# elements array and atomic indices sorted by elements
-elements = get_elements_list(atomic_numbers)
-nel = len(elements)
-(atomicindx, atom_counting, element_indices) = get_atomicindx(elements, atomic_numbers, natmax)
+        print(f'Number of testing molecules = {ntest}')
 
-for frac in fracs:
+        run_prediction(ntest, natmax, natoms_test,
+                       atom_counting_test, atomicindx_test, test_configs, o.M, elements,
+                       p.kernelconfbase, p.basisfilename, f'{p.elselfilebase}{o.M}.txt', weightsfile, predictfile)
 
-  if not training:
-    ntest,test_configs = get_test_set(trainfilename, nmol)
-    predictfile = predictfilebase + "_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
-  else:
-    ntest,test_configs = get_training_set(trainfilename, frac)
-    predictfile = predictfilebase + "_training_trainfrac"+str(frac)+"_M"+str(M)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
-  weightsfile = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
-
-  natoms_test = natoms[test_configs]
-  atomicindx_test = atomicindx[test_configs]
-  atom_counting_test = atom_counting[test_configs]
-
-  print("Number of testing molecules =", ntest)
-
-  run_prediction(ntest, natmax, natoms_test,
-      atom_counting_test, atomicindx_test, test_configs,
-      M, elements,
-      kernelconfbase,
-      basisfilename,
-      elselfilebase+str(M)+".txt",
-      weightsfile,
-      predictfile)
-
+if __name__=='__main__':
+    main()

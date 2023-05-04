@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import gc
 import numpy as np
 import equistore
 
@@ -226,3 +227,46 @@ def tmap2matrix(atom_charges, lmax, nmax, tensor):
                 i2 = idx[iat2,l2]
                 dm[i1:i1+nsize1*msize1,i2:i2+nsize2*msize2] = values[iiat1,iiat2].transpose((2,0,3,1)).reshape((nsize1*msize1,nsize2*msize2))
     return dm
+
+
+def merge_ref_ps(lmax, elements, atomic_numbers, idx, splitpsfilebase):
+
+    keys = [(l, q) for q in elements for l in range(lmax[q]+1)]
+
+    tm_labels = None
+    block_comp_labels = {}
+    block_prop_labels = {}
+    block_samp_label_vals = {key: [] for key in keys}
+    blocks = {key: [] for key in keys}
+
+    tensor_keys_names = None
+    for iref, (mol_id, atom_id) in enumerate(idx):
+        q = atomic_numbers[mol_id][atom_id]
+        tensor = equistore.load(f'{splitpsfilebase}_{mol_id}.npz')
+
+        for l in range(lmax[q]+1):
+            key = (l, q)
+            block = tensor.block(spherical_harmonics_l=l, species_center=q)
+            isamp = block.samples.position((0, atom_id))
+            vals  = np.copy(block.values[isamp,:,:])
+            blocks[key].append(vals)
+            block_samp_label_vals[key].append(iref)
+            if key not in block_comp_labels:
+                block_comp_labels[key] = block.components
+                block_prop_labels[key] = block.properties
+        if not tensor_keys_names:
+            tensor_keys_names = tensor.keys.names
+
+        del tensor
+        gc.collect()
+
+    for key in keys:
+        block_samp_label = equistore.Labels(['ref_env'], np.array(block_samp_label_vals[key]).reshape(-1,1))
+        blocks[key] = equistore.TensorBlock(values=np.array(blocks[key]),
+                                            samples=block_samp_label,
+                                            components=block_comp_labels[key],
+                                            properties=block_prop_labels[key])
+
+    tm_labels = equistore.Labels(tensor_keys_names, np.array(keys))
+    tensor = equistore.TensorMap(keys=tm_labels, blocks=[blocks[key] for key in keys])
+    return tensor

@@ -1,102 +1,81 @@
 #!/usr/bin/env python3
 
 import sys
-import numpy as np
-import scipy.linalg as spl
-from basis import basis_read
-from config import Config,get_config_path
-from functions import moldata_read,get_elements_list,basis_info
 import os
 import gc
 import ctypes
+import numpy as np
+import scipy.linalg as spl
+from basis import basis_read
+from config import read_config
+from functions import moldata_read, get_elements_list, basis_info
 import ctypes_def
 
-path = get_config_path(sys.argv)
-conf = Config(config_path=path)
 
-def set_variable_values():
-    f  = conf.get_option('trainfrac', np.array([1.0]), conf.floats)
-    m  = conf.get_option('m'        , 100,             int  )
-    r  = conf.get_option('regular'  , 1e-6,            float)
-    j  = conf.get_option('jitter'   , 1e-10,           float)
-    return [f,m,r,j]
+def main():
+    o, p = read_config(sys.argv)
 
-[fracs,M,reg,jit] = set_variable_values()
+    kmmfile   = f'{p.kmmbase}{o.M}.npy'
+    elselfile = f'{p.elselfilebase}{o.M}.txt'
+    ref_elements = np.loadtxt(elselfile, int)
 
-kmmbase         = conf.paths['kmm_base']
-avecfilebase    = conf.paths['avec_base']
-bmatfilebase    = conf.paths['bmat_base']
-weightsfilebase = conf.paths['weights_base']
-xyzfilename     = conf.paths['xyzfile']
-basisfilename   = conf.paths['basisfile']
-elselfilebase   = conf.paths['spec_sel_base']
+    nmol, natoms, atomic_numbers = moldata_read(p.xyzfilename)
+    elements = get_elements_list(atomic_numbers)
 
-kmmfile     = kmmbase+str(M)+".npy"
-elselfile   = elselfilebase+str(M)+".txt"
+    # elements dictionary, max. angular momenta, number of radial channels
+    (el_dict, lmax, nmax) = basis_read(p.basisfilename)
+    if list(elements) != list(el_dict.values()):
+        print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
+        exit(1)
 
-#====================================== reference environments
-ref_elements = np.loadtxt(elselfile, int)
+    # basis set size
+    llmax = max(lmax.values())
+    [bsize, alnum, annum] = basis_info(el_dict, lmax, nmax);
+    totsize = sum(bsize[ref_elements])
+    print(f'problem dimensionality = {totsize}')
 
-(nmol, natoms, atomic_numbers) = moldata_read(xyzfilename)
-elements = get_elements_list(atomic_numbers)
+    k_MM = np.load(kmmfile)
+    mat  = np.ndarray((totsize,totsize))
 
-# elements dictionary, max. angular momenta, number of radial channels
-(el_dict, lmax, nmax) = basis_read(basisfilename)
-if list(elements) != list(el_dict.values()):
-    print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
-    exit(1)
+    regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/regression.so")
+    regression.make_matrix.restype = ctypes.c_int
+    regression.make_matrix.argtypes = [
+      ctypes.c_int,
+      ctypes.c_int,
+      ctypes.c_int,
+      ctypes_def.array_1d_int,
+      ctypes_def.array_1d_int,
+      ctypes_def.array_2d_int,
+      ctypes_def.array_3d_double,
+      ctypes_def.array_2d_double,
+      ctypes.c_double,
+      ctypes.c_double,
+      ctypes.c_char_p ]
 
-# basis set size
-llmax = max(lmax.values())
-[bsize, alnum, annum] = basis_info(el_dict, lmax, nmax);
-totsize = sum(bsize[ref_elements])
-print("problem dimensionality =", totsize)
+    for frac in o.fracs:
+      avecfile    = f'{p.avecfilebase}_M{o.M}_trainfrac{frac}.txt'
+      bmatfile    = f'{p.bmatfilebase}_M{o.M}_trainfrac{frac}.dat'
+      weightsfile = f'{p.weightsfilebase}_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy'
+      Avec = np.loadtxt(avecfile)
+      mat[:] = 0
 
-k_MM = np.load(kmmfile)
+      ret = regression.make_matrix(
+            totsize,
+            llmax  ,
+            o.M    ,
+            ref_elements.astype(np.uint32),
+            alnum.astype(np.uint32),
+            annum.astype(np.uint32),
+            k_MM, mat, o.reg, o.jit,
+            bmatfile.encode('ascii'))
+      print(ret)
 
-regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/regression.so")
-regression.make_matrix.restype = ctypes.c_int
-regression.make_matrix.argtypes = [
-  ctypes.c_int,
-  ctypes.c_int,
-  ctypes.c_int,
-  ctypes_def.array_1d_int,
-  ctypes_def.array_1d_int,
-  ctypes_def.array_2d_int,
-  ctypes_def.array_3d_double,
-  ctypes_def.array_2d_double,
-  ctypes.c_double,
-  ctypes.c_double,
-  ctypes.c_char_p ]
-
-
-mat  = np.ndarray((totsize,totsize))
-
-for frac in fracs:
-
-  avecfile    = avecfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".txt"
-  bmatfile    = bmatfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+".dat"
-  weightsfile = weightsfilebase+"_M"+str(M)+"_trainfrac"+str(frac)+"_reg"+str(reg)+"_jit"+str(jit)+".npy"
-
-  Avec = np.loadtxt(avecfile)
-
-  mat[:] = 0
-
-  ret = regression.make_matrix(
-        totsize,
-        llmax  ,
-        M      ,
-        ref_elements.astype(np.uint32),
-        alnum.astype(np.uint32),
-        annum.astype(np.uint32),
-        k_MM, mat, reg, jit,
-        bmatfile.encode('ascii'))
-  print(ret)
-
-  weights = spl.solve(mat, Avec, assume_a='sym', overwrite_a=True, overwrite_b=True)
-  del Avec
-  np.save(weightsfile, weights)
-  del weights
-  gc.collect()
+      weights = spl.solve(mat, Avec, assume_a='sym', overwrite_a=True, overwrite_b=True)
+      np.save(weightsfile, weights)
+      del Avec
+      del weights
+      gc.collect()
 
 
+if __name__=='__main__':
+    main()

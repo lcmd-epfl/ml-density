@@ -55,6 +55,11 @@ def read_config(argv):
 
         o.reorder_ao  = conf.get_option('reorder_ao'      ,  0, int)
         o.copy_metric = conf.get_option('copy_metric'     ,  1, int)
+
+        o.reg  = conf.get_option('regular'  , 1e-6,            float)
+        o.jit  = conf.get_option('jitter'   , 1e-10,           float)
+
+        o.use_charges = conf.get_option('charges'  , 0,               int  )
         return o
 
     def get_all_paths():
@@ -78,6 +83,10 @@ def read_config(argv):
         p.powerexbase   = conf.paths['ex_ps_base']
         p.avecfilebase     = conf.paths['avec_base']
         p.bmatfilebase     = conf.paths['bmat_base']
+        p.elselfilebase   = conf.paths['spec_sel_base']
+        p.weightsfilebase = conf.paths['weights_base']
+        p.predictfilebase = conf.paths['predict_base']
+        p.chargefilename = conf.paths['chargesfile']
         return p
 
     path = get_config_path(argv)
