@@ -18,7 +18,6 @@ def main():
     path = get_config_path(sys.argv)
     conf = Config(config_path=path)
     [fracs, M] = set_variable_values(conf)
-
     xyzfilename      = conf.paths['xyzfile']
     basisfilename    = conf.paths['basisfile']
     trainfilename    = conf.paths['trainingselfile']
@@ -40,7 +39,7 @@ def main():
     # reference environments
     ref_indices = np.loadtxt(f'{refsselfilebase}{M}.txt', dtype=int)
     ref_elements = np.hstack(atomic_numbers)[ref_indices]
-    totsize = nao_for_mol(np.hstack(atomic_numbers), lmax, nmax)
+    totsize = nao_for_mol(ref_elements, lmax, nmax)
 
     # training set selection
     fracs.sort()
@@ -48,8 +47,8 @@ def main():
     avecfiles = [f'{avecfilebase}_M{M}_trainfrac{fracs[i]}.txt' for i in range(nfrac)]
 
     get_a(lmax, nmax, totsize, ref_elements,
-                         nfrac, ntrains, train_configs,
-                         baselinedwbase, kernelconfbase, avecfiles)
+          nfrac, ntrains, train_configs,
+          baselinedwbase, kernelconfbase, avecfiles)
 
 
 if __name__=='__main__':
