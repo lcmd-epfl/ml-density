@@ -197,32 +197,32 @@ def matrix2tmap(atom_charges, lmax, nmax, dm):
 
     return tensor
 
-def sparseindices_fill(atoms, lmax, nmax):
-    sparseindices = np.zeros((max(lmax.values())+1, max(nmax.values()), len(atoms)), dtype=int)
-    i = 0;
+
+def sparseindices_fill(lmax, nmax, atoms):
+    idx = np.zeros((len(atoms), max(lmax.values())+1), dtype=int)
+    i = 0
     for iat, q in enumerate(atoms):
         for l in range(lmax[q]+1):
-            msize = 2*l+1;
-            for n in range(nmax[(q,l)]):
-                sparseindices[l,n,iat] = i;
-                i += msize;
-    return sparseindices;
+            idx[iat,l] = i
+            i += (2*l+1) * nmax[(q,l)]
+    return idx
 
 
 def tmap2matrix(atom_charges, lmax, nmax, tensor):
     nao = int(round(np.sqrt(_get_tsize(tensor))))
     dm = np.zeros((nao, nao))
-    idx = sparseindices_fill(atom_charges, lmax, nmax)
+    idx = sparseindices_fill(lmax, nmax, atom_charges)
     for (l1, l2, q1, q2), block in tensor:
         msize1 = 2*l1+1
         msize2 = 2*l2+1
-        for iat1 in np.where(atom_charges==q1)[0]:
-            for iat2 in np.where(atom_charges==q2)[0]:
-                id_samp = block.samples.position((iat1, iat2))
-                for n1 in range(nmax[(q1,l1)]):
-                    for n2 in range(nmax[(q2,l2)]):
-                        id_prop = block.properties.position((n1, n2))
-                        i1 = idx[l1,n1,iat1]
-                        i2 = idx[l2,n2,iat2]
-                        dm[i1:i1+msize1,i2:i2+msize2] = block.values[id_samp,:,:,id_prop]
+        nsize1 = nmax[(q1,l1)]
+        nsize2 = nmax[(q2,l2)]
+        ac1 = np.count_nonzero(atom_charges==q1)
+        ac2 = np.count_nonzero(atom_charges==q2)
+        values = block.values.reshape((ac1, ac2, msize1, msize2, nsize1, nsize2))
+        for iiat1, iat1 in enumerate(np.where(atom_charges==q1)[0]):
+            for iiat2, iat2 in enumerate(np.where(atom_charges==q2)[0]):
+                i1 = idx[iat1,l1]
+                i2 = idx[iat2,l2]
+                dm[i1:i1+nsize1*msize1,i2:i2+nsize2*msize2] = values[iiat1,iiat2].transpose((2,0,3,1)).reshape((nsize1*msize1,nsize2*msize2))
     return dm
