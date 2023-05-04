@@ -29,7 +29,7 @@ def main():
 
 
     def do_mol(imol):
-        kernel_for_mol(lmax, el_dict, ref_elements, atomic_numbers[imol],
+        kernel_for_mol(lmax, ref_elements, atomic_numbers[imol],
                        power_ref, f'{splitpsfilebase}_{imol}.npz', f'{kernelconfbase}{imol}.dat')
 
     (nmol, _, atomic_numbers) = moldata_read(xyzfilename)

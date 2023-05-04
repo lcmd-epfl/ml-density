@@ -44,7 +44,7 @@ def main():
 
     for imol in range(nmol_ex):
         print_progress(imol, nmol_ex)
-        kernel_for_mol(lmax, el_dict, ref_elements, atomic_numbers_ex[imol],
+        kernel_for_mol(lmax, ref_elements, atomic_numbers_ex[imol],
                        power_ref, f'{powerexbase}_{imol}.npz', f'{kernelexbase}{imol}.dat')
 
 
