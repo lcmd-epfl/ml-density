@@ -12,7 +12,7 @@ def moldata_read(xyzfilename):
     for i, mol in enumerate(mols):
         atomic_numbers.append(mol.get_atomic_numbers())
         natoms[i] = mol.get_global_number_of_atoms()
-    return (nmol, natoms, atomic_numbers)
+    return (nmol, natoms, np.array(atomic_numbers, dtype=object))
 
 def basis_info(el_dict, lmax, nmax):
     nel = len(el_dict)

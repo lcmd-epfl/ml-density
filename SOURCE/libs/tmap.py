@@ -17,6 +17,7 @@ matrix_label_names = SimpleNamespace(
     block_comp = ['spherical_harmonics_m1', 'spherical_harmonics_m2']
     )
 
+_molid_name = 'mol_id'
 
 def averages2tmap(averages):
     tm_label_vals = []
@@ -270,3 +271,96 @@ def merge_ref_ps(lmax, elements, atomic_numbers, idx, splitpsfilebase):
     tm_labels = equistore.Labels(tensor_keys_names, np.array(keys))
     tensor = equistore.TensorMap(keys=tm_labels, blocks=[blocks[key] for key in keys])
     return tensor
+
+
+def join(tensors):
+
+    if not all(tensor.keys.names==tensors[0].keys.names for tensor in tensors):
+        raise Exception(f'Cannot merge tensors with different label names')
+    tm_label_vals = sorted(list(set().union(*[set(tensor.keys.tolist()) for tensor in tensors])))
+    tm_labels = equistore.Labels(tensors[0].keys.names, np.array(tm_label_vals))
+
+    blocks = {}
+    block_comp_labels = {}
+    block_prop_labels = {}
+    block_samp_labels = {}
+    block_samp_label_vals = {}
+
+    for label in tm_labels:
+        key = tuple(label.tolist())
+        blocks[key] = []
+        block_samp_label_vals[key] = []
+        for imol,tensor in enumerate(tensors):
+            if not label in tensor.keys:
+                continue
+            block = tensor.block(label)
+            blocks[key].append(block.values)
+            block_samp_label_vals[key].extend([(imol, *s) for s in block.samples])
+            if not key in block_comp_labels:
+                block_comp_labels[key] = block.components
+                block_prop_labels[key] = block.properties
+
+    for key in blocks:
+        blocks[key] = np.concatenate(blocks[key])
+        block_samp_label_vals[key] = np.array(block_samp_label_vals[key])
+        block_samp_labels[key] = equistore.Labels((_molid_name, *tensor.sample_names), block_samp_label_vals[key])
+
+    tensor_blocks = [equistore.TensorBlock(values=blocks[key], samples=block_samp_labels[key], components=block_comp_labels[key], properties=block_prop_labels[key]) for key in tm_label_vals]
+    tensor = equistore.TensorMap(keys=tm_labels, blocks=tensor_blocks)
+
+    return tensor
+
+
+def split(tensor):
+
+    if tensor.sample_names[0]!=_molid_name:
+        raise Exception(f'Tensor does not seem to contain several molecules')
+
+    # Check if the molecule indices are continuous
+    mollist = sorted(set(np.hstack([np.array(tensor.block(keys).samples.tolist())[:,0] for keys in tensor.keys])))
+    if mollist==list(range(len(mollist))):
+        tensors = [None] * len(mollist)
+    else:
+        tensors = {}
+
+    # Common labels
+    block_comp_labels = {}
+    block_prop_labels = {}
+    for label in tensor.keys:
+        key = label.tolist()
+        block = tensor.block(label)
+        block_comp_labels[key] = block.components
+        block_prop_labels[key] = block.properties
+
+    # Tensors for each molecule
+    for imol in mollist:
+        blocks = {}
+        block_samp_labels = {}
+
+        for label in tensor.keys:
+            key = label.tolist()
+            block = tensor.block(label)
+
+            samplelbl = [lbl for lbl in block.samples.tolist() if lbl[0]==imol]
+            if len(samplelbl)==0:
+                continue
+            sampleidx = [block.samples.position(lbl) for lbl in samplelbl]
+
+            blocks[key] = block.values[sampleidx]
+            block_samp_labels[key] = equistore.Labels(tensor.sample_names[1:], np.array(samplelbl)[:,1:])
+
+        tm_label_vals = sorted(list(blocks.keys()))
+        tm_labels = equistore.Labels(tensor.keys.names, np.array(tm_label_vals))
+        tensor_blocks = [equistore.TensorBlock(values=blocks[key], samples=block_samp_labels[key], components=block_comp_labels[key], properties=block_prop_labels[key]) for key in tm_label_vals]
+        tensors[imol] = equistore.TensorMap(keys=tm_labels, blocks=tensor_blocks)
+
+    return tensors
+
+
+def sph2vector(atoms, lmax, nmax, tensor):
+    c = []
+    for iat, q in enumerate(atoms):
+        c.append(np.squeeze(tensor.block(spherical_harmonics_l=0, species_center=q).values))
+        for l in range(1, lmax[q]+1):
+            c.append(np.zeros((2*l+1)*nmax[(q,l)]))
+    return np.hstack(c)
