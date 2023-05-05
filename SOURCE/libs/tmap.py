@@ -364,3 +364,10 @@ def sph2vector(atoms, lmax, nmax, tensor):
         for l in range(1, lmax[q]+1):
             c.append(np.zeros((2*l+1)*nmax[(q,l)]))
     return np.hstack(c)
+
+
+def tmap_add(x, dx):
+    for (l, q) in set(x.keys).intersection(set(dx.keys)):
+        b = x.block(spherical_harmonics_l=l, species_center=q)
+        db = dx.block(spherical_harmonics_l=l, species_center=q)
+        b.values[...] += db.values

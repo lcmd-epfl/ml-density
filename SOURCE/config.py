@@ -69,24 +69,27 @@ def read_config(argv):
         p.kmmbase          = conf.paths.get('kmm_base')
         p.powerrefbase     = conf.paths.get('ps_ref_base')
         p.refsselfilebase  = conf.paths.get('refs_sel_base')
-        p.kernelconfbase   = conf.paths['kernel_conf_base']
-        p.splitpsfilebase  = conf.paths['ps_split_base']
-        p.trainfilename    = conf.paths['trainingselfile']
-        p.coefffilebase    = conf.paths['coeff_base']
-        p.overfilebase     = conf.paths['over_base']
-        p.goodcoeffilebase = conf.paths['goodcoef_base']
-        p.goodoverfilebase = conf.paths['goodover_base']
-        p.baselinedwbase   = conf.paths['baselined_w_base']
-        p.avfile           = conf.paths['averages_file']
-        p.xyzexfilename = conf.paths['ex_xyzfile']
-        p.kernelexbase  = conf.paths['ex_kernel_base']
-        p.powerexbase   = conf.paths['ex_ps_base']
-        p.avecfilebase     = conf.paths['avec_base']
-        p.bmatfilebase     = conf.paths['bmat_base']
-        p.elselfilebase   = conf.paths['spec_sel_base']
-        p.weightsfilebase = conf.paths['weights_base']
-        p.predictfilebase = conf.paths['predict_base']
-        p.chargefilename = conf.paths['chargesfile']
+        p.kernelconfbase   = conf.paths.get('kernel_conf_base')
+        p.splitpsfilebase  = conf.paths.get('ps_split_base')
+        p.trainfilename    = conf.paths.get('trainingselfile')
+        p.coefffilebase    = conf.paths.get('coeff_base')
+        p.overfilebase     = conf.paths.get('over_base')
+        p.goodcoeffilebase = conf.paths.get('goodcoef_base')
+        p.goodoverfilebase = conf.paths.get('goodover_base')
+        p.baselinedwbase   = conf.paths.get('baselined_w_base')
+        p.avfile           = conf.paths.get('averages_file')
+        p.xyzexfilename    = conf.paths.get('ex_xyzfile')
+        p.kernelexbase     = conf.paths.get('ex_kernel_base')
+        p.powerexbase      = conf.paths.get('ex_ps_base')
+        p.avecfilebase     = conf.paths.get('avec_base')
+        p.bmatfilebase     = conf.paths.get('bmat_base')
+        p.elselfilebase    = conf.paths.get('spec_sel_base')
+        p.weightsfilebase  = conf.paths.get('weights_base')
+        p.predictfilebase  = conf.paths.get('predict_base')
+        p.chargefilename   = conf.paths.get('chargesfile')
+        p.outexfilebase    = conf.paths['ex_output_base']
+        p.outfilebase      = conf.paths['output_base']
+
         return p
 
     path = get_config_path(argv)

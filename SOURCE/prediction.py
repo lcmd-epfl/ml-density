@@ -5,7 +5,9 @@ import numpy as np
 from config import read_config
 from basis import basis_read
 from functions import moldata_read, get_test_set, get_training_set
-from run_prediction import run_prediction_new as run_prediction
+from libs.predict import run_prediction
+from libs.tmap import join
+import equistore
 
 
 def main():
@@ -26,8 +28,10 @@ def main():
         weightsfile = f'{p.weightsfilebase}_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy'
 
         print(f'Number of testing molecules = {ntest}')
-        run_prediction(test_configs, atomic_numbers[test_configs], ref_elements,
-                       p.basisfilename, weightsfile, p.kernelconfbase, predictfile)
+        predictions = run_prediction(test_configs, atomic_numbers[test_configs], ref_elements,
+                                     p.basisfilename, weightsfile, p.kernelconfbase)
+        predictions = join(predictions)
+        equistore.save(predictfile, predictions)
 
 
 if __name__=='__main__':
