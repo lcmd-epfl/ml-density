@@ -17,7 +17,7 @@ def main():
     o, p = read_config(sys.argv)
 
     def do_mol(imol):
-        soap = generate_lambda_soap_wrapper(mols[imol], rascal_hypers, neighbor_species=elements, normalize=True)
+        soap = generate_lambda_soap_wrapper(mols[imol], rascal_hypers, neighbor_species=elements, normalize=True, min_norm=1e-20)
         soap = remove_high_l(soap, lmax)
         equistore.save(f'{p.splitpsfilebase}_{imol}.npz', soap)
 
