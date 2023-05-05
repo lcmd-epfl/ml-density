@@ -371,3 +371,20 @@ def tmap_add(x, dx):
         b = x.block(spherical_harmonics_l=l, species_center=q)
         db = dx.block(spherical_harmonics_l=l, species_center=q)
         b.values[...] += db.values
+
+
+def kmm2tmap(qsamples, kernel):
+    tm_label_vals = sorted(list(kernel.keys()), key=lambda x: x[::-1])
+    tensor_blocks = []
+    for (l, q) in tm_label_vals:
+        values = kernel[(l, q)].reshape(-1, 2*l+1, 2*l+1, 1)
+        prop_label_vals = np.array(1, ndmin=2)
+        samp_label_vals = np.array([(*i, *j) for i in qsamples[q] for j in qsamples[q]])
+        comp_label_vals = np.arange(-l, l+1).reshape(-1,1)
+        properties = equistore.Labels(vector_label_names.block_prop, prop_label_vals)
+        samples    = equistore.Labels(('ref_env1', 'ref_env2'), samp_label_vals)
+        components = [equistore.Labels([name], comp_label_vals) for name in matrix_label_names.block_comp]
+        tensor_blocks.append(equistore.TensorBlock(values=values, samples=samples, components=components, properties=properties))
+    tm_labels = equistore.Labels(vector_label_names.tm, np.array(tm_label_vals))
+    tensor = equistore.TensorMap(keys=tm_labels, blocks=tensor_blocks)
+    return tensor

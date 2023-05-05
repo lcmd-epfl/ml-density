@@ -8,6 +8,8 @@ from basis import basis_read
 from config import read_config
 from functions import moldata_read, get_elements_list, nao_for_mol
 from libs.tmap import sparseindices_fill
+from libs.get_matrices_B import mpos
+import equistore
 
 
 def main():
@@ -23,7 +25,7 @@ def main():
         print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
         exit(1)
 
-    k_MM = np.load(f'{p.kmmbase}{o.M}.npy')
+    k_MM = equistore.load(f'{p.kmmbase}{o.M}.npz')
     totsize = nao_for_mol(ref_elements, lmax, nmax)
     mat  = np.ndarray((totsize,totsize))
     idx = sparseindices_fill(lmax, nmax, ref_elements)
@@ -37,34 +39,35 @@ def main():
         Avec = np.loadtxt(avecfile)
         mat[:] = 0
 
-        fill_matrix(mat, k_MM, bmatfile, ref_elements, idx, lmax, nmax, o.jit, o.reg      )
+        fill_matrix(mat, k_MM, bmatfile, idx, nmax, o.jit, o.reg)
 
         weights = spl.solve(mat, Avec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
         np.save(weightsfile, weights)
 
 
-def fill_matrix(mat, k_MM, bmatfile, ref_elements, idx, lmax, nmax, jit, reg):
+def fill_matrix(mat, k_MM, bmatfile, idx, nmax, jit, reg):
     n = mat.shape[0]
-    ind = np.tril_indices(n)
     data = np.fromfile(bmatfile)
-    mat[ind] = data
-    del ind
+    # shouldn't use np.tril_indices because it creates huge indices arrays
+    k = 0
+    for j in range(n):
+        for i in range(j+1):
+            mat[j,i] = data[mpos(i,j)]
+            k += 1
+        mat[j,j] += jit
     del data
     gc.collect()
 
-    mat[np.diag_indices(n)] += jit
-
-    for q in set(ref_elements):
-        qrefs = np.where(ref_elements==q)[0]
-        for l in range(lmax[q]+1):
-            msize = 2*l+1
-            for iref1 in qrefs:
-                for iref2 in qrefs:
-                    dk = reg * k_MM[l][iref1*msize:(iref1+1)*msize, iref2*msize:(iref2+1)*msize]
-                    for n in range(nmax[q, l]):
-                       i1 = idx[iref1, l] + n*msize
-                       i2 = idx[iref2, l] + n*msize
-                       mat[i1:i1+msize, i2:i2+msize] += dk
+    for (l, q), kblock in k_MM:
+        msize = 2*l+1
+        for iiref12, (iref1, iref2) in enumerate(kblock.samples):
+            if iref1<iref2:
+                continue
+            dk = reg * kblock.values[iiref12,:,:,0]
+            for n in range(nmax[q, l]):
+               i1 = idx[iref1, l] + n*msize
+               i2 = idx[iref2, l] + n*msize
+               mat[i1:i1+msize, i2:i2+msize] += dk
 
 
 if __name__=='__main__':

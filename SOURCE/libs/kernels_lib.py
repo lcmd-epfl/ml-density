@@ -1,6 +1,6 @@
 import numpy as np
 import equistore
-from libs.tmap import kernels2tmap
+from libs.tmap import kernels2tmap, kmm2tmap
 
 
 def kernel_nm_sparse_indices(lmax, ref_elements, atomic_numbers):
@@ -24,7 +24,7 @@ def kernel_nm(atom_charges, soap, soap_ref, imol=0):
     kernel = {key: [] for key in keys}
 
     for iat, q in enumerate(atom_charges):
-        for (l,q_) in keys:
+        for (l, q_) in keys:
             if q_!=q: continue
             block = soap.block(spherical_harmonics_l=l, species_center=q)
             isamp = block.samples.position((imol, iat))
@@ -66,26 +66,27 @@ def kernel_for_mol(lmax, ref_elements, atomic_numbers, power_ref, power_file, ke
     np.savetxt(kernel_file, k_NM_flat)
 
 
-def kernel_mm(M, powerrefbase, ref_elements):
+def kernel_mm(lmax, power_ref):
 
-    power_ref = equistore.load(f'{powerrefbase}_{M}.npz')
-    llmax = max(l for l, q in power_ref.keys)
-    k_MM = np.zeros((llmax+1, M*(2*llmax+1), M*(2*llmax+1)))
-
+    samples = {}
+    k_MM = {}
     for (l, q), rblock in power_ref:
         msize = 2*l+1
-        for iref1 in rblock.samples:
-            pos1 = rblock.samples.position(iref1)
-            vec1 = rblock.values[pos1]
-            for iref2 in rblock.samples:
-                pos2 = rblock.samples.position(iref2)
-                vec2 = rblock.values[pos2]
-                k_MM[l, iref1[0]*msize:(iref1[0]+1)*msize, iref2[0]*msize:(iref2[0]+1)*msize] = vec1 @ vec2.T
+        nsamp = len(rblock.samples)
+        if not q in samples:
+            samples[q] = list(rblock.samples)
+        k_MM[(l, q)] = np.zeros((nsamp, nsamp, msize, msize))
+        for iiref1 in range(nsamp):
+            vec1 = rblock.values[iiref1]
+            for iiref2 in range(iiref1, nsamp):
+                vec2 = rblock.values[iiref2]
+                dot = vec1 @ vec2.T
+                k_MM[(l, q)][iiref1, iiref2] = dot
+                if iiref1!=iiref2:
+                    k_MM[(l, q)][iiref2, iiref1] = dot.T
+    for q in lmax.keys():
+        # Mind the descending order of l
+        for l in range(lmax[q], -1, -1):
+            k_MM[(l, q)] *= k_MM[(0, q)]
 
-    for l in range(llmax, -1, -1):
-        msize = 2*l+1
-        for iref1 in range(M):
-            for iref2 in range(M):
-                k_MM[l, iref1*msize:(iref1+1)*msize, iref2*msize:(iref2+1)*msize] *= k_MM[0, iref1, iref2]
-
-    return k_MM
+    return kmm2tmap(samples, k_MM)
