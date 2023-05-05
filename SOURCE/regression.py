@@ -1,80 +1,70 @@
 #!/usr/bin/env python3
 
 import sys
-import os
 import gc
-import ctypes
 import numpy as np
 import scipy.linalg as spl
 from basis import basis_read
 from config import read_config
-from functions import moldata_read, get_elements_list, basis_info
-import ctypes_def
+from functions import moldata_read, get_elements_list, nao_for_mol
+from libs.tmap import sparseindices_fill
 
 
 def main():
     o, p = read_config(sys.argv)
 
-    kmmfile   = f'{p.kmmbase}{o.M}.npy'
-    elselfile = f'{p.elselfilebase}{o.M}.txt'
-    ref_elements = np.loadtxt(elselfile, int)
-
-    nmol, natoms, atomic_numbers = moldata_read(p.xyzfilename)
+    _, _, atomic_numbers = moldata_read(p.xyzfilename)
     elements = get_elements_list(atomic_numbers)
+    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)
+    ref_elements = np.hstack(atomic_numbers)[ref_indices]
 
-    # elements dictionary, max. angular momenta, number of radial channels
     (el_dict, lmax, nmax) = basis_read(p.basisfilename)
     if list(elements) != list(el_dict.values()):
         print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
         exit(1)
 
-    # basis set size
-    llmax = max(lmax.values())
-    [bsize, alnum, annum] = basis_info(el_dict, lmax, nmax);
-    totsize = sum(bsize[ref_elements])
+    k_MM = np.load(f'{p.kmmbase}{o.M}.npy')
+    totsize = nao_for_mol(ref_elements, lmax, nmax)
+    mat  = np.ndarray((totsize,totsize))
+    idx = sparseindices_fill(lmax, nmax, ref_elements)
+
     print(f'problem dimensionality = {totsize}')
 
-    k_MM = np.load(kmmfile)
-    mat  = np.ndarray((totsize,totsize))
-
-    regression = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/regression.so")
-    regression.make_matrix.restype = ctypes.c_int
-    regression.make_matrix.argtypes = [
-      ctypes.c_int,
-      ctypes.c_int,
-      ctypes.c_int,
-      ctypes_def.array_1d_int,
-      ctypes_def.array_1d_int,
-      ctypes_def.array_2d_int,
-      ctypes_def.array_3d_double,
-      ctypes_def.array_2d_double,
-      ctypes.c_double,
-      ctypes.c_double,
-      ctypes.c_char_p ]
-
     for frac in o.fracs:
-      avecfile    = f'{p.avecfilebase}_M{o.M}_trainfrac{frac}.txt'
-      bmatfile    = f'{p.bmatfilebase}_M{o.M}_trainfrac{frac}.dat'
-      weightsfile = f'{p.weightsfilebase}_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy'
-      Avec = np.loadtxt(avecfile)
-      mat[:] = 0
+        avecfile    = f'{p.avecfilebase}_M{o.M}_trainfrac{frac}.txt'
+        bmatfile    = f'{p.bmatfilebase}_M{o.M}_trainfrac{frac}.dat'
+        weightsfile = f'{p.weightsfilebase}_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy'
+        Avec = np.loadtxt(avecfile)
+        mat[:] = 0
 
-      ret = regression.make_matrix(
-            totsize,
-            llmax  ,
-            o.M    ,
-            ref_elements.astype(np.uint32),
-            alnum.astype(np.uint32),
-            annum.astype(np.uint32),
-            k_MM, mat, o.reg, o.jit,
-            bmatfile.encode('ascii'))
-      print(ret)
+        fill_matrix(mat, k_MM, bmatfile, ref_elements, idx, lmax, nmax, o.jit, o.reg      )
 
-      weights = spl.solve(mat, Avec, assume_a='sym', overwrite_a=True, overwrite_b=True)
-      np.save(weightsfile, weights)
-      del Avec
-      del weights
-      gc.collect()
+        weights = spl.solve(mat, Avec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
+        np.save(weightsfile, weights)
+
+
+def fill_matrix(mat, k_MM, bmatfile, ref_elements, idx, lmax, nmax, jit, reg):
+    n = mat.shape[0]
+    ind = np.tril_indices(n)
+    data = np.fromfile(bmatfile)
+    mat[ind] = data
+    del ind
+    del data
+    gc.collect()
+
+    mat[np.diag_indices(n)] += jit
+
+    for q in set(ref_elements):
+        qrefs = np.where(ref_elements==q)[0]
+        for l in range(lmax[q]+1):
+            msize = 2*l+1
+            for iref1 in qrefs:
+                for iref2 in qrefs:
+                    dk = reg * k_MM[l][iref1*msize:(iref1+1)*msize, iref2*msize:(iref2+1)*msize]
+                    for n in range(nmax[q, l]):
+                       i1 = idx[iref1, l] + n*msize
+                       i2 = idx[iref2, l] + n*msize
+                       mat[i1:i1+msize, i2:i2+msize] += dk
 
 
 if __name__=='__main__':
