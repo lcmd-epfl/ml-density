@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import equistore
 import numpy as np
@@ -17,6 +18,8 @@ def main():
     o, p = read_config(sys.argv)
 
     def do_mol(imol):
+        #if os.path.exists(f'{p.splitpsfilebase}_{imol}.npz'):
+        #    return
         soap = generate_lambda_soap_wrapper(mols[imol], rascal_hypers, neighbor_species=elements, normalize=True, min_norm=1e-20)
         soap = remove_high_l(soap, lmax)
         equistore.save(f'{p.splitpsfilebase}_{imol}.npz', soap)

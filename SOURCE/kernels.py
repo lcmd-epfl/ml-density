@@ -8,6 +8,7 @@ from basis import basis_read
 from functions import moldata_read, get_elements_list, get_atomicindx, print_progress
 from libs.kernels_lib import kernel_for_mol
 from libs.multi import multi_process
+import os
 
 USEMPI = 1
 
@@ -16,6 +17,8 @@ def main():
     o, p = read_config(sys.argv)
 
     def do_mol(imol):
+        #if os.path.exists(f'{p.kernelconfbase}{imol}.dat'):
+        #    return
         kernel_for_mol(lmax, ref_elements, atomic_numbers[imol],
                        power_ref, f'{p.splitpsfilebase}_{imol}.npz', f'{p.kernelconfbase}{imol}.dat')
 

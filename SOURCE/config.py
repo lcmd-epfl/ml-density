@@ -1,4 +1,4 @@
-import os.path
+import os, os.path
 from types import SimpleNamespace
 import configparser
 import numpy as np
@@ -11,9 +11,10 @@ class Config(object):
         if config_path==None:
             config_path = DEFAULT_PATH
         if not os.path.isfile(config_path):
-            print("Cannot open configuration file \""+config_path+"\"")
+            print(f'Cannot open configuration file "{config_path}"')
             exit(1)
-        print("Configuration file:", config_path)
+        link = f' -> {os.readlink(config_path)}' if os.path.islink(config_path) else ''
+        print(f'Configuration file: {config_path}'+link)
 
         self.configuration = configparser.RawConfigParser()
         self.configuration.read(config_path)
