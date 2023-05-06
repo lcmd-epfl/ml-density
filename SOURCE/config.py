@@ -61,29 +61,34 @@ def read_config(argv):
         p = SimpleNamespace()
         p.xyzfilename      = conf.paths.get('xyzfile')
         p.basisfilename    = conf.paths.get('basisfile')
-        p.kmmbase          = conf.paths.get('kmm_base')
-        p.powerrefbase     = conf.paths.get('ps_ref_base')
-        p.refsselfilebase  = conf.paths.get('refs_sel_base')
-        p.kernelconfbase   = conf.paths.get('kernel_conf_base')
-        p.splitpsfilebase  = conf.paths.get('ps_split_base')
-        p.trainfilename    = conf.paths.get('trainingselfile')
+        p.chargefilename   = conf.paths.get('chargesfile')
         p.coefffilebase    = conf.paths.get('coeff_base')
         p.overfilebase     = conf.paths.get('over_base')
+
+        p.splitpsfilebase  = conf.paths.get('ps_split_base')
+        p.refsselfilebase  = conf.paths.get('refs_sel_base')
+        p.elselfilebase    = conf.paths.get('spec_sel_base') # TODO remove
+        p.powerrefbase     = conf.paths.get('ps_ref_base')
+
+        p.kmmbase          = conf.paths.get('kmm_base')
+        p.kernelconfbase   = conf.paths.get('kernel_conf_base')
+
         p.goodcoeffilebase = conf.paths.get('goodcoef_base')
         p.goodoverfilebase = conf.paths.get('goodover_base')
         p.baselinedwbase   = conf.paths.get('baselined_w_base')
         p.avfile           = conf.paths.get('averages_file')
-        p.xyzexfilename    = conf.paths.get('ex_xyzfile')
-        p.kernelexbase     = conf.paths.get('ex_kernel_base')
-        p.powerexbase      = conf.paths.get('ex_ps_base')
+
+        p.trainfilename    = conf.paths.get('trainingselfile')
         p.avecfilebase     = conf.paths.get('avec_base')
         p.bmatfilebase     = conf.paths.get('bmat_base')
-        p.elselfilebase    = conf.paths.get('spec_sel_base')
         p.weightsfilebase  = conf.paths.get('weights_base')
         p.predictfilebase  = conf.paths.get('predict_base')
-        p.chargefilename   = conf.paths.get('chargesfile')
-        p.outexfilebase    = conf.paths.get('ex_output_base')
         p.outfilebase      = conf.paths.get('output_base')
+
+        p.xyzexfilename    = conf.paths.get('ex_xyzfile')
+        p.powerexbase      = conf.paths.get('ex_ps_base')
+        p.kernelexbase     = conf.paths.get('ex_kernel_base')
+        p.outexfilebase    = conf.paths.get('ex_output_base')
         return p
 
     path = get_config_path(argv)
