@@ -30,12 +30,12 @@ def main():
     nfrac, ntrains, train_configs = get_training_sets(p.trainfilename, o.fracs)
 
     if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
-        bmatfiles= [f'{p.bmatfilebase}_M{o.M}_trainfrac{o.fracs[i]}.dat' for i in range(nfrac)]
+        bmatfiles = [f'{p.bmatfilebase}_M{o.M}_trainfrac{frac}.dat' for frac in o.fracs]
         get_b(lmax, nmax, totsize, ref_elements,
               nfrac, ntrains, train_configs,
               p.goodoverfilebase, p.kernelconfbase, bmatfiles)
     else:
-        avecfiles = [f'{p.avecfilebase}_M{o.M}_trainfrac{o.fracs[i]}.txt' for i in range(nfrac)]
+        avecfiles = [f'{p.avecfilebase}_M{o.M}_trainfrac{frac}.txt' for frac in o.fracs]
         get_a(lmax, nmax, totsize, ref_elements,
               nfrac, ntrains, train_configs,
               p.baselinedwbase, p.kernelconfbase, avecfiles)

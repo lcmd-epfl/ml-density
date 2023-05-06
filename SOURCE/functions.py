@@ -46,21 +46,25 @@ def get_kernel_sizes(myrange, ref_elements, el_dict, M, lmax, atom_counting):
 def get_elements_list(atomic_numbers, return_counts=False):
     return np.unique(np.concatenate(atomic_numbers), return_counts=return_counts)
 
-def get_atomicindx(elements,atomic_numbers,natmax):
+def get_atomicindx(elements, atomic_numbers, natmax):
+    '''
+    element_indices[imol, :]   for each atom its element number iel
+    atom_counting[imol, iel]   number of atoms of element #iel
+    atom_indices[imol, iel, :] indices of atoms of element #iel
+    '''
     nmol = len(atomic_numbers)
     nel  = len(elements)
-    element_indices = []
-    atom_counting = np.zeros((nmol,nel),int)
-    atomicindx    = np.zeros((nmol,nel,natmax),int)
-    for imol,atoms in enumerate(atomic_numbers):
-        element_indices.append( np.full(len(atoms),-1,int) )
-        for iel,el in enumerate(elements):
-            idx = np.nonzero(atomic_numbers[imol]==el)[0]
+    atom_counting   = np.zeros((nmol, nel), dtype=int)
+    atom_indices    = np.zeros((nmol, nel, natmax), dtype=int)
+    element_indices = np.zeros((nmol, natmax), dtype=int)
+    for imol, atoms in enumerate(atomic_numbers):
+        for iel, el in enumerate(elements):
+            idx = np.where(atomic_numbers[imol]==el)[0]
             count = len(idx)
-            atomicindx[imol,iel,0:count] = idx
-            atom_counting[imol,iel] = count
-            element_indices[imol][idx] = iel
-    return (atomicindx, atom_counting, element_indices)
+            atom_indices[imol, iel, 0:count] = idx
+            atom_counting[imol, iel] = count
+            element_indices[imol, idx] = iel
+    return atom_indices, atom_counting, element_indices
 
 def unravel_weights(M, llmax, nnmax, ref_elements, annum, alnum, weights):
     w = np.zeros((M,llmax+1,nnmax,2*llmax+1),float)
