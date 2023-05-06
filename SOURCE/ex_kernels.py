@@ -15,16 +15,16 @@ def main():
     _, _, atomic_numbers = moldata_read(p.xyzfilename)
     nmol_ex, _, atomic_numbers_ex = moldata_read(p.xyzexfilename)
 
-    elements = get_elements_list(atomic_numbers)
+    ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
 
-    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)
-    ref_elements = np.hstack(atomic_numbers)[ref_indices]
-
-    # elements dictionary, max. angular momenta, number of radial channels
-    (el_dict, lmax, _) = basis_read(p.basisfilename)
-    if list(elements) != list(el_dict.values()):
-        print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
+    elements = np.unique(ref_elements)
+    elements_ex = get_elements_list(atomic_numbers_ex)
+    if not set(elements_ex).issubset(elements):
+        print(f'Different elements in the molecule and in the training set: {elements_ex} and {elements}')
         exit(1)
+
+
+    lmax, _ = basis_read(p.basisfilename)
 
     power_ref = equistore.load(f'{p.powerrefbase}_{o.M}.npz');
 

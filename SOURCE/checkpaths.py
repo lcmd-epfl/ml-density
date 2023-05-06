@@ -34,6 +34,7 @@ def main():
       'ps_ref_base',
       'ps_split_base',
       'refs_sel_base',
+      'qrefs_sel_base',
       'weights_base',
       'trainingselfile',
       'ex_ps_base',

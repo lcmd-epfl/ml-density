@@ -65,6 +65,7 @@ def get_training_set(filename, fraction=1.0, sort=True):
         train_configs.sort()
     return n, train_configs
 
+
 def get_training_sets(filename, fractions):
     train_selection = np.loadtxt(filename, dtype=int, ndmin=1)
     n = (fractions*len(train_selection)).astype(int)
@@ -94,13 +95,3 @@ def do_fps(x, d=0):
         nd = n2 + n2[iy[i]] - 2.0*np.dot(x,x[iy[i]])
         dl = np.minimum(dl,nd)
     return iy, measure
-
-
-def get_atomicindx_new(elements, atomic_numbers):
-    element_indices = []
-    for imol, atoms in enumerate(atomic_numbers):
-        element_indices.append(np.full(len(atoms), -1, int))
-        for iq, q in enumerate(elements):
-            idx = np.where(atoms==q)
-            element_indices[imol][idx] = iq
-    return element_indices

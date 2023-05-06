@@ -34,7 +34,7 @@ def main():
         "center_atom_weight": 1.0,
     }
 
-    _, lmax, _ = basis_read(p.basisfilename)
+    lmax, _ = basis_read(p.basisfilename)
     mols = ase.io.read(p.xyzfilename, ":")
     elements = get_elements_list([mol.get_atomic_numbers() for mol in mols])
 

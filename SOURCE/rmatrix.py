@@ -4,7 +4,7 @@ import sys
 import numpy as np
 from basis import basis_read
 from config import read_config
-from functions import moldata_read, get_elements_list
+from functions import moldata_read
 from libs.kernels_lib import kernel_mm
 import equistore
 
@@ -12,8 +12,7 @@ import equistore
 def main():
     o, p = read_config(sys.argv)
 
-    (el_dict, lmax, _) = basis_read(p.basisfilename)
-
+    lmax, _ = basis_read(p.basisfilename)
     power_ref = equistore.load(f'{p.powerrefbase}_{o.M}.npz')
     k_MM = kernel_mm(lmax, power_ref)
     equistore.save(f'{p.kmmbase}{o.M}.npz', k_MM)

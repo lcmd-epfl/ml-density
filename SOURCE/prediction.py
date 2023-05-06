@@ -3,7 +3,6 @@
 import sys
 import numpy as np
 from config import read_config
-from basis import basis_read
 from functions import moldata_read, get_test_set, get_training_set
 from libs.predict import run_prediction
 from libs.tmap import join
@@ -15,8 +14,7 @@ def main():
     training = 'training' in sys.argv[1:]
 
     nmol, _, atomic_numbers = moldata_read(p.xyzfilename)
-    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)
-    ref_elements= np.hstack(atomic_numbers)[ref_indices]
+    ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
 
     for frac in o.fracs:
         if not training:

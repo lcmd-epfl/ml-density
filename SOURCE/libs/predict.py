@@ -24,7 +24,7 @@ def run_prediction(test_configs, atomic_numbers, ref_elements,
                    basisfilename, weightsfilename, kernelbase,
                    averages=None):
 
-    _, lmax, nmax = basis_read(basisfilename)
+    lmax, nmax = basis_read(basisfilename)
     weights = vector2tmap(ref_elements, lmax, nmax, np.load(weightsfilename))
 
     predictions = []

@@ -16,14 +16,8 @@ def main():
     print(f'{o.reorder_ao=}')
 
     nmol, _, atomic_numbers = moldata_read(p.xyzfilename)
-    elements = get_elements_list(atomic_numbers)
-    el_dict, lmax, nmax = basis_read(p.basisfilename)
-    if list(elements) != list(el_dict.values()):
-        print("different elements in the molecules and in the basis:", elements_in_set, "and", list(el_dict.values()) )
-        exit(1)
-
+    lmax, nmax = basis_read(p.basisfilename)
     coefficients = load_coefs(atomic_numbers, p.coefffilebase)
-
     av_coefs = get_averages(lmax, nmax, coefficients, atomic_numbers)
 
     for imol, (coef, atoms) in enumerate(zip(coefficients, atomic_numbers)):

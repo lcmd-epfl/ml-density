@@ -12,22 +12,12 @@ import equistore
 def main():
     o, p = read_config(sys.argv)
 
-    _, _, atomic_numbers = moldata_read(p.xyzfilename)
-    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)
-    ref_elements= np.hstack(atomic_numbers)[ref_indices]
-    elements = set(ref_elements)
-
+    ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
     nmol_ex, _, atomic_numbers_ex = moldata_read(p.xyzexfilename)
-
-    elements_ex = get_elements_list(atomic_numbers_ex)
-    if not set(elements_ex).issubset(set(elements)):
-        print("different elements in the molecule and in the training set:", list(elements_ex), "and", list(elements))
-        exit(1)
-
-    _, lmax, nmax = basis_read(p.basisfilename)
+    lmax, nmax = basis_read(p.basisfilename)
+    averages = equistore.load(p.avfile)
 
     weightsfile = f'{p.weightsfilebase}_M{o.M}_trainfrac{o.fracs[-1]}_reg{o.reg}_jit{o.jit}.npy'
-    averages = equistore.load(p.avfile)
     predictions = run_prediction(np.arange(nmol_ex), atomic_numbers_ex, ref_elements,
                                  p.basisfilename, weightsfile, p.kernelexbase, averages=averages)
 

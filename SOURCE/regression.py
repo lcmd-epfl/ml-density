@@ -6,7 +6,7 @@ import numpy as np
 import scipy.linalg as spl
 from basis import basis_read
 from config import read_config
-from functions import moldata_read, get_elements_list, nao_for_mol
+from functions import nao_for_mol
 from libs.tmap import sparseindices_fill
 from libs.get_matrices_B import mpos
 import equistore
@@ -15,18 +15,11 @@ import equistore
 def main():
     o, p = read_config(sys.argv)
 
-    _, _, atomic_numbers = moldata_read(p.xyzfilename)
-    elements = get_elements_list(atomic_numbers)
-    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)
-    ref_elements = np.hstack(atomic_numbers)[ref_indices]
-
-    (el_dict, lmax, nmax) = basis_read(p.basisfilename)
-    if list(elements) != list(el_dict.values()):
-        print("different elements in the molecules and in the basis:", list(elements), "and", list(el_dict.values()) )
-        exit(1)
+    lmax, nmax = basis_read(p.basisfilename)
+    ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
+    totsize = nao_for_mol(ref_elements, lmax, nmax)
 
     k_MM = equistore.load(f'{p.kmmbase}{o.M}.npz')
-    totsize = nao_for_mol(ref_elements, lmax, nmax)
     mat  = np.ndarray((totsize,totsize))
     idx = sparseindices_fill(lmax, nmax, ref_elements)
 

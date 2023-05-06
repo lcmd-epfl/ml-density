@@ -21,6 +21,12 @@ def main():
     natmax = max(natoms)
     nel = len(elements)
 
+    # reference environments
+    ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
+    ref_elements_idx = np.zeros_like(ref_elements)
+    for iq, q in enumerate(elements):
+        ref_elements_idx[np.where(ref_elements==q)] = iq
+
     # training set selection
     nfrac, ntrains, train_configs = get_training_sets(p.trainfilename, o.fracs)
     ntrain = ntrains[-1]
@@ -28,22 +34,15 @@ def main():
     atom_indices, atom_counting, element_indices = get_atomicindx(elements, atomic_numbers[train_configs], natmax)
 
     # basis set info
-    el_dict, lmax, nmax = basis_read(p.basisfilename)
-    bsize, alnum, annum = basis_info(el_dict, lmax, nmax);
+    lmax, nmax = basis_read(p.basisfilename)
+    bsize, alnum, annum = basis_info(elements, lmax, nmax);
     llmax = max(lmax.values())
     nnmax = max(nmax.values())
-
-    # reference environments
-    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)
-    ref_elements = np.hstack(atomic_numbers)[ref_indices]
-    ref_elements_idx = np.zeros_like(ref_elements)
-    for iq, q in enumerate(elements):
-        ref_elements_idx[np.where(ref_elements==q)] = iq
 
     # problem dimensionality
     totsize = sum(bsize[ref_elements_idx])
     ao_sizes = np.array([nao_for_mol(atoms, lmax, nmax) for atoms in atomic_numbers[train_configs]])
-    kernel_sizes = get_kernel_sizes(train_configs, ref_elements_idx, el_dict, o.M, lmax, atom_counting)
+    kernel_sizes = get_kernel_sizes(elements, ref_elements_idx, lmax, atom_counting)
 
     # C arguments
     outputfiles = (ctypes.c_char_p * nfrac)()
@@ -89,14 +88,13 @@ def main():
         ret = get_matrices.get_a(*args)
 
 
-def basis_info(el_dict, lmax, nmax):
-    nel = len(el_dict)
+def basis_info(elements, lmax, nmax):
+    nel = len(elements)
     llmax = max(lmax.values())
-    bsize = np.zeros(nel,int)
-    alnum = np.zeros(nel,int)
-    annum = np.zeros((nel,llmax+1),int)
-    for iel in range(nel):
-        q = el_dict[iel]
+    bsize = np.zeros(nel, dtype=int)
+    alnum = np.zeros(nel, dtype=int)
+    annum = np.zeros((nel, llmax+1), dtype=int)
+    for iel, q in enumerate(elements):
         alnum[iel] = lmax[q]+1
         for l in range(lmax[q]+1):
             annum[iel,l] = nmax[(q,l)]
@@ -104,19 +102,9 @@ def basis_info(el_dict, lmax, nmax):
     return [bsize, alnum, annum]
 
 
-def get_kernel_sizes(myrange, ref_elements_idx, el_dict, M, lmax, atom_counting):
-    kernel_sizes = np.zeros(len(myrange),int)
-    i = 0
-    for imol in myrange:
-        for iref in range(M):
-            iel = ref_elements_idx[iref]
-            q = el_dict[iel]
-            temp = 0
-            for l in range(lmax[q]+1):
-                msize = 2*l+1
-                temp += msize*msize
-            kernel_sizes[i] += temp * atom_counting[i,iel]
-        i += 1
+def get_kernel_sizes(elements, ref_elements_idx, lmax, atom_counting):
+    size_k = np.array([sum((2*l+1)**2 for l in range(lmax[q]+1)) for q in elements])
+    kernel_sizes = atom_counting[:, ref_elements_idx] @ size_k[ref_elements_idx]
     return kernel_sizes
 
 
