@@ -67,7 +67,6 @@ def read_config(argv):
 
         p.splitpsfilebase  = conf.paths.get('ps_split_base')
         p.refsselfilebase  = conf.paths.get('refs_sel_base')
-        p.elselfilebase    = conf.paths.get('spec_sel_base') # TODO remove
         p.powerrefbase     = conf.paths.get('ps_ref_base')
 
         p.kmmbase          = conf.paths.get('kmm_base')

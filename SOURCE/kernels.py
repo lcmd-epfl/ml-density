@@ -5,7 +5,7 @@ import numpy as np
 import equistore
 from config import read_config
 from basis import basis_read
-from functions import moldata_read, get_elements_list, get_atomicindx, print_progress
+from functions import moldata_read, get_elements_list, print_progress
 from libs.kernels_lib import kernel_for_mol
 from libs.multi import multi_process
 import os

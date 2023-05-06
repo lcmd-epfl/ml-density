@@ -1,6 +1,6 @@
 import numpy as np
 from basis import basis_read
-from functions import basis_info, nao_for_mol, print_progress
+from functions import nao_for_mol, print_progress
 from libs.tmap import vector2tmap
 import equistore
 

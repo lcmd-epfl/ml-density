@@ -6,7 +6,7 @@ import ctypes
 import numpy as np
 from config import read_config
 from basis import basis_read
-from functions import moldata_read, get_elements_list, get_atomicindx, basis_info, get_kernel_sizes, nao_for_mol, get_training_sets
+from functions import moldata_read, get_elements_list, nao_for_mol, get_training_sets
 import ctypes_def
 
 
@@ -33,11 +33,17 @@ def main():
     llmax = max(lmax.values())
     nnmax = max(nmax.values())
 
+    # reference environments
+    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)
+    ref_elements = np.hstack(atomic_numbers)[ref_indices]
+    ref_elements_idx = np.zeros_like(ref_elements)
+    for iq, q in enumerate(elements):
+        ref_elements_idx[np.where(ref_elements==q)] = iq
+
     # problem dimensionality
-    ref_elements = np.loadtxt(p.elselfilebase+str(o.M)+".txt",int)
-    totsize = sum(bsize[ref_elements])
+    totsize = sum(bsize[ref_elements_idx])
     ao_sizes = np.array([nao_for_mol(atoms, lmax, nmax) for atoms in atomic_numbers[train_configs]])
-    kernel_sizes = get_kernel_sizes(train_configs, ref_elements, el_dict, o.M, lmax, atom_counting)
+    kernel_sizes = get_kernel_sizes(train_configs, ref_elements_idx, el_dict, o.M, lmax, atom_counting)
 
     # C arguments
     outputfiles = (ctypes.c_char_p * nfrac)()
@@ -61,7 +67,7 @@ def main():
                  (ao_sizes.astype(np.uint32)        ,      ctypes_def.array_1d_int,       ),
                  (kernel_sizes.astype(np.uint32)    ,      ctypes_def.array_1d_int,       ),
                  (element_indices.astype(np.uint32) ,      ctypes_def.array_2d_int,       ),
-                 (ref_elements.astype(np.uint32)    ,      ctypes_def.array_1d_int,       ),
+                 (ref_elements_idx.astype(np.uint32),      ctypes_def.array_1d_int,       ),
                  (alnum.astype(np.uint32)           ,      ctypes_def.array_1d_int,       ),
                  (annum.astype(np.uint32)           ,      ctypes_def.array_2d_int,       ),
                  (qcfilebase.encode('ascii')        ,      ctypes.c_char_p,               ),
@@ -81,6 +87,58 @@ def main():
         get_matrices.get_a.restype = ctypes.c_int
         get_matrices.get_a.argtypes = argtypes
         ret = get_matrices.get_a(*args)
+
+
+def basis_info(el_dict, lmax, nmax):
+    nel = len(el_dict)
+    llmax = max(lmax.values())
+    bsize = np.zeros(nel,int)
+    alnum = np.zeros(nel,int)
+    annum = np.zeros((nel,llmax+1),int)
+    for iel in range(nel):
+        q = el_dict[iel]
+        alnum[iel] = lmax[q]+1
+        for l in range(lmax[q]+1):
+            annum[iel,l] = nmax[(q,l)]
+            bsize[iel] += nmax[(q,l)]*(2*l+1)
+    return [bsize, alnum, annum]
+
+
+def get_kernel_sizes(myrange, ref_elements_idx, el_dict, M, lmax, atom_counting):
+    kernel_sizes = np.zeros(len(myrange),int)
+    i = 0
+    for imol in myrange:
+        for iref in range(M):
+            iel = ref_elements_idx[iref]
+            q = el_dict[iel]
+            temp = 0
+            for l in range(lmax[q]+1):
+                msize = 2*l+1
+                temp += msize*msize
+            kernel_sizes[i] += temp * atom_counting[i,iel]
+        i += 1
+    return kernel_sizes
+
+
+def get_atomicindx(elements, atomic_numbers, natmax):
+    '''
+    element_indices[imol, :]   for each atom its element number iel
+    atom_counting[imol, iel]   number of atoms of element #iel
+    atom_indices[imol, iel, :] indices of atoms of element #iel
+    '''
+    nmol = len(atomic_numbers)
+    nel  = len(elements)
+    atom_counting   = np.zeros((nmol, nel), dtype=int)
+    atom_indices    = np.zeros((nmol, nel, natmax), dtype=int)
+    element_indices = np.zeros((nmol, natmax), dtype=int)
+    for imol, atoms in enumerate(atomic_numbers):
+        for iel, el in enumerate(elements):
+            idx = np.where(atomic_numbers[imol]==el)[0]
+            count = len(idx)
+            atom_indices[imol, iel, 0:count] = idx
+            atom_counting[imol, iel] = count
+            element_indices[imol, idx] = iel
+    return atom_indices, atom_counting, element_indices
 
 
 if __name__=='__main__':
