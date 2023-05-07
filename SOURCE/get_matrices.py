@@ -2,9 +2,9 @@
 
 import sys
 import numpy as np
-from config import read_config
-from basis import basis_read
-from functions import moldata_read, nao_for_mol, get_training_sets
+from libs.config import read_config
+from libs.basis import basis_read
+from libs.functions import moldata_read, nao_for_mol, get_training_sets
 from libs.get_matrices_A import get_a
 from libs.get_matrices_B import get_b
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import sys
-import equistore
 import numpy as np
-from config import read_config
 import ase.io
-from soap.lsoap import generate_lambda_soap_wrapper, remove_high_l, make_rascal_hypers
-from functions import get_elements_list, print_progress, moldata_read
-from basis import basis_read
+import equistore
+from libs.config import read_config
+from libs.lsoap import generate_lambda_soap_wrapper, remove_high_l, make_rascal_hypers
+from libs.functions import get_elements_list, print_progress, moldata_read
+from libs.basis import basis_read
 
 def main():
     o, p = read_config(sys.argv)

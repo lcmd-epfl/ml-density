@@ -4,12 +4,12 @@ import sys
 import gc
 import numpy as np
 import scipy.linalg as spl
-from basis import basis_read
-from config import read_config
-from functions import nao_for_mol
-from libs.tmap import sparseindices_fill
-import equistore
 from numba import jit
+import equistore
+from libs.basis import basis_read
+from libs.config import read_config
+from libs.functions import nao_for_mol
+from libs.tmap import sparseindices_fill
 
 
 def main():

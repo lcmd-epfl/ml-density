@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import equistore
+import sys, os
 import numpy as np
-from config import read_config
 import ase.io
-from soap.lsoap import generate_lambda_soap_wrapper, remove_high_l
-from functions import get_elements_list, print_progress
-from basis import basis_read
+import equistore
+from libs.config import read_config
+from libs.lsoap import generate_lambda_soap_wrapper, remove_high_l
+from libs.functions import get_elements_list, print_progress
+from libs.basis import basis_read
 from libs.multi import multi_process
 
 USEMPI=1

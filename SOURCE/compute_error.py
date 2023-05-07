@@ -3,9 +3,9 @@
 import sys
 import numpy as np
 import equistore
-from config import read_config
-from basis import basis_read_full
-from functions import moldata_read, number_of_electrons_ao, correct_number_of_electrons, get_test_set, get_training_set
+from libs.config import read_config
+from libs.basis import basis_read_full
+from libs.functions import moldata_read, number_of_electrons_ao, correct_number_of_electrons, get_test_set, get_training_set
 from libs.tmap import split, tmap2vector, tmap2matrix, sph2vector
 
 

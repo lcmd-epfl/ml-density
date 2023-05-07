@@ -2,8 +2,8 @@
 
 import sys
 import numpy as np
-from config import read_config
 import ase.io
+from libs.config import read_config
 
 
 def main():

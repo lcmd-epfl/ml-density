@@ -6,10 +6,6 @@ import re
 import ase.io
 import numpy as np
 import wigners
-
-# HACK: load the rascaline library before loading any equistore function
-import rascaline
-rascaline._c_lib._get_library()
 from rascaline import SphericalExpansion
 from equistore import Labels, TensorBlock, TensorMap
 

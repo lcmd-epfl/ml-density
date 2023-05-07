@@ -2,9 +2,9 @@
 
 import sys
 import numpy as np
-from config import read_config
 from ase.data import chemical_symbols
-from functions import moldata_read, get_elements_list, do_fps, print_progress
+from libs.config import read_config
+from libs.functions import moldata_read, get_elements_list, do_fps, print_progress
 from libs.power_spectra_lib import read_ps_1mol_l0
 
 

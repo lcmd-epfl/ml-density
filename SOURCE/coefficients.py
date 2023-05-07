@@ -2,11 +2,11 @@
 
 import sys
 import numpy as np
-from config import read_config
-from basis import basis_read
-from functions import moldata_read, get_test_set
-from libs.tmap import split, tmap2vector, tmap_add
 import equistore
+from libs.config import read_config
+from libs.basis import basis_read
+from libs.functions import moldata_read, get_test_set
+from libs.tmap import split, tmap2vector, tmap_add
 
 
 def main():

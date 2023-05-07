@@ -4,10 +4,9 @@ import sys
 import os
 import ctypes
 import numpy as np
-from config import read_config
-from basis import basis_read
-from functions import moldata_read, get_elements_list, nao_for_mol, get_training_sets
-import ctypes_def
+from libs.config import read_config
+from libs.basis import basis_read
+from libs.functions import moldata_read, get_elements_list, nao_for_mol, get_training_sets
 
 
 def main():
@@ -50,6 +49,10 @@ def main():
         outputfiles[i] = (f'{p.bmatfilebase if task=="b" else p.avecfilebase}_M{o.M}_trainfrac{frac}.dat').encode('ascii')
     qcfilebase = p.goodoverfilebase if task=='b' else p.baselinedwbase
 
+    array_1d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
+    array_2d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
+    array_3d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=3, flags='CONTIGUOUS')
+
     arguments = ((totsize                           ,      ctypes.c_int,                  ),
                  (len(elements)                     ,      ctypes.c_int,                  ),
                  (llmax                             ,      ctypes.c_int,                  ),
@@ -58,17 +61,17 @@ def main():
                  (ntrain                            ,      ctypes.c_int,                  ),
                  (natmax                            ,      ctypes.c_int,                  ),
                  (nfrac                             ,      ctypes.c_int,                  ),
-                 (ntrains.astype(np.uint32)         ,      ctypes_def.array_1d_int,       ),
-                 (atom_indices.astype(np.uint32)    ,      ctypes_def.array_3d_int,       ),
-                 (atom_counting.astype(np.uint32)   ,      ctypes_def.array_2d_int,       ),
-                 (train_configs.astype(np.uint32)   ,      ctypes_def.array_1d_int,       ),
-                 (natoms_train.astype(np.uint32)    ,      ctypes_def.array_1d_int,       ),
-                 (ao_sizes.astype(np.uint32)        ,      ctypes_def.array_1d_int,       ),
-                 (kernel_sizes.astype(np.uint32)    ,      ctypes_def.array_1d_int,       ),
-                 (element_indices.astype(np.uint32) ,      ctypes_def.array_2d_int,       ),
-                 (ref_elements_idx.astype(np.uint32),      ctypes_def.array_1d_int,       ),
-                 (alnum.astype(np.uint32)           ,      ctypes_def.array_1d_int,       ),
-                 (annum.astype(np.uint32)           ,      ctypes_def.array_2d_int,       ),
+                 (ntrains.astype(np.uint32)         ,      array_1d_int,                  ),
+                 (atom_indices.astype(np.uint32)    ,      array_3d_int,                  ),
+                 (atom_counting.astype(np.uint32)   ,      array_2d_int,                  ),
+                 (train_configs.astype(np.uint32)   ,      array_1d_int,                  ),
+                 (natoms_train.astype(np.uint32)    ,      array_1d_int,                  ),
+                 (ao_sizes.astype(np.uint32)        ,      array_1d_int,                  ),
+                 (kernel_sizes.astype(np.uint32)    ,      array_1d_int,                  ),
+                 (element_indices.astype(np.uint32) ,      array_2d_int,                  ),
+                 (ref_elements_idx.astype(np.uint32),      array_1d_int,                  ),
+                 (alnum.astype(np.uint32)           ,      array_1d_int,                  ),
+                 (annum.astype(np.uint32)           ,      array_2d_int,                  ),
                  (qcfilebase.encode('ascii')        ,      ctypes.c_char_p,               ),
                  (p.kernelconfbase.encode('ascii')  ,      ctypes.c_char_p,               ),
                  (outputfiles                       ,      ctypes.POINTER(ctypes.c_char_p)))

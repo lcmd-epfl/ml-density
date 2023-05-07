@@ -1,6 +1,7 @@
 import sys
 from mpi4py import MPI
-from functions import print_progress
+from lib.functions import print_progress
+
 
 def print_nodes(Nproc, nproc, comm):
     sys.stdout.flush()

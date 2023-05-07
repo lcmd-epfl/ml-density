@@ -2,11 +2,11 @@
 
 import sys
 import numpy as np
-from config import read_config
-from basis import basis_read
-from functions import moldata_read, get_elements_list
-from libs.tmap import merge_ref_ps
 import equistore
+from libs.config import read_config
+from libs.basis import basis_read
+from libs.functions import moldata_read, get_elements_list
+from libs.tmap import merge_ref_ps
 
 
 def main():

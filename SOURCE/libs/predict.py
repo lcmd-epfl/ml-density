@@ -1,8 +1,7 @@
 import numpy as np
-from basis import basis_read
-from functions import nao_for_mol, print_progress
-from libs.tmap import vector2tmap
 import equistore
+from libs.functions import nao_for_mol, print_progress
+from libs.tmap import vector2tmap
 
 
 def compute_prediction(atoms, lmax, nmax, kernel, weights, averages=None):
@@ -20,12 +19,11 @@ def compute_prediction(atoms, lmax, nmax, kernel, weights, averages=None):
     return coeffs
 
 
-def run_prediction(test_configs, atomic_numbers, ref_elements,
-                   basisfilename, weightsfilename, kernelbase,
-                   averages=None):
+def run_prediction(test_configs, atomic_numbers,
+                   lmax, nmax, weights, ref_elements,
+                   kernelbase, averages=None):
 
-    lmax, nmax = basis_read(basisfilename)
-    weights = vector2tmap(ref_elements, lmax, nmax, np.load(weightsfilename))
+    weights = vector2tmap(ref_elements, lmax, nmax, weights)
 
     predictions = []
     for i, (imol, atoms) in enumerate(zip(test_configs, atomic_numbers)):

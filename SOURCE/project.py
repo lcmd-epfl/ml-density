@@ -3,9 +3,9 @@
 import sys
 import numpy as np
 import equistore
-from config import read_config
-from basis import basis_read
-from functions import moldata_read, print_progress, get_elements_list, nao_for_mol
+from libs.config import read_config
+from libs.basis import basis_read
+from libs.functions import moldata_read, print_progress, get_elements_list, nao_for_mol
 from libs.tmap import averages2tmap, vector2tmap, matrix2tmap, tmap2matrix
 
 

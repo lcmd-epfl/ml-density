@@ -3,9 +3,9 @@
 import sys
 import numpy as np
 import equistore
-from config import read_config
-from basis import basis_read
-from functions import moldata_read, get_elements_list, print_progress
+from libs.config import read_config
+from libs.basis import basis_read
+from libs.functions import moldata_read, get_elements_list, print_progress
 from libs.kernels_lib import kernel_for_mol
 
 

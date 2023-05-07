@@ -2,10 +2,10 @@
 
 import sys
 import numpy as np
-from basis import basis_read
-from config import read_config
-from libs.kernels_lib import kernel_mm
 import equistore
+from libs.basis import basis_read
+from libs.config import read_config
+from libs.kernels_lib import kernel_mm
 
 
 def main():

@@ -2,7 +2,7 @@
 
 import sys
 import os.path
-from config import Config, get_config_path
+from libs.config import Config, get_config_path
 
 
 def main():

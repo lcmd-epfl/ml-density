@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
-import sys
+import sys, os
 import numpy as np
 import equistore
-from config import read_config
-from basis import basis_read
-from functions import moldata_read, print_progress
+from libs.config import read_config
+from libs.basis import basis_read
+from libs.functions import moldata_read, print_progress
 from libs.kernels_lib import kernel_for_mol
 from libs.multi import multi_process
-import os
 
 USEMPI = 1
 
