@@ -1,6 +1,6 @@
 import sys
 from mpi4py import MPI
-from lib.functions import print_progress
+from libs.functions import print_progress
 
 
 def print_nodes(Nproc, nproc, comm):
