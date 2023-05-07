@@ -12,7 +12,7 @@ from libs.get_matrices_B import get_b
 def main():
     o, p = read_config(sys.argv)
 
-    _, _, atomic_numbers = moldata_read(p.xyzfilename)
+    atomic_numbers = moldata_read(p.xyzfilename)
     lmax, nmax = basis_read(p.basisfilename)
 
     # reference environments

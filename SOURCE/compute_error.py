@@ -14,8 +14,9 @@ def main():
     training = 'training' in sys.argv[1:]
 
     averages = equistore.load(p.avfile)
-    nmol, _, atomic_numbers = moldata_read(p.xyzfilename)
+    atomic_numbers = moldata_read(p.xyzfilename)
     basis, lmax, nmax = basis_read_full(p.basisfilename)
+    nmol = len(atomic_numbers)
 
     if o.use_charges:
         print(f'charge_file: {p.chargefilename} mode: {o.use_charges}\n')

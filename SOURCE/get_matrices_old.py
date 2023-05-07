@@ -16,10 +16,8 @@ def main():
     task = 'b' if (len(sys.argv)>1 and sys.argv[1][0].lower()=='b') else 'a'
 
     # load molecules
-    _, natoms, atomic_numbers = moldata_read(p.xyzfilename)
+    atomic_numbers = moldata_read(p.xyzfilename)
     elements = get_elements_list(atomic_numbers)
-    natmax = max(natoms)
-    nel = len(elements)
 
     # reference environments
     ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
@@ -30,8 +28,10 @@ def main():
     # training set selection
     nfrac, ntrains, train_configs = get_training_sets(p.trainfilename, o.fracs)
     ntrain = ntrains[-1]
-    natoms_train = natoms[train_configs]
-    atom_indices, atom_counting, element_indices = get_atomicindx(elements, atomic_numbers[train_configs], natmax)
+    atomic_numbers_train = atomic_numbers[train_configs]
+    natoms_train = np.array([len(atoms) for atoms in atomic_numbers_train])
+    natmax = max(natoms_train)
+    atom_indices, atom_counting, element_indices = get_atomicindx(elements, atomic_numbers_train, natmax)
 
     # basis set info
     lmax, nmax = basis_read(p.basisfilename)
@@ -51,7 +51,7 @@ def main():
     qcfilebase = p.goodoverfilebase if task=='b' else p.baselinedwbase
 
     arguments = ((totsize                           ,      ctypes.c_int,                  ),
-                 (nel                               ,      ctypes.c_int,                  ),
+                 (len(elements)                     ,      ctypes.c_int,                  ),
                  (llmax                             ,      ctypes.c_int,                  ),
                  (nnmax                             ,      ctypes.c_int,                  ),
                  (o.M                               ,      ctypes.c_int,                  ),

@@ -15,13 +15,13 @@ def main():
     print(f'{o.copy_metric=}')
     print(f'{o.reorder_ao=}')
 
-    nmol, _, atomic_numbers = moldata_read(p.xyzfilename)
+    atomic_numbers = moldata_read(p.xyzfilename)
     lmax, nmax = basis_read(p.basisfilename)
     coefficients = load_coefs(atomic_numbers, p.coefffilebase)
     av_coefs = get_averages(lmax, nmax, coefficients, atomic_numbers)
 
     for imol, (coef, atoms) in enumerate(zip(coefficients, atomic_numbers)):
-        print_progress(imol, nmol)
+        print_progress(imol, len(atomic_numbers))
         idx = reorder_idx(atoms, lmax, nmax, o.reorder_ao)
 
         good_coef = coef[idx]

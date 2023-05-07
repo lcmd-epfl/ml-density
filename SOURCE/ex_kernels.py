@@ -12,7 +12,7 @@ from libs.kernels_lib import kernel_for_mol
 def main():
     o, p = read_config(sys.argv)
 
-    _, _, atomic_numbers_ex = moldata_read(p.xyzexfilename)
+    atomic_numbers_ex = moldata_read(p.xyzexfilename)
     lmax, _ = basis_read(p.basisfilename)
     ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
     power_ref = equistore.load(f'{p.powerrefbase}_{o.M}.npz');

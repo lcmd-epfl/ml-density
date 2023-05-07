@@ -6,13 +6,10 @@ from ase.data import chemical_symbols
 
 def moldata_read(xyzfilename):
     mols = ase.io.read(xyzfilename, ":")
-    nmol = len(mols)
-    natoms = np.zeros(nmol, int)
     atomic_numbers = []
     for i, mol in enumerate(mols):
         atomic_numbers.append(mol.get_atomic_numbers())
-        natoms[i] = mol.get_global_number_of_atoms()
-    return (nmol, natoms, np.array(atomic_numbers, dtype=object))
+    return np.array(atomic_numbers, dtype=object)
 
 
 def get_elements_list(atomic_numbers, return_counts=False):
@@ -75,7 +72,7 @@ def get_training_sets(filename, fractions):
 
 def get_test_set(filename, nmol):
     train_selection = np.loadtxt(filename, dtype=int)
-    test_configs = np.setdiff1d(range(nmol),train_selection)
+    test_configs = np.setdiff1d(range(nmol), train_selection)
     return len(test_configs), test_configs
 
 

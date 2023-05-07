@@ -13,12 +13,12 @@ def main():
     o, p = read_config(sys.argv)
     training = 'training' in sys.argv[1:]
 
-    nmol, _, atomic_numbers = moldata_read(p.xyzfilename)
+    atomic_numbers = moldata_read(p.xyzfilename)
     ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
 
     for frac in o.fracs:
         if not training:
-            ntest, test_configs = get_test_set(p.trainfilename, nmol)
+            ntest, test_configs = get_test_set(p.trainfilename, len(atomic_numbers))
             predictfile = f'{p.predictfilebase}_test_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npz'
         else:
             ntest, test_configs = get_training_set(p.trainfilename, frac)

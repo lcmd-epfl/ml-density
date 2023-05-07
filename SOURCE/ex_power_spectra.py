@@ -13,7 +13,7 @@ def main():
     o, p = read_config(sys.argv)
 
     mols_ex = ase.io.read(p.xyzexfilename, ":")
-    _, _, atomic_numbers = moldata_read(p.xyzfilename)
+    atomic_numbers = moldata_read(p.xyzfilename)
 
     elements = get_elements_list(atomic_numbers)
     elements_ex = get_elements_list([mol.get_atomic_numbers() for mol in mols_ex])

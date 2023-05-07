@@ -12,10 +12,11 @@ import equistore
 def main():
     o, p = read_config(sys.argv)
 
-    _, natoms, atomic_numbers = moldata_read(p.xyzfilename)
+    atomic_numbers = moldata_read(p.xyzfilename)
     elements = get_elements_list(atomic_numbers)
-    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)
+    natoms = np.array([len(atoms) for atoms in atomic_numbers])
 
+    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)
     lmax, _ = basis_read(p.basisfilename)
 
     ref_mol_at = get_ref_idx(natoms, ref_indices)

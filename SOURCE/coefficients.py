@@ -12,9 +12,9 @@ import equistore
 def main():
     o, p = read_config(sys.argv)
 
-    nmol, _, atomic_numbers = moldata_read(p.xyzfilename)
+    atomic_numbers = moldata_read(p.xyzfilename)
     lmax, nmax = basis_read(p.basisfilename)
-    _, test_configs = get_test_set(p.trainfilename, nmol)
+    _, test_configs = get_test_set(p.trainfilename, len(atomic_numbers))
     averages = equistore.load(p.avfile)
 
     for frac in o.fracs:

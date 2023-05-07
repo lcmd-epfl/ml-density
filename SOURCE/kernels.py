@@ -22,10 +22,11 @@ def main():
         kernel_for_mol(lmax, ref_elements, atomic_numbers[imol],
                        power_ref, f'{p.splitpsfilebase}_{imol}.npz', f'{p.kernelconfbase}{imol}.dat')
 
-    nmol, _, atomic_numbers = moldata_read(p.xyzfilename)
+    atomic_numbers = moldata_read(p.xyzfilename)
     power_ref = equistore.load(f'{p.powerrefbase}_{o.M}.npz');
     ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
     lmax, nmax = basis_read(p.basisfilename)
+    nmol = len(atomic_numbers)
 
     if USEMPI==0:
         for imol in range(nmol):

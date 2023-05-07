@@ -4,7 +4,6 @@ import sys
 import numpy as np
 from basis import basis_read
 from config import read_config
-from functions import moldata_read
 from libs.kernels_lib import kernel_mm
 import equistore
 
