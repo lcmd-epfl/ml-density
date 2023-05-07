@@ -733,3 +733,15 @@ def remove_high_l(lsoap: TensorMap, lmax: dict):
         blocks=new_blocks,
     )
     return lsoap_cleaned
+
+
+def make_rascal_hypers(soap_rcut, soap_ncut, soap_lcut, soap_sigma):
+    return {
+        "cutoff": soap_rcut,
+        "max_radial": soap_ncut,
+        "max_angular": soap_lcut,
+        "atomic_gaussian_width": soap_sigma,
+        "radial_basis": {"Gto": {}},
+        "cutoff_function": {"ShiftedCosine": {"width": 0.5}},
+        "center_atom_weight": 1.0,
+    }
