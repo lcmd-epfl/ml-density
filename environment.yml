@@ -5,6 +5,7 @@ dependencies:
   - numpy=1.23.3=py39h14f4228_0
   - python=3.9.13=haa1d7c7_2
   - scipy=1.9.1=py39h14f4228_0
+  - numba=0.56.4
   - pip=23.0
   - pip:
     - ase==3.22.1

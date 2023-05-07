@@ -8,8 +8,8 @@ from basis import basis_read
 from config import read_config
 from functions import nao_for_mol
 from libs.tmap import sparseindices_fill
-from libs.get_matrices_B import mpos
 import equistore
+from numba import jit
 
 
 def main():
@@ -38,19 +38,24 @@ def main():
         np.save(weightsfile, weights)
 
 
-def fill_matrix(mat, k_MM, bmatfile, idx, nmax, jit, reg):
+@jit(nopython=True)
+def unravel_tril(mat, data, jitter):
+    # shouldn't use np.tril_indices() because it creates a huge indices array
     n = mat.shape[0]
-    data = np.fromfile(bmatfile)
-    # shouldn't use np.tril_indices because it creates huge indices arrays
     k = 0
     for j in range(n):
         for i in range(j+1):
-            mat[j,i] = data[mpos(i,j)]
+            mat[j,i] = data[k]
             k += 1
-        mat[j,j] += jit
+        mat[j,j] += jitter
+    return
+
+
+def fill_matrix(mat, k_MM, bmatfile, idx, nmax, jitter, reg):
+    data = np.fromfile(bmatfile)
+    unravel_tril(mat, data, jitter)
     del data
     gc.collect()
-
     for (l, q), kblock in k_MM:
         msize = 2*l+1
         for iiref12, (iref1, iref2) in enumerate(kblock.samples):
