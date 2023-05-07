@@ -20,6 +20,7 @@ def main():
     lmax, _ = basis_read(p.basisfilename)
 
     ref_mol_at = get_ref_idx(natoms, ref_indices)
+    print(ref_mol_at)
     tensor = merge_ref_ps(lmax, elements, atomic_numbers, ref_mol_at, p.splitpsfilebase)
     equistore.save(f'{p.powerrefbase}_{o.M}.npz', tensor)
 

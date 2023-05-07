@@ -27,10 +27,11 @@ def main():
     print(f'{rascal_hypers=}')
     print(f'{elements=}')
     print(f'{lmax=}')
+    print(f'{o.ps_min_norm=}')
 
     for imol, mol in enumerate(mols_ex):
         print_progress(imol, len(mols_ex))
-        soap = generate_lambda_soap_wrapper(mol, rascal_hypers, neighbor_species=elements, normalize=True, min_norm=1e-20)
+        soap = generate_lambda_soap_wrapper(mol, rascal_hypers, neighbor_species=elements, normalize=True, min_norm=o.ps_min_norm)
         soap = remove_high_l(soap, lmax)
         equistore.save(f'{p.powerexbase}_{imol}.npz', soap)
 

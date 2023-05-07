@@ -42,19 +42,20 @@ def get_config_path(argv):
 def read_config(argv):
     def set_variable_values():
         o = SimpleNamespace()
-        o.M = conf.get_option('m'           ,  100, int  )
-        o.seed  = conf.get_option('seed'        ,    1, int  )
-        o.train = conf.get_option('train_size'  , 1000, int  )
-        o.fracs = conf.get_option('trainfrac', np.array([1.0]), conf.floats)
-        o.soap_sigma = conf.get_option('soap_sigma'  ,  0.3, float  )
-        o.soap_rcut  = conf.get_option('soap_rcut '  ,  4.0, float  )
-        o.soap_ncut  = conf.get_option('soap_ncut '  ,  8  , int    )
-        o.soap_lcut  = conf.get_option('soap_lcut '  ,  6  , int    )
-        o.reorder_ao  = conf.get_option('reorder_ao'      ,  0, int)
-        o.copy_metric = conf.get_option('copy_metric'     ,  1, int)
-        o.reg  = conf.get_option('regular'  , 1e-6,            float)
-        o.jit  = conf.get_option('jitter'   , 1e-10,           float)
-        o.use_charges = conf.get_option('charges'  , 0,               int  )
+        o.M           = conf.get_option('m'           , 100             , int         )
+        o.seed        = conf.get_option('seed'        , 1               , int         )
+        o.train       = conf.get_option('train_size'  , 1000            , int         )
+        o.fracs       = conf.get_option('trainfrac'   , np.array([1.0]) , conf.floats )
+        o.soap_sigma  = conf.get_option('soap_sigma'  , 0.3             , float       )
+        o.soap_rcut   = conf.get_option('soap_rcut '  , 4.0             , float       )
+        o.soap_ncut   = conf.get_option('soap_ncut '  , 8               , int         )
+        o.soap_lcut   = conf.get_option('soap_lcut '  , 6               , int         )
+        o.reorder_ao  = conf.get_option('reorder_ao'  , 0               , int         )
+        o.copy_metric = conf.get_option('copy_metric' , 1               , int         )
+        o.reg         = conf.get_option('regular'     , 1e-6            , float       )
+        o.jit         = conf.get_option('jitter'      , 1e-10           , float       )
+        o.use_charges = conf.get_option('charges'     , 0               , int         )
+        o.ps_min_norm = conf.get_option('ps_min_norm' , 1e-20           , float       )
         return o
 
     def get_all_paths():
