@@ -11,6 +11,8 @@ soap_ncut  = 8
 soap_lcut  = 6
 reorder_ao = 1
 copy_metric = 1
+ps_min_norm = 1e-20
+ps_normalize = True
 
 [paths]
 xyzfile          = ALL.xyz

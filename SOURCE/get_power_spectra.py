@@ -20,7 +20,7 @@ def main():
         #if os.path.exists(f'{p.splitpsfilebase}_{imol}.npz'):
         #    return
         #print(imol)
-        soap = generate_lambda_soap_wrapper(mols[imol], rascal_hypers, neighbor_species=elements, normalize=True, min_norm=o.ps_min_norm)
+        soap = generate_lambda_soap_wrapper(mols[imol], rascal_hypers, neighbor_species=elements, normalize=o.ps_normalize, min_norm=o.ps_min_norm)
         soap = remove_high_l(soap, lmax)
         equistore.save(f'{p.splitpsfilebase}_{imol}.npz', soap)
 
@@ -41,7 +41,7 @@ def main():
     print(f'{rascal_hypers=}')
     print(f'{elements=}')
     print(f'{lmax=}')
-    print(f'{o.ps_min_norm=}')
+    print(f'{o.ps_min_norm=} {o.ps_normalize=}')
 
     nmol = len(mols)
     if USEMPI==0:

@@ -9,6 +9,7 @@ from libs.lsoap import generate_lambda_soap_wrapper, remove_high_l, make_rascal_
 from libs.functions import get_elements_list, print_progress, moldata_read
 from libs.basis import basis_read
 
+
 def main():
     o, p = read_config(sys.argv)
 
@@ -27,11 +28,11 @@ def main():
     print(f'{rascal_hypers=}')
     print(f'{elements=}')
     print(f'{lmax=}')
-    print(f'{o.ps_min_norm=}')
+    print(f'{o.ps_min_norm=} {o.ps_normalize=}')
 
     for imol, mol in enumerate(mols_ex):
         print_progress(imol, len(mols_ex))
-        soap = generate_lambda_soap_wrapper(mol, rascal_hypers, neighbor_species=elements, normalize=True, min_norm=o.ps_min_norm)
+        soap = generate_lambda_soap_wrapper(mol, rascal_hypers, neighbor_species=elements, normalize=o.ps_normalize, min_norm=o.ps_min_norm)
         soap = remove_high_l(soap, lmax)
         equistore.save(f'{p.powerexbase}_{imol}.npz', soap)
 
