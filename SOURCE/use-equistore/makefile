@@ -17,11 +17,16 @@ W= -Warray-bounds -Wmaybe-uninitialized -Wmissing-braces -Wparentheses -Wsequenc
 
 all: get_matrices.so
 
-%.so: %.o mylib.o
-	$(CC) $^ -shared -Wl,-soname,$@ -o $@
+%.so: %.o mylib.o do_work_a.o
+	$(CC) $^ -L./eq -l:libequistore.a -lstdc++ -shared -Wl,-soname,$@ -o $@
+
+do_work_a.o: do_work_a.cpp
+	$(CC) $(DEF) $(OMPFLAG) $(W) $^ -c --std=c++11 -O2 -fPIC -o $@
+
 %.o: %.c
 	$(CC) $(DEF) $(OMPFLAG) $(W) $^ -c --std=gnu11 -O2 -fPIC -o $@
 
 clean:
 	rm -vf get_matrices.so
+	rm -vf mylib.o do_work_a.o
 

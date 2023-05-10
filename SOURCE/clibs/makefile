@@ -1,9 +1,27 @@
-all:
-	make -f get_matrices_makefile
-	make -f regression_makefile
-	make -f prediction_makefile
+USE_MPI = 1
+USE_OMP = 1
+
+CC=gcc
+OMPFLAG=
+DEF=
+ifeq ($(USE_MPI),1)
+	DEF := $(DEF) -DUSE_MPI
+	CC=mpicc
+endif
+ifeq ($(USE_OMP),1)
+	OMPFLAG = -fopenmp
+endif
+
+W= -Warray-bounds -Wmaybe-uninitialized -Wmissing-braces -Wparentheses -Wsequence-point -Wtype-limits -Wundef \
+   -Wuninitialized -Wunused -Wmisleading-indentation -Wempty-body -Wunused-but-set-variable -Wunused-parameter -Winline
+
+all: get_matrices.so
+
+%.so: %.o mylib.o
+	$(CC) $^ -shared -Wl,-soname,$@ -o $@
+%.o: %.c
+	$(CC) $(DEF) $(OMPFLAG) $(W) $^ -c --std=gnu11 -O2 -fPIC -o $@
+
 clean:
-	make clean -f get_matrices_makefile
-	make clean -f regression_makefile
-	make clean -f prediction_makefile
+	rm -vf get_matrices.so
 
