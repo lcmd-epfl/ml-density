@@ -266,35 +266,14 @@ int get_a(
 #endif
 
   double * Avec = calloc(sizeof(double)*totsize, 1);
-  ao_t * aoref = ao_fill(totsize, llmax, M, ref_elem, alnum, annum);
+  ao_t * aoref = ao_fill(nelem, totsize, llmax, M, elements, ref_elem, alnum, annum);
 
 
   if(Nproc==1){
     for(int ifrac=0; ifrac<nfrac; ifrac++){
       for(int imol=(ifrac==0?0:ntrains[ifrac-1]); imol<ntrains[ifrac]; imol++){
         printf("%4d: %4d\n", nproc, imol);
-        do_work_a(
-            totsize,
-            nelem  ,
-            elements,
-            llmax  ,
-            nnmax  ,
-            M      ,
-            natmax ,
-            natoms    [imol],
-            trrange   [imol],
-            totalsizes[imol],
-            kernsizes [imol],
-            atomicindx[imol],
-            atomcount [imol],
-            atom_elem [imol],
-            ref_elem  ,
-            alnum     ,
-            annum     ,
-            aoref     ,
-            path_proj,
-            path_kern,
-            Avec);
+        do_work_a(totsize, trrange[imol], atomcount[imol], aoref, path_proj, path_kern, Avec);
       }
       vec_print(totsize, Avec, "w", paths_avec[ifrac]);
     }
@@ -323,28 +302,7 @@ int get_a(
           if(imol<0){
             break;
           }
-          do_work_a(
-              totsize,
-              nelem  ,
-              elements,
-              llmax  ,
-              nnmax  ,
-              M      ,
-              natmax ,
-              natoms    [imol],
-              trrange   [imol],
-              totalsizes[imol],
-              kernsizes [imol],
-              atomicindx[imol],
-              atomcount [imol],
-              atom_elem [imol],
-              ref_elem  ,
-              alnum     ,
-              annum     ,
-              aoref     ,
-              path_proj,
-              path_kern,
-              Avec);
+          do_work_a(totsize, trrange[imol], atomcount[imol], aoref, path_proj, path_kern, Avec);
         }
         printf("%4d: finished work\n", nproc);
       }
@@ -397,6 +355,7 @@ int get_b(
     const char * const path_kern,
     const char ** const paths_bmat
     ){
+  int elements[] = {1,6,7,8}; // TODO
 
 #ifdef USE_MPI
   int argc = 1;
@@ -430,7 +389,7 @@ int get_b(
 #endif
 
   double * Bmat = calloc(sizeof(double)*symsize(totsize), 1);
-  ao_t * aoref = ao_fill(totsize, llmax, M, ref_elem, alnum, annum);
+  ao_t * aoref = ao_fill(nelem, totsize, llmax, M, elements, ref_elem, alnum, annum);
 
   if(Nproc==1){
     for(int ifrac=0; ifrac<nfrac; ifrac++){

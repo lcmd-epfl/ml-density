@@ -1,9 +1,11 @@
 #include "mylib.h"
 
 ao_t * ao_fill(
+    const int nelem   ,
     const int totsize ,
     const int llmax   ,
     const int M       ,
+    const unsigned int const elements[nelem],
     const unsigned int const ref_elem[M],
     const unsigned int const alnum[],         // nelem
     const unsigned int const annum[][llmax+1] // nelem*(llmax+1)
@@ -11,6 +13,7 @@ ao_t * ao_fill(
 
   ao_t * aoref = malloc(sizeof(ao_t)*totsize);
 
+  int * iiref = (int *)calloc(nelem, sizeof(int));
   int i = 0;
   for(int iref=0; iref<M; iref++){
     int a = ref_elem[iref];
@@ -24,12 +27,16 @@ ao_t * ao_fill(
           aoref[i].n  = n;
           aoref[i].l  = l;
           aoref[i].a  = a;
+          aoref[i].q  = elements[a];
           aoref[i].iref = iref;
+          aoref[i].iiref = iiref[a];
           i++;
         }
       }
     }
+    iiref[a]++;
   }
+  free(iiref);
   return aoref;
 }
 
