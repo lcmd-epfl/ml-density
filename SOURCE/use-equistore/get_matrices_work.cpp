@@ -10,13 +10,11 @@ static inline size_t mpos(size_t i, size_t j){
   return (i)+(((j)*((j)+1))>>1);
 }
 
-#define ANNUM(A, L)                                     (annum[(A)*(llmax+1)+L])
-
 #define KBLOCK(L,A)                                     ((L)*nelem+(A))
 #define KVALUE(L,A,ICEL,IMM,IM,IIREF)                   ((((ICEL)*(2*(L)+1) + IMM)*(2*(L)+1) + IM)*nref[A] + IIREF)
 
-#define OBLOCK(L1,L2,A1,A2)                             ((((L1)*(llmax+1) + L2)*nelem + A1)*nelem + A2)
-#define OVALUE(L1,L2,A1,A2,ICEL1,ICEL2,IMM1,IMM2,N1,N2) (((((ICEL1 * atomcount[A2]) + ICEL2) * (2*L1+1) + IMM1) * (2*L2+1) + IMM2) * ANNUM(A1,L1) + N1) * ANNUM(A2,L2) + N2
+#define OBLOCK(L1,L2,A1,A2)                             ((((L1)*(llmax1) + L2)*nelem + A1)*nelem + A2)
+#define OVALUE(L1,L2,A1,A2,ICEL1,ICEL2,IMM1,IMM2,N1,N2) (((((ICEL1 * atomcount[A2]) + ICEL2) * (2*L1+1) + IMM1) * (2*L2+1) + IMM2) * annum[KBLOCK(L1,A1)] + N1) * annum[KBLOCK(L2,A2)] + N2
 
 #define KVAL(L,A,ICEL,IMM,IM,IIREF)                     kvalues[KBLOCK(L, A)][KVALUE(L, A, ICEL, IMM, IM, IIREF)]
 #define OVAL(L1,L2,A1,A2,ICEL1,ICEL2,IMM1,IMM2,N1,N2)   ovalues[OBLOCK(L1,L2,A1,A2)][OVALUE(L1,L2,A1,A2,ICEL1,ICEL2,IMM1,IMM2,N1,N2)]
@@ -88,13 +86,13 @@ void do_work_a(
 void do_work_b(
     const unsigned int totsize,
     const unsigned int nelem,
-    const unsigned int llmax,
+    const unsigned int llmax1,
     const unsigned int conf,
     const unsigned int * const atomcount ,//[nelem],
     const unsigned int * const nref      ,//[nelem]
     const unsigned int * const elements  ,//[nelem]
     const unsigned int * const alnum     ,//[nelem],
-    const unsigned int * const annum     ,//[nelem][llmax+1],
+    const unsigned int * const annum     ,//[llmax1][nelem],
     const ao_t         * const aoref     ,//[totsize],
     const char * const path_over,
     const char * const path_kern,
@@ -106,8 +104,8 @@ void do_work_b(
   auto ktensor = TensorMap::load(file_kern);
   auto otensor = TensorMap::load(file_over);
 
-  double ** kvalues = (double **)calloc(nelem*(llmax+1), sizeof(double *));
-  double ** ovalues = (double **)calloc(nelem*nelem*(llmax+1)*(llmax+1), sizeof(double *));
+  double ** kvalues = (double **)calloc(nelem*llmax1, sizeof(double *));
+  double ** ovalues = (double **)calloc(nelem*nelem*llmax1*llmax1, sizeof(double *));
   for(int a1=0; a1<nelem; a1++){
     if(atomcount[a1]){
       for(int l1=0; l1<alnum[a1]; l1++){

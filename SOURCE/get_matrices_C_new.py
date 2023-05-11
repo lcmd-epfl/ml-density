@@ -6,7 +6,7 @@ import ctypes
 import numpy as np
 from libs.config import read_config
 from libs.basis import basis_read
-from libs.functions import moldata_read, get_elements_list, nao_for_mol, get_training_sets
+from libs.functions import moldata_read, get_elements_list, get_training_sets
 
 
 def main():
@@ -29,19 +29,14 @@ def main():
     ntrain = ntrains[-1]
     atomic_numbers_train = atomic_numbers[train_configs]
     natoms_train = np.array([len(atoms) for atoms in atomic_numbers_train])
-    natmax = max(natoms_train)
-    atom_indices, atom_counting, element_indices = get_atomicindx(elements, atomic_numbers_train, natmax)
+    atom_counting = get_atomicindx(elements, atomic_numbers_train)
 
     # basis set info
     lmax, nmax = basis_read(p.basisfilename)
     bsize, alnum, annum = basis_info(elements, lmax, nmax);
-    llmax = max(lmax.values())
-    nnmax = max(nmax.values())
 
     # problem dimensionality
     totsize = sum(bsize[ref_elements_idx])
-    ao_sizes = np.array([nao_for_mol(atoms, lmax, nmax) for atoms in atomic_numbers[train_configs]])
-    kernel_sizes = get_kernel_sizes(elements, ref_elements_idx, lmax, atom_counting)
 
     # C arguments
     outputfiles = (ctypes.c_char_p * nfrac)()
@@ -51,20 +46,18 @@ def main():
 
     array_1d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
     array_2d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
-    array_3d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=3, flags='CONTIGUOUS')
 
     arguments = ((totsize                           ,      ctypes.c_int,                  ),
                  (len(elements)                     ,      ctypes.c_int,                  ),
-                 (llmax                             ,      ctypes.c_int,                  ),
                  (o.M                               ,      ctypes.c_int,                  ),
                  (ntrain                            ,      ctypes.c_int,                  ),
                  (nfrac                             ,      ctypes.c_int,                  ),
                  (ntrains.astype(np.uint32)         ,      array_1d_int,                  ),
-                 (atom_counting.astype(np.uint32)   ,      array_2d_int,                  ), #
+                 (atom_counting.astype(np.uint32)   ,      array_2d_int,                  ),
                  (train_configs.astype(np.uint32)   ,      array_1d_int,                  ),
                  (ref_elements_idx.astype(np.uint32),      array_1d_int,                  ),
                  (alnum.astype(np.uint32)           ,      array_1d_int,                  ),
-                 (annum.astype(np.uint32)           ,      array_2d_int,                  ),
+                 (annum.flatten().astype(np.uint32) ,      array_1d_int,                  ),
                  (elements.astype(np.uint32)        ,      array_1d_int,                  ),
                  (qcfilebase.encode('ascii')        ,      ctypes.c_char_p,               ),
                  (p.kernelconfbase.encode('ascii')  ,      ctypes.c_char_p,               ),
@@ -90,40 +83,25 @@ def basis_info(elements, lmax, nmax):
     llmax = max(lmax.values())
     bsize = np.zeros(nel, dtype=int)
     alnum = np.zeros(nel, dtype=int)
-    annum = np.zeros((nel, llmax+1), dtype=int)
-    for iel, q in enumerate(elements):
-        alnum[iel] = lmax[q]+1
+    annum = np.zeros((llmax+1, nel), dtype=int)
+    for iq, q in enumerate(elements):
+        alnum[iq] = lmax[q]+1
         for l in range(lmax[q]+1):
-            annum[iel,l] = nmax[(q,l)]
-            bsize[iel] += nmax[(q,l)]*(2*l+1)
-    return [bsize, alnum, annum]
+            annum[l,iq] = nmax[(q,l)]
+            bsize[iq]  += nmax[(q,l)]*(2*l+1)
+    return bsize, alnum, annum
 
 
-def get_kernel_sizes(elements, ref_elements_idx, lmax, atom_counting):
-    size_k = np.array([sum((2*l+1)**2 for l in range(lmax[q]+1)) for q in elements])
-    kernel_sizes = atom_counting[:, ref_elements_idx] @ size_k[ref_elements_idx]
-    return kernel_sizes
-
-
-def get_atomicindx(elements, atomic_numbers, natmax):
+def get_atomicindx(elements, atomic_numbers):
     '''
-    element_indices[imol, :]   for each atom its element number iel
-    atom_counting[imol, iel]   number of atoms of element #iel
-    atom_indices[imol, iel, :] indices of atoms of element #iel
+    Returns:
+      atom_counting[imol, iq]   number of atoms of element #iq in mol #imol
     '''
-    nmol = len(atomic_numbers)
-    nel  = len(elements)
-    atom_counting   = np.zeros((nmol, nel), dtype=int)
-    atom_indices    = np.zeros((nmol, nel, natmax), dtype=int)
-    element_indices = np.zeros((nmol, natmax), dtype=int)
+    atom_counting = np.zeros((len(atomic_numbers), len(elements)), dtype=int)
     for imol, atoms in enumerate(atomic_numbers):
-        for iel, el in enumerate(elements):
-            idx = np.where(atomic_numbers[imol]==el)[0]
-            count = len(idx)
-            atom_indices[imol, iel, 0:count] = idx
-            atom_counting[imol, iel] = count
-            element_indices[imol, idx] = iel
-    return atom_indices, atom_counting, element_indices
+        for iq, q in enumerate(elements):
+            atom_counting[imol, iq] = np.count_nonzero(atoms==q)
+    return atom_counting
 
 
 if __name__=='__main__':

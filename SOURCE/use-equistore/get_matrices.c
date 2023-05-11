@@ -15,12 +15,11 @@ static inline size_t symsize(size_t M){
 static ao_t * ao_fill(
     const int nelem   ,
     const int totsize ,
-    const int llmax   ,
     const int M       ,
-    const unsigned int const elements[nelem],
-    const unsigned int const ref_elem[M],
-    const unsigned int const alnum[],         // nelem
-    const unsigned int const annum[][llmax+1] // nelem*(llmax+1)
+    const unsigned int * const elements,  // nelem
+    const unsigned int * const ref_elem,  // M
+    const unsigned int * const alnum,     // nelem
+    const unsigned int * const annum      // (llmax1)*nelem
     ){
 
   ao_t * aoref = malloc(sizeof(ao_t)*totsize);
@@ -32,7 +31,7 @@ static ao_t * ao_fill(
     int al = alnum[a];
     for(int l=0; l<al; l++){
       int msize = 2*l+1;
-      int anc   = annum[a][l];
+      int anc   = annum[l*nelem+a];
       for(int n=0; n<anc; n++){
         for(int im=0; im<msize; im++){
           aoref[i].im = im;
@@ -164,17 +163,16 @@ static void vec_write(size_t n, double * v, const char * mode, const char * fnam
 int get_a(
     const unsigned int totsize,
     const unsigned int nelem,
-    const unsigned int llmax,
     const unsigned int M,
     const unsigned int ntrain,
     const unsigned int nfrac,
-    const unsigned int const ntrains   [nfrac],                  //  nfrac
-    const unsigned int const atomcount [ntrain][nelem],          //  ntrain*nelem
-    const unsigned int const trrange   [ntrain],                 //  ntrain
-    const unsigned int const ref_elem  [M],                      //  M
-    const unsigned int const alnum     [nelem],                  //  nelem
-    const unsigned int const annum     [nelem][llmax+1],         //  nelem*(llmax+1)
-    const unsigned int const elements  [nelem],                  //  nelem
+    const unsigned int const ntrains  [nfrac],
+    const unsigned int const atomcount[ntrain][nelem],
+    const unsigned int const trrange  [ntrain],
+    const unsigned int const ref_elem [M],
+    const unsigned int * const alnum,
+    const unsigned int * const annum,
+    const unsigned int const elements[nelem],
     const char * const path_proj,
     const char * const path_kern,
     const char ** const paths_avec
@@ -204,7 +202,7 @@ int get_a(
 #endif
 
   double * Avec = calloc(sizeof(double)*totsize, 1);
-  ao_t * aoref = ao_fill(nelem, totsize, llmax, M, elements, ref_elem, alnum, annum);
+  ao_t * aoref = ao_fill(nelem, totsize, M, elements, ref_elem, alnum, annum);
 
 
   if(Nproc==1){
@@ -272,17 +270,16 @@ int get_a(
 int get_b(
     const unsigned int totsize,
     const unsigned int nelem  ,
-    const unsigned int llmax  ,
     const unsigned int M      ,
     const unsigned int ntrain ,
     const unsigned int nfrac,
-    const unsigned int const ntrains   [nfrac],                  //  nfrac
-    const unsigned int const atomcount [ntrain][nelem],         // ntrain*nelem
-    const unsigned int const trrange   [ntrain],                // ntrain
-    const unsigned int const ref_elem  [M],                     // M
-    const unsigned int const alnum     [nelem],                 // nelem
-    const unsigned int const annum     [nelem][llmax+1],        // nelem*(llmax+1)
-    const unsigned int const elements  [nelem],                  //  nelem
+    const unsigned int const ntrains   [nfrac],
+    const unsigned int const atomcount [ntrain][nelem],
+    const unsigned int const trrange   [ntrain],
+    const unsigned int const ref_elem  [M],
+    const unsigned int const * alnum,
+    const unsigned int const * annum,
+    const unsigned int const elements  [nelem],
     const char * const path_over,
     const char * const path_kern,
     const char ** const paths_bmat
@@ -320,21 +317,23 @@ int get_b(
 #endif
 
   double * Bmat = calloc(sizeof(double)*symsize(totsize), 1);
-  ao_t * aoref = ao_fill(nelem, totsize, llmax, M, elements, ref_elem, alnum, annum);
-  int nref[nelem];
-  for(int a=0; a<nelem; a++){
-    nref[a] = 0;
-  }
+  ao_t * aoref = ao_fill(nelem, totsize, M, elements, ref_elem, alnum, annum);
+  int * nref = calloc(nelem, sizeof(int));
   for(int i=0; i<M; i++){
     nref[ref_elem[i]]++;
   }
-
+  int llmax1 = 0;
+  for(int a=0; a<nelem; a++){
+    if(llmax1<alnum[a]){
+      llmax1 = alnum[a];
+    }
+  }
 
   if(Nproc==1){
     for(int ifrac=0; ifrac<nfrac; ifrac++){
       for(int imol=(ifrac==0?0:ntrains[ifrac-1]); imol<ntrains[ifrac]; imol++){
         printf("%4d: %4d\n", nproc, imol);
-        do_work_b(totsize, nelem, llmax, trrange[imol], atomcount[imol], nref, elements, alnum, annum, aoref, path_over, path_kern, Bmat);
+        do_work_b(totsize, nelem, llmax1, trrange[imol], atomcount[imol], nref, elements, alnum, annum, aoref, path_over, path_kern, Bmat);
       }
       vec_write(symsize(totsize), Bmat, "w", paths_bmat[ifrac]);
     }
@@ -363,7 +362,7 @@ int get_b(
           if(imol<0){
             break;
           }
-          do_work_b(totsize, nelem, llmax, trrange[imol], atomcount[imol], nref, elements, alnum, annum, aoref, path_over, path_kern, Bmat);
+          do_work_b(totsize, nelem, llmax1, trrange[imol], atomcount[imol], nref, elements, alnum, annum, aoref, path_over, path_kern, Bmat);
         }
         printf("%4d: finished work\n", nproc);
       }
@@ -393,6 +392,7 @@ int get_b(
   }
 #endif
 
+  free(nref);
   free(aoref);
   free(Bmat);
 
