@@ -1,3 +1,16 @@
+#include <stdlib.h>
+#include <stdio.h>
+
+#define MAX_PATH_LENGTH 512
+
+#define printalive printf("alive @ %s:%d\n", __FILE__, __LINE__)
+
+#define GOTOHELL { \
+  fprintf(stderr, "%s:%d %s() -- ", \
+      __FILE__, __LINE__, __FUNCTION__); \
+  abort(); }
+
+
 typedef struct {
   int im;
   int n;

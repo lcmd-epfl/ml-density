@@ -1,12 +1,8 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include "eq/equistore.hpp"
+#include <equistore.hpp>
 using namespace equistore;
 
-#define MAX_PATH_LENGTH 512
-
 extern "C"{
-#include "mylib_for_cpp.h"
+#include "get_matrices.h"
 }
 
 static inline size_t mpos(size_t i, size_t j){

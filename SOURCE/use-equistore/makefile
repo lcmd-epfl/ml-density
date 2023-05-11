@@ -1,5 +1,6 @@
 USE_MPI = 1
 USE_OMP = 1
+EQUISTORE_PATH=./equistore
 
 CC=gcc
 OMPFLAG=
@@ -17,16 +18,15 @@ W= -Warray-bounds -Wmaybe-uninitialized -Wmissing-braces -Wparentheses -Wsequenc
 
 all: get_matrices.so
 
-%.so: %.o mylib.o do_work_a.o
-	$(CC) $^ -L./eq -l:libequistore.a -lstdc++ -shared -Wl,-soname,$@ -o $@
+%.so: %.o get_matrices_work.o
+	$(CC) $^ -L$(EQUISTORE_PATH) -l:libequistore.a -lstdc++ -shared -Wl,-soname,$@ -o $@
 
-do_work_a.o: do_work_a.cpp
-	$(CC) $(DEF) $(OMPFLAG) $(W) $^ -c --std=c++11 -O2 -fPIC -o $@
+get_matrices_work.o: get_matrices_work.cpp
+	$(CC) $(DEF) $(OMPFLAG) $(W) -I$(EQUISTORE_PATH) $^ -c --std=c++11 -O2 -fPIC -o $@
 
 %.o: %.c
 	$(CC) $(DEF) $(OMPFLAG) $(W) $^ -c --std=gnu11 -O2 -fPIC -o $@
 
 clean:
-	rm -vf get_matrices.so
-	rm -vf mylib.o do_work_a.o
+	rm -vf get_matrices.so get_matrices_work.o
 
