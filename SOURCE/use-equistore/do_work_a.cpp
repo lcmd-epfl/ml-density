@@ -11,9 +11,23 @@ extern "C"{
 #include "mylib_for_cpp.h"
 }
 
+static inline size_t mpos(size_t i, size_t j){
+  /* A[i+j*(j+1)/2], i <= j, 0 <= j < N */
+  return (i)+(((j)*((j)+1))>>1);
+}
 
 equistore::NDArray<double> get_matching_block_values(TensorMap * tensor, int l, int q){
   auto matching_blocks_id = tensor->blocks_matching(Labels({"spherical_harmonics_l", "species_center"}, {{l, q}}));
+  if(matching_blocks_id.size() != 1){
+    printf("%d\n", matching_blocks_id.size());
+    abort();
+  }
+  auto block = tensor->block_by_id(matching_blocks_id[0]);
+  return block.values();
+}
+
+equistore::NDArray<double> get_matching_block_values2(TensorMap * tensor, int l1, int l2, int q1, int q2){
+  auto matching_blocks_id = tensor->blocks_matching(Labels({"spherical_harmonics_l1", "spherical_harmonics_l2", "species_center1", "species_center2"}, {{l1, l2, q1, q2}}));
   if(matching_blocks_id.size() != 1){
     abort();
   }
@@ -61,6 +75,120 @@ void do_work_a(
       }
     }
     Avec[i1] += dA;
+  }
+  return;
+}
+
+
+
+
+
+void do_work_b(
+    const unsigned int totsize,
+    const unsigned int nelem,
+    const unsigned int llmax,
+    const unsigned int nnmax,
+    const unsigned int M,
+    const unsigned int natmax,
+    const unsigned int nat,
+    const unsigned int conf,
+    const unsigned int nao,
+    const unsigned int kernsize,
+    const unsigned int * const atomicindx,//[nelem][natmax],
+    const unsigned int * const atomcount ,//[nelem],
+    const unsigned int * const atom_elem ,//[natmax],
+    const unsigned int * const ref_elem  ,//[M],
+    const unsigned int * const alnum     ,//[nelem],
+    const unsigned int * const annum     ,//[nelem][llmax+1],
+    const ao_t         * const aoref     ,//[totsize],
+    const char * const path_over,
+    const char * const path_kern,
+    double * Bmat){
+
+  char file_over[MAX_PATH_LENGTH], file_kern[MAX_PATH_LENGTH];
+  sprintf(file_over, "%s%d.npz", path_over, conf);
+  sprintf(file_kern, "%s%d.dat.npz", path_kern, conf);
+  auto ktensor = TensorMap::load(file_kern);
+  auto otensor = TensorMap::load(file_over);
+
+  // TODO TODO TODO TODO
+  int elements[] = {1,6,7,8};
+  equistore::NDArray<double> kvalues[100];
+  equistore::NDArray<double> oovalues[1000];
+  for(int a1=0; a1<nelem; a1++){
+    if(atomcount[a1]){
+      for(int l1=0; l1<alnum[a1]; l1++){
+        kvalues[l1*nelem+a1] = get_matching_block_values(&ktensor, l1, elements[a1]);
+        for(int a2=0; a2<nelem; a2++){
+          if(atomcount[a2]){
+            for(int l2=0; l2<alnum[a2]; l2++){
+              oovalues[l1*(llmax+1)*nelem*nelem + l2*nelem*nelem + a1*nelem + a2] = get_matching_block_values2(&otensor, l1, l2, elements[a1], elements[a2]);
+            }
+          }
+        }
+      }
+    }
+  }
+  printf("%p\n", kvalues[0].data());
+  printf("%lf\n", kvalues[0].data()[0]);
+  printf("%lf\n", kvalues[0](0,0,0,0));
+
+
+  int nref[4] = {};
+  for(int i=0; i<M; i++){
+    nref[ref_elem[i]] ++;
+  }
+  printf("%d %d %d %d\n", nref[0], nref[1], nref[2], nref[3]);
+
+
+
+
+#pragma omp parallel shared(Bmat)
+#pragma omp for schedule(dynamic)
+  for(int i1=0; i1<totsize; i1++){
+    int iiref1 = aoref[i1].iiref;
+    int im1    = aoref[i1].im;
+    int n1     = aoref[i1].n;
+    int l1     = aoref[i1].l;
+    int a1     = aoref[i1].a;
+    int q1     = aoref[i1].q;
+    int msize1 = 2*l1+1;
+    if(!atomcount[a1]){
+      continue;
+    }
+
+    for(int i2=i1; i2<totsize; i2++){
+      int iiref2 = aoref[i2].iiref;
+      int im2    = aoref[i2].im;
+      int n2     = aoref[i2].n;
+      int l2     = aoref[i2].l;
+      int a2     = aoref[i2].a;
+      int q2     = aoref[i2].q;
+      int msize2 = 2*l2+1;
+      if(!atomcount[a2]){
+        continue;
+      }
+
+#define KBLOCK(L,A)                     ((L)*nelem+(A))
+#define KVALUE(L,A,ICEL,IMM,IM,IIREF)   ICEL*(2*(L)+1)*(2*(L)+1)*nref[A] + IMM*(2*(L)+1)*nref[A] + IM*nref[A] + IIREF
+
+      double dB = 0.0;
+      for(int icel1=0; icel1<atomcount[a1]; icel1++){
+        for(int imm1=0; imm1<msize1; imm1++){
+          double Btemp = 0.0;
+          for(int icel2=0; icel2<atomcount[a2]; icel2++){
+            for(int imm2=0; imm2<msize2; imm2++){
+              double o = oovalues[l1*(llmax+1)*nelem*nelem + l2*nelem*nelem + a1*nelem + a2](icel1 * atomcount[a2] + icel2, imm1, imm2, n1*annum[a2*(llmax+1)+l2]+n2);
+              double k2 = kvalues[KBLOCK(l2, a2)].data()[KVALUE(l2, a2, icel2, imm2, im2, iiref2)];
+              Btemp += o * k2;
+            }
+          }
+          double k1 = kvalues[KBLOCK(l1, a1 )].data()[KVALUE(l1, a1, icel1, imm1, im1, iiref1)];
+          dB += Btemp * k1;
+        }
+      }
+      Bmat[mpos(i1,i2)] += dB;
+    }
   }
   return;
 }

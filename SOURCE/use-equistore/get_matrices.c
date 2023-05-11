@@ -116,105 +116,10 @@ static void vec_write(size_t n, double * v, const char * mode, const char * fnam
   return;
 }
 
-static double * npy_read(int n, const char * fname){
-
-  // read simple 1d / symmetric 2d arrays of doubles only
-  static const size_t header_size = 128;
-
-  double * v = calloc(n, sizeof(double));
-  FILE   * f = fopen(fname, "r");
-  if(!f){
-    fprintf(stderr, "cannot open file %s", fname);
-    GOTOHELL;
-  }
-  if( fseek(f, header_size, SEEK_SET) ||
-      fread(v, sizeof(double), n, f)!=n){
-    fprintf(stderr, "cannot read file %s line %d", fname);
-    GOTOHELL;
-  }
-  fclose(f);
-  return v;
-}
 
 
 
 
-static void do_work_b(
-    const unsigned int totsize,
-    const unsigned int nelem,
-    const unsigned int llmax,
-    const unsigned int nnmax,
-    const unsigned int M,
-    const unsigned int natmax,
-    const unsigned int nat,
-    const unsigned int conf,
-    const unsigned int nao,
-    const unsigned int kernsize,
-    const unsigned int const atomicindx[nelem][natmax],
-    const unsigned int const atomcount [nelem],
-    const unsigned int const atom_elem [natmax],
-    const unsigned int const ref_elem  [M],
-    const unsigned int const alnum     [nelem],
-    const unsigned int const annum     [nelem][llmax+1],
-    const ao_t         const aoref     [totsize],
-    const char * const path_over,
-    const char * const path_kern,
-    double * Bmat){
-
-  char file_over[512], file_kern[512];
-  sprintf(file_over, "%s%d.npy", path_over, conf);
-  sprintf(file_kern, "%s%d.dat", path_kern, conf);
-
-  double * overlaps = npy_read(nao*nao, file_over);
-  double * kernels  = vec_readtxt(kernsize, file_kern);
-
-  int * sparseindices = sparseindices_fill(nat, llmax, nnmax, alnum, annum, atom_elem);
-  int * kernsparseindices = kernsparseindices_fill(nat, llmax , M, atomcount, ref_elem , alnum);
-
-#pragma omp parallel shared(Bmat)
-#pragma omp for schedule(dynamic)
-  for(int i1=0; i1<totsize; i1++){
-    int iref1 = aoref[i1].iref;
-    int im1   = aoref[i1].im;
-    int n1    = aoref[i1].n;
-    int l1    = aoref[i1].l;
-    int a1    = aoref[i1].a;
-    int msize1 = 2*l1+1;
-
-    for(int i2=i1; i2<totsize; i2++){
-      int iref2 = aoref[i2].iref;
-      int im2   = aoref[i2].im;
-      int n2    = aoref[i2].n;
-      int l2    = aoref[i2].l;
-      int a2    = aoref[i2].a;
-      int msize2 = 2*l2+1;
-      double dB = 0.0;
-      for(int icel1=0; icel1<atomcount[a1]; icel1++){
-        int iat = atomicindx[a1][icel1];
-        int sk1 = kernsparseindices[KSPARSEIND(iref1, l1, icel1)];
-        int sp1 = sparseindices    [SPARSEIND(l1,n1,iat)];
-        for(int imm1=0; imm1<msize1; imm1++){
-          double Btemp = 0.0;
-          for(int icel2=0; icel2<atomcount[a2]; icel2++){
-            int jat = atomicindx[a2][icel2];
-            int sk2 = kernsparseindices[KSPARSEIND(iref2, l2, icel2)];
-            int sp2 = sparseindices    [SPARSEIND(l2,n2,jat)];
-            for(int imm2=0; imm2<msize2; imm2++){
-              Btemp += overlaps[(sp2+imm2)*nao+(sp1+imm1)] * kernels[sk2 + msize2*im2 + imm2];
-            }
-          }
-          dB += Btemp * kernels[sk1 + msize1*im1 + imm1];
-        }
-      }
-      Bmat[mpos(i1,i2)] += dB;
-    }
-  }
-  free(kernsparseindices);
-  free(sparseindices);
-  free(overlaps);
-  free(kernels);
-  return;
-}
 
 int get_a(
     const unsigned int totsize,

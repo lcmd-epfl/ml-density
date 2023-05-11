@@ -37,25 +37,5 @@ ao_t * ao_fill(
 
 
 
-double * vec_readtxt(int n, const char * fname);
 
 
-int * kernsparseindices_fill(
-    const int nat,
-    const int llmax ,
-    const int M,
-    const unsigned int const atomcount[],  // nelem
-    const unsigned int const ref_elem[M],
-    const unsigned int const alnum[]       // nelem
-    );
-
-
-
-int * sparseindices_fill(
-    const int nat,
-    const int llmax,
-    const int nnmax,
-    const unsigned int const alnum[],           //  nelem
-    const unsigned int const annum[][llmax+1],  //  nelem*(llmax+1)
-    const unsigned int const atom_elem[]        //  natmax
-    );

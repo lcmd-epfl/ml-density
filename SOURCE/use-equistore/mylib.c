@@ -63,9 +63,9 @@ int * kernsparseindices_fill(
     const int nat,
     const int llmax ,
     const int M,
-    const unsigned int const atomcount[],  // nelem
-    const unsigned int const ref_elem[M],
-    const unsigned int const alnum[]       // nelem
+    const unsigned int * const atomcount,  // nelem
+    const unsigned int * const ref_elem,   // M
+    const unsigned int * const alnum       // nelem
     ){
 
   int * kernsparseindices = calloc(M*(llmax+1)*nat, sizeof(int));
@@ -88,9 +88,9 @@ int * sparseindices_fill(
     const int nat,
     const int llmax,
     const int nnmax,
-    const unsigned int const alnum[],           //  nelem
-    const unsigned int const annum[][llmax+1],  //  nelem*(llmax+1)
-    const unsigned int const atom_elem[]        //  natmax
+    const unsigned int * const alnum,           //  nelem
+    const unsigned int * const annum,  //  nelem*(llmax+1)
+    const unsigned int * const atom_elem        //  natmax
     ){
 
   int * sparseindices = calloc((llmax+1) * nnmax * nat, sizeof(int));
@@ -100,7 +100,7 @@ int * sparseindices_fill(
     int al = alnum[a];
     for(int l=0; l<al; l++){
       int msize = 2*l+1;
-      int anc   = annum[a][l];
+      int anc   = annum[a*(llmax+1)+l];
       for(int n=0; n<anc; n++){
         sparseindices[ SPARSEIND(l,n,iat)] = i;
         i += msize;
@@ -108,4 +108,25 @@ int * sparseindices_fill(
     }
   }
   return sparseindices;
+}
+
+
+double * npy_read(int n, const char * fname){
+
+  // read simple 1d / symmetric 2d arrays of doubles only
+  static const size_t header_size = 128;
+
+  double * v = calloc(n, sizeof(double));
+  FILE   * f = fopen(fname, "r");
+  if(!f){
+    fprintf(stderr, "cannot open file %s", fname);
+    GOTOHELL;
+  }
+  if( fseek(f, header_size, SEEK_SET) ||
+      fread(v, sizeof(double), n, f)!=n){
+    fprintf(stderr, "cannot read file %s line %d", fname);
+    GOTOHELL;
+  }
+  fclose(f);
+  return v;
 }
