@@ -261,6 +261,10 @@ int get_b(
     const char ** const paths_bmat
     ){
   int elements[] = {1,6,7,8}; // TODO
+  int nref[4] = {};
+  for(int i=0; i<M; i++){
+    nref[ref_elem[i]] ++;
+  } //TODO
 
 #ifdef USE_MPI
   int argc = 1;
@@ -304,17 +308,10 @@ int get_b(
             totsize,
             nelem  ,
             llmax  ,
-            nnmax  ,
-            M      ,
-            natmax ,
-            natoms    [imol],
             trrange   [imol],
-            totalsizes[imol],
-            kernsizes [imol],
-            atomicindx[imol],
             atomcount [imol],
-            atom_elem [imol],
-            ref_elem  ,
+            nref,
+            elements,
             alnum     ,
             annum     ,
             aoref     ,
@@ -353,17 +350,10 @@ int get_b(
               totsize,
               nelem  ,
               llmax  ,
-              nnmax  ,
-              M      ,
-              natmax ,
-              natoms    [imol],
               trrange   [imol],
-              totalsizes[imol],
-              kernsizes [imol],
-              atomicindx[imol],
               atomcount [imol],
-              atom_elem [imol],
-              ref_elem  ,
+              nref,
+            elements,
               alnum     ,
               annum     ,
               aoref     ,
