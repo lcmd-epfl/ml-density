@@ -37,4 +37,3 @@ def get_a(lmax, nmax,
             do_work_a(trrange[imol], ref_elem, path_proj, path_kern, A1)
         Avec = tmap2vector(ref_elem, lmax, nmax, A1)
         np.savetxt(paths_avec[ifrac], Avec)
-        equistore.save(paths_avec[ifrac]+'.npz', A1)

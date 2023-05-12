@@ -33,14 +33,12 @@ def main():
             good_over = over[np.ix_(idx,idx)]
             over_tmap = matrix2tmap(atoms, lmax, nmax, good_over)
             equistore.save(f'{p.goodoverfilebase}{imol}.npz', over_tmap)
-            np.save(f'{p.goodoverfilebase}{imol}.npy', good_over)
         else:
             good_over = tmap2matrix(atoms, lmax, nmax, equistore.load(f'{p.goodoverfilebase}{imol}.npz'))
 
         proj = good_over @ good_coef
         proj_tmap = vector2tmap(atoms, lmax, nmax, proj)
         equistore.save(f'{p.baselinedwbase}{imol}.npz', proj_tmap)
-        np.savetxt(f'{p.baselinedwbase}{imol}.dat', proj)
     equistore.save(p.avfile, averages2tmap(av_coefs))
 
 
