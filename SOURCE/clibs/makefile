@@ -1,6 +1,10 @@
 USE_MPI = 1
 USE_OMP = 1
 
+EQUISTORE_PATH=$(shell python -c 'import equistore; print(equistore.__path__[0])')
+EQUISTORE_INCL_PATH=$(EQUISTORE_PATH)/core/include/
+EQUISTORE_LINK_PATH=$(EQUISTORE_PATH)/core/lib/
+
 CC=gcc
 OMPFLAG=
 DEF=
@@ -15,13 +19,24 @@ endif
 W= -Warray-bounds -Wmaybe-uninitialized -Wmissing-braces -Wparentheses -Wsequence-point -Wtype-limits -Wundef \
    -Wuninitialized -Wunused -Wmisleading-indentation -Wempty-body -Wunused-but-set-variable -Wunused-parameter -Winline
 
-all: get_matrices.so
+.IGNORE:
+all: get_matrices.so warn
 
-%.so: %.o mylib.o
-	$(CC) $^ -shared -Wl,-soname,$@ -o $@
+%.so: %.o get_matrices_work.o
+	$(CC) $^ -L$(EQUISTORE_LINK_PATH) -l:libequistore.so -lstdc++ -shared -Wl,-rpath=$(EQUISTORE_LINK_PATH),-soname,$@ -o $@
+
+get_matrices_work.o: get_matrices_work.cpp
+	$(CC) $(DEF) $(OMPFLAG) $(W) -I$(EQUISTORE_INCL_PATH) $^ -c --std=c++11 -O2 -fPIC -o $@
+
 %.o: %.c
 	$(CC) $(DEF) $(OMPFLAG) $(W) $^ -c --std=gnu11 -O2 -fPIC -o $@
 
 clean:
-	rm -vf get_matrices.so
+	rm -vf get_matrices.so get_matrices_work.o
 
+warn:
+	@echo
+	@echo -e "\e[1;31mATTENTION!\e[0m" Build the library in the same environment you are going to use it in.
+	@echo Current equistore path:
+	@echo $(EQUISTORE_PATH)
+	@echo
