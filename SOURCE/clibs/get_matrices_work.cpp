@@ -50,7 +50,7 @@ void do_work_a(
 
   char file_proj[MAX_PATH_LENGTH], file_kern[MAX_PATH_LENGTH];
   sprintf(file_proj, "%s%d.npz", path_proj, conf);
-  sprintf(file_kern, "%s%d.dat.npz", path_kern, conf);
+  sprintf(file_kern, "%s%d.npz", path_kern, conf);
 
   auto ktensor = TensorMap::load(file_kern);
   auto ptensor = TensorMap::load(file_proj);
@@ -100,7 +100,7 @@ void do_work_b(
 
   char file_over[MAX_PATH_LENGTH], file_kern[MAX_PATH_LENGTH];
   sprintf(file_over, "%s%d.npz", path_over, conf);
-  sprintf(file_kern, "%s%d.dat.npz", path_kern, conf);
+  sprintf(file_kern, "%s%d.npz", path_kern, conf);
   auto ktensor = TensorMap::load(file_kern);
   auto otensor = TensorMap::load(file_over);
 

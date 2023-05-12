@@ -19,7 +19,7 @@ def main():
         #if os.path.exists(f'{p.kernelconfbase}{imol}.dat'):
         #    return
         kernel_for_mol(lmax, ref_elements, atomic_numbers[imol],
-                       power_ref, f'{p.splitpsfilebase}_{imol}.npz', f'{p.kernelconfbase}{imol}.dat')
+                       power_ref, f'{p.splitpsfilebase}_{imol}.npz', f'{p.kernelconfbase}{imol}.npz')
 
     atomic_numbers = moldata_read(p.xyzfilename)
     power_ref = equistore.load(f'{p.powerrefbase}_{o.M}.npz');

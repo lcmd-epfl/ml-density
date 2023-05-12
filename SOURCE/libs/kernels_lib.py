@@ -41,7 +41,7 @@ def kernel_nm(atom_charges, soap, soap_ref, imol=0):
 
 
 def kernel_nm_flatten(kernel_size, kernel_sparse_indices,
-                      ref_elements, atomic_numbers, k_NM, imol=0):
+                      ref_elements, atomic_numbers, k_NM):
 
     k_NM_flat = np.zeros(kernel_size)
     for (l, q) in k_NM.keys:
@@ -55,15 +55,14 @@ def kernel_nm_flatten(kernel_size, kernel_sparse_indices,
     return k_NM_flat
 
 
-def kernel_for_mol(lmax, ref_elements, atomic_numbers, power_ref, power_file, kernel_file):
-
+def kernel_for_mol(lmax, ref_elements, atomic_numbers, power_ref, power_file, kernel_file, save_txt=False):
     power = equistore.load(power_file)
     k_NM = kernel_nm(atomic_numbers, power, power_ref)
-    equistore.save(f'{kernel_file}.npz', k_NM)
-
-    kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(lmax, ref_elements, atomic_numbers)
-    k_NM_flat = kernel_nm_flatten(kernel_size, kernel_sparse_indices, ref_elements, atomic_numbers, k_NM)
-    np.savetxt(kernel_file, k_NM_flat)
+    equistore.save(f'{kernel_file}', k_NM)
+    if save_txt:
+        kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(lmax, ref_elements, atomic_numbers)
+        k_NM_flat = kernel_nm_flatten(kernel_size, kernel_sparse_indices, ref_elements, atomic_numbers, k_NM)
+        np.savetxt(f'{kernel_file}.dat', k_NM_flat)
 
 
 def kernel_mm(lmax, power_ref):
