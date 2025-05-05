@@ -1,5 +1,5 @@
-#include <equistore.hpp>
-using namespace equistore;
+#include <metatensor.hpp>
+using namespace metatensor;
 
 extern "C"{
 #include "get_matrices.h"
@@ -19,8 +19,8 @@ static inline size_t mpos(size_t i, size_t j){
 #define KVAL(L,A,ICEL,IMM,IM,IIREF)                     kvalues[KBLOCK(L, A)][KVALUE(L, A, ICEL, IMM, IM, IIREF)]
 #define OVAL(L1,L2,A1,A2,ICEL1,ICEL2,IMM1,IMM2,N1,N2)   ovalues[OBLOCK(L1,L2,A1,A2)][OVALUE(L1,L2,A1,A2,ICEL1,ICEL2,IMM1,IMM2,N1,N2)]
 
-equistore::NDArray<double> get_matching_block_values(TensorMap * tensor, int l, int q){
-  auto matching_blocks_id = tensor->blocks_matching(Labels({"spherical_harmonics_l", "species_center"}, {{l, q}}));
+metatensor::NDArray<double> get_matching_block_values(TensorMap * tensor, int l, int q){
+  auto matching_blocks_id = tensor->blocks_matching(Labels({"o3_lambda", "center_type"}, {{l, q}}));
   if(matching_blocks_id.size() != 1){
     printf("%d\n", matching_blocks_id.size());
     abort();
@@ -29,8 +29,8 @@ equistore::NDArray<double> get_matching_block_values(TensorMap * tensor, int l, 
   return block.values();
 }
 
-equistore::NDArray<double> get_matching_block_values2(TensorMap * tensor, int l1, int l2, int q1, int q2){
-  auto matching_blocks_id = tensor->blocks_matching(Labels({"spherical_harmonics_l1", "spherical_harmonics_l2", "species_center1", "species_center2"}, {{l1, l2, q1, q2}}));
+metatensor::NDArray<double> get_matching_block_values2(TensorMap * tensor, int l1, int l2, int q1, int q2){
+  auto matching_blocks_id = tensor->blocks_matching(Labels({"o3_lambda1", "o3_lambda2", "center_type1", "center_type2"}, {{l1, l2, q1, q2}}));
   if(matching_blocks_id.size() != 1){
     abort();
   }
@@ -49,8 +49,8 @@ void do_work_a(
     double * Avec){
 
   char file_proj[MAX_PATH_LENGTH], file_kern[MAX_PATH_LENGTH];
-  sprintf(file_proj, "%s%d.npz", path_proj, conf);
-  sprintf(file_kern, "%s%d.npz", path_kern, conf);
+  sprintf(file_proj, "%s%d.mts", path_proj, conf);
+  sprintf(file_kern, "%s%d.mts", path_kern, conf);
 
   auto ktensor = TensorMap::load(file_kern);
   auto ptensor = TensorMap::load(file_proj);
@@ -99,8 +99,8 @@ void do_work_b(
     double * Bmat){
 
   char file_over[MAX_PATH_LENGTH], file_kern[MAX_PATH_LENGTH];
-  sprintf(file_over, "%s%d.npz", path_over, conf);
-  sprintf(file_kern, "%s%d.npz", path_kern, conf);
+  sprintf(file_over, "%s%d.mts", path_over, conf);
+  sprintf(file_kern, "%s%d.mts", path_kern, conf);
   auto ktensor = TensorMap::load(file_kern);
   auto otensor = TensorMap::load(file_over);
 
@@ -109,11 +109,13 @@ void do_work_b(
   for(int a1=0; a1<nelem; a1++){
     if(atomcount[a1]){
       for(int l1=0; l1<alnum[a1]; l1++){
-        kvalues[KBLOCK(l1,a1)] = get_matching_block_values(&ktensor, l1, elements[a1]).data();
+        auto kblock_values = get_matching_block_values(&ktensor, l1, elements[a1]);
+        kvalues[KBLOCK(l1,a1)] = kblock_values.data();
         for(int a2=0; a2<nelem; a2++){
           if(atomcount[a2]){
             for(int l2=0; l2<alnum[a2]; l2++){
-              ovalues[OBLOCK(l1, l2, a1, a2)] = get_matching_block_values2(&otensor, l1, l2, elements[a1], elements[a2]).data();
+              auto oblock_values = get_matching_block_values2(&otensor, l1, l2, elements[a1], elements[a2]);
+              ovalues[OBLOCK(l1, l2, a1, a2)] = oblock_values.data();
             }
           }
         }

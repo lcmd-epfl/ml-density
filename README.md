@@ -3,6 +3,7 @@
 ```
 git clone https://github.com/lcmd-epfl/ml-density/
 cd ml-density/
+git checkout use-rascaline-ps
 ```
 
 ## environment
@@ -23,8 +24,9 @@ pip install git+https://github.com/metatensor/featomic.git@4968429ece4f5fc793504
 
 ## build
 
+If planning to use the C library:
 ```
-make -C SOURCE/clibs
+make -C src/clibs
 ```
 
 ## usage
@@ -37,3 +39,4 @@ in progress... see `sidechains_examples/` and `sbatch_examples`
 * add tests
 * replace `print_progress` by `tqdm`
 * ? add `rho-predictor` as a dependency 
+* fix OMP
