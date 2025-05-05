@@ -1,0 +1,45 @@
+[options]
+M = 32
+seed = 1
+train_size = 8
+trainfrac = 1.0
+regular = 1e-6
+jitter = 1e-8
+charges= 1
+soap_sigma = 0.3
+soap_rcut  = 4.0
+soap_ncut  = 8
+soap_lcut  = 6
+reorder_ao = 1
+copy_metric = 1
+ps_min_norm = 1e-20
+ps_normalize = true
+
+[paths]
+xyzfile          = 16.xyz
+chargesfile      = charges.dat
+basisfile        = cc-pvqz-jkfit.1.d2k
+over_base        = ALL_J/mol_
+coeff_base       = ALL_C/mol_
+ps_split_base    = PS/PS
+ps_ref_base      = INNER/PS
+refs_sel_base    = INNER/SELECTIONS/refs_selection_
+qrefs_sel_base   = INNER/SELECTIONS/refs_selection_q_
+trainingselfile  = INNER/SELECTIONS/training_selection.txt
+kmm_base         = INNER/KMM
+kernel_conf_base = INNER/KERNELS/kernel_conf
+goodover_base    = INNER/metric/mol_
+bmat_base        = INNER/Bmat
+goodcoef_base    = INNER/coeff/mol_
+averages_file    = INNER/AVERAGES.npz
+baselined_w_base = INNER/BASELINED_PROJECTIONS/projections_conf
+avec_base        = INNER/Avec
+weights_base     = INNER/weights
+predict_base     = INNER/prediction
+output_base      = INNER/predicted/rho_
+
+ex_xyzfile      = extra/1.xyz
+ex_ps_base      = extra/PS
+ex_kernel_base  = extra/kernel
+ex_predict_base = extra/prediction
+ex_output_base  = extra/rho_
