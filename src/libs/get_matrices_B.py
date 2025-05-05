@@ -1,5 +1,5 @@
 import numpy as np
-import equistore
+import metatensor
 from libs.tmap import sparseindices_fill
 from libs.get_matrices_A import print_batches
 from libs.multi import print_nodes, scatter_jobs
@@ -30,16 +30,16 @@ def mpos(i, j):
 
 def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
 
-    over = equistore.load(f'{path_over}{conf}.npz')
-    k_NM = equistore.load(f'{path_kern}{conf}.npz')
+    over = metatensor.load(f'{path_over}{conf}.mts')
+    k_NM = metatensor.load(f'{path_kern}{conf}.mts')
 
-    for (l1, l2, q1, q2), oblock in over:
+    for (l1, l2, q1, q2), oblock in over.items():
         msize1 = 2*l1+1
         msize2 = 2*l2+1
         nsize1 = nmax[(q1,l1)]
         nsize2 = nmax[(q2,l2)]
-        kblock1 = k_NM.block(spherical_harmonics_l=l1, species_center=q1)
-        kblock2 = k_NM.block(spherical_harmonics_l=l2, species_center=q2)
+        kblock1 = k_NM.block(o3_lambda=l1, center_type=q1)
+        kblock2 = k_NM.block(o3_lambda=l2, center_type=q2)
         oval = oblock.values.reshape(len(kblock1.samples), len(kblock2.samples), msize1, msize2, nsize1, nsize2)
 
         for iiref1, iref1 in enumerate(np.where(ref_elem==q1)[0]):

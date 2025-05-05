@@ -5,7 +5,7 @@ import gc
 import numpy as np
 import scipy.linalg as spl
 from numba import jit
-import equistore
+import metatensor
 from libs.basis import basis_read
 from libs.config import read_config
 from libs.functions import nao_for_mol
@@ -19,7 +19,7 @@ def main():
     ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
     totsize = nao_for_mol(ref_elements, lmax, nmax)
 
-    k_MM = equistore.load(f'{p.kmmbase}{o.M}.npz')
+    k_MM = metatensor.load(f'{p.kmmbase}{o.M}.mts')
     mat  = np.ndarray((totsize,totsize))
     idx = sparseindices_fill(lmax, nmax, ref_elements)
 
@@ -56,7 +56,7 @@ def fill_matrix(mat, k_MM, bmatfile, idx, nmax, jitter, reg):
     unravel_tril(mat, data, jitter)
     del data
     gc.collect()
-    for (l, q), kblock in k_MM:
+    for (l, q), kblock in k_MM.items():
         msize = 2*l+1
         for iiref12, (iref1, iref2) in enumerate(kblock.samples):
             if iref1<iref2:

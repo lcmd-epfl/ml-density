@@ -1,5 +1,5 @@
 import numpy as np
-import equistore
+import metatensor
 from libs.tmap import kernels2tmap, kmm2tmap
 
 
@@ -26,10 +26,10 @@ def kernel_nm(atom_charges, soap, soap_ref, imol=0):
     for iat, q in enumerate(atom_charges):
         for (l, q_) in keys:
             if q_!=q: continue
-            block = soap.block(spherical_harmonics_l=l, species_center=q)
+            block = soap.block(o3_lambda=l, center_type=q)
             isamp = block.samples.position((imol, iat))
             vals  = block.values[isamp,:,:]
-            block_ref = soap_ref.block(spherical_harmonics_l=l, species_center=q)
+            block_ref = soap_ref.block(o3_lambda=l, center_type=q)
             vals_ref  = block_ref.values
             pre_kernel = np.einsum('rmx,Mx->rMm', vals_ref, vals)
             # Normalize with zeta=2
@@ -47,7 +47,7 @@ def kernel_nm_flatten(kernel_size, kernel_sparse_indices,
     for (l, q) in k_NM.keys:
         nq = np.count_nonzero(atomic_numbers==q)
         msize = 2*l+1
-        kblock = k_NM.block(spherical_harmonics_l=l, species_center=q)
+        kblock = k_NM.block(o3_lambda=l, center_type=q)
         for iiref, iref in enumerate(np.where(ref_elements==q)[0]):
             for iatq in range(nq):
                 ik = kernel_sparse_indices[iref,iatq,l]
@@ -56,9 +56,9 @@ def kernel_nm_flatten(kernel_size, kernel_sparse_indices,
 
 
 def kernel_for_mol(lmax, ref_elements, atomic_numbers, power_ref, power_file, kernel_file, save_txt=False):
-    power = equistore.load(power_file)
+    power = metatensor.load(power_file)
     k_NM = kernel_nm(atomic_numbers, power, power_ref)
-    equistore.save(f'{kernel_file}', k_NM)
+    metatensor.save(f'{kernel_file}', k_NM)
     if save_txt:
         kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(lmax, ref_elements, atomic_numbers)
         k_NM_flat = kernel_nm_flatten(kernel_size, kernel_sparse_indices, ref_elements, atomic_numbers, k_NM)
@@ -69,7 +69,7 @@ def kernel_mm(lmax, power_ref):
 
     samples = {}
     k_MM = {}
-    for (l, q), rblock in power_ref:
+    for (l, q), rblock in power_ref.items():
         msize = 2*l+1
         nsamp = len(rblock.samples)
         if not q in samples:

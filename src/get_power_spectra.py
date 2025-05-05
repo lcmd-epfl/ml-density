@@ -17,7 +17,7 @@ def main():
     o, p = read_config(sys.argv)
 
     def do_mol(imol):
-        #if os.path.exists(f'{p.splitpsfilebase}_{imol}.npz'):
+        #if os.path.exists(f'{p.splitpsfilebase}_{imol}.mts'):
         #    return
         #print(imol)
         soap = generate_lambda_soap_wrapper(mols[imol], rascal_hypers, neighbor_species=elements,

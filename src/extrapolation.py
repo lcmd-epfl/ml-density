@@ -2,7 +2,7 @@
 
 import sys
 import numpy as np
-import equistore
+import metatensor
 from libs.config import read_config
 from libs.functions import moldata_read, get_elements_list
 from libs.basis import basis_read
@@ -14,7 +14,7 @@ def main():
 
     atomic_numbers_ex = moldata_read(p.xyzexfilename)
     lmax, nmax = basis_read(p.basisfilename)
-    averages = equistore.load(p.avfile)
+    averages = metatensor.load(p.avfile)
     ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
     weights = np.load(f'{p.weightsfilebase}_M{o.M}_trainfrac{o.fracs[-1]}_reg{o.reg}_jit{o.jit}.npy')
 

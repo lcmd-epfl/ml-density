@@ -2,7 +2,7 @@
 
 import sys
 import numpy as np
-import equistore
+import metatensor
 from libs.config import read_config
 from libs.basis import basis_read_full
 from libs.functions import moldata_read, number_of_electrons_ao, correct_number_of_electrons, get_test_set, get_training_set
@@ -13,7 +13,7 @@ def main():
     o, p = read_config(sys.argv)
     training = 'training' in sys.argv[1:]
 
-    averages = equistore.load(p.avfile)
+    averages = metatensor.load(p.avfile)
     atomic_numbers = moldata_read(p.xyzfilename)
     basis, lmax, nmax = basis_read_full(p.basisfilename)
     nmol = len(atomic_numbers)
@@ -27,11 +27,11 @@ def main():
         print(f'fraction = {frac}')
         if not training:
             ntest, test_configs = get_test_set(p.trainfilename, nmol)
-            predictfile = f'{p.predictfilebase}_test_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npz'
+            predictfile = f'{p.predictfilebase}_test_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.mts'
         else:
             ntest, test_configs = get_training_set(p.trainfilename, frac)
-            predictfile = f'{p.predictfilebase}_training_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npz'
-        predictions = split(equistore.load(predictfile))
+            predictfile = f'{p.predictfilebase}_training_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.mts'
+        predictions = split(metatensor.load(predictfile))
 
         dn_av = 0.0
         total_error_N      = 0.0
@@ -49,7 +49,7 @@ def main():
             elif o.use_charges==2:
                 N  = molcharges[imol]
 
-            S = tmap2matrix(atoms, lmax, nmax, equistore.load(f'{p.goodoverfilebase}{imol}.npz'))
+            S = tmap2matrix(atoms, lmax, nmax, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'))
             qvec = number_of_electrons_ao(basis, atoms)
             c0   = np.load(f'{p.goodcoeffilebase}{imol}.npy')
             c_bl = tmap2vector(atoms, lmax, nmax, predictions[itest])

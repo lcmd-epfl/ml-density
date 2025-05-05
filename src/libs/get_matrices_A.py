@@ -1,5 +1,5 @@
 import numpy as np
-import equistore
+import metatensor
 from libs.tmap import vector2tmap, tmap2vector
 
 
@@ -10,12 +10,12 @@ def print_batches(nfrac, ntrains, paths):
 
 
 def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
-    proj = equistore.load(f'{path_proj}{conf}.npz')
-    k_NM = equistore.load(f'{path_kern}{conf}.npz')
-    for (l1, q1), pblock in proj:
+    proj = metatensor.load(f'{path_proj}{conf}.mts')
+    k_NM = metatensor.load(f'{path_kern}{conf}.mts')
+    for (l1, q1), pblock in proj.items():
         msize1 = 2*l1+1
-        kblock = k_NM.block(spherical_harmonics_l=l1, species_center=q1)
-        ablock = Avec.block(spherical_harmonics_l=l1, species_center=q1)
+        kblock = k_NM.block(o3_lambda=l1, center_type=q1)
+        ablock = Avec.block(o3_lambda=l1, center_type=q1)
         for iiref1 in range(np.count_nonzero(ref_elem==q1)):
             dA = np.einsum('kmM,kmn->Mn', kblock.values[:,:,:,iiref1], pblock.values)
             ablock.values[iiref1,:,:] += dA

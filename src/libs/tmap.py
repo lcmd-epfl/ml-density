@@ -4,14 +4,14 @@ import numpy as np
 import metatensor
 
 vector_label_names = SimpleNamespace(
-    tm = ['spherical_harmonics_l', 'species_center'],
+    tm = ['o3_lambda', 'center_type'],
     block_prop = ['radial_channel'],
     block_samp = ['atom_id'],
     block_comp = ['spherical_harmonics_m']
     )
 
 matrix_label_names = SimpleNamespace(
-    tm = ['spherical_harmonics_l1', 'spherical_harmonics_l2', 'species_center1', 'species_center2'],
+    tm = ['o3_lambda1', 'o3_lambda2', 'center_type1', 'center_type2'],
     block_prop = ['radial_channel1', 'radial_channel2'],
     block_samp = ['atom_id1', 'atom_id2'],
     block_comp = ['spherical_harmonics_m1', 'spherical_harmonics_m2']
@@ -114,7 +114,7 @@ def tmap2vector(atom_charges, lmax, nmax, tensor):
     for iat, q in enumerate(atom_charges):
         for l in range(lmax[q]+1):
             for n in range(nmax[(q,l)]):
-                block = tensor.block(spherical_harmonics_l=l, species_center=q)
+                block = tensor.block(o3_lambda=l, center_type=q)
                 id_samp = block.samples.position((iat,))
                 id_prop = block.properties.position((n,))
                 for m in range(-l,l+1):
@@ -214,7 +214,7 @@ def tmap2matrix(atom_charges, lmax, nmax, tensor):
     nao = int(round(np.sqrt(_get_tsize(tensor))))
     dm = np.zeros((nao, nao))
     idx = sparseindices_fill(lmax, nmax, atom_charges)
-    for (l1, l2, q1, q2), block in tensor:
+    for (l1, l2, q1, q2), block in tensor.items():
         msize1 = 2*l1+1
         msize2 = 2*l2+1
         nsize1 = nmax[(q1,l1)]
@@ -247,7 +247,7 @@ def merge_ref_ps(lmax, elements, atomic_numbers, idx, splitpsfilebase):
 
         for l in range(lmax[q]+1):
             key = (l, q)
-            block = tensor.block(spherical_harmonics_l=l, species_center=q)
+            block = tensor.block(o3_lambda=l, center_type=q)
             isamp = block.samples.position((0, atom_id))
             vals  = np.copy(block.values[isamp,:,:])
             blocks[key].append(vals)
@@ -277,7 +277,8 @@ def join(tensors):
 
     if not all(tensor.keys.names==tensors[0].keys.names for tensor in tensors):
         raise Exception(f'Cannot merge tensors with different label names')
-    tm_label_vals = sorted(list(set().union(*[set(tensor.keys.tolist()) for tensor in tensors])))
+
+    tm_label_vals = sorted(list(set().union(*[set(tuple(i) for i in tensor.keys) for tensor in tensors])))
     tm_labels = metatensor.Labels(tensors[0].keys.names, np.array(tm_label_vals))
 
     blocks = {}
@@ -287,7 +288,7 @@ def join(tensors):
     block_samp_label_vals = {}
 
     for label in tm_labels:
-        key = tuple(label.tolist())
+        key = tuple(label.values.tolist())
         blocks[key] = []
         block_samp_label_vals[key] = []
         for imol,tensor in enumerate(tensors):
@@ -317,7 +318,7 @@ def split(tensor):
         raise Exception(f'Tensor does not seem to contain several molecules')
 
     # Check if the molecule indices are continuous
-    mollist = sorted(set(np.hstack([np.array(tensor.block(keys).samples.tolist())[:,0] for keys in tensor.keys])))
+    mollist = sorted(set(np.hstack([np.array(tensor.block(keys).samples.values.tolist())[:,0] for keys in tensor.keys])))
     if mollist==list(range(len(mollist))):
         tensors = [None] * len(mollist)
     else:
@@ -327,7 +328,7 @@ def split(tensor):
     block_comp_labels = {}
     block_prop_labels = {}
     for label in tensor.keys:
-        key = label.tolist()
+        key = tuple(label.values.tolist())
         block = tensor.block(label)
         block_comp_labels[key] = block.components
         block_prop_labels[key] = block.properties
@@ -338,10 +339,10 @@ def split(tensor):
         block_samp_labels = {}
 
         for label in tensor.keys:
-            key = label.tolist()
+            key = tuple(label.values.tolist())
             block = tensor.block(label)
 
-            samplelbl = [lbl for lbl in block.samples.tolist() if lbl[0]==imol]
+            samplelbl = [lbl for lbl in block.samples.values.tolist() if lbl[0]==imol]
             if len(samplelbl)==0:
                 continue
             sampleidx = [block.samples.position(lbl) for lbl in samplelbl]
@@ -360,7 +361,7 @@ def split(tensor):
 def sph2vector(atoms, lmax, nmax, tensor):
     c = []
     for iat, q in enumerate(atoms):
-        c.append(np.squeeze(tensor.block(spherical_harmonics_l=0, species_center=q).values))
+        c.append(np.squeeze(tensor.block(o3_lambda=0, center_type=q).values))
         for l in range(1, lmax[q]+1):
             c.append(np.zeros((2*l+1)*nmax[(q,l)]))
     return np.hstack(c)
@@ -368,8 +369,8 @@ def sph2vector(atoms, lmax, nmax, tensor):
 
 def tmap_add(x, dx):
     for (l, q) in set(x.keys).intersection(set(dx.keys)):
-        b = x.block(spherical_harmonics_l=l, species_center=q)
-        db = dx.block(spherical_harmonics_l=l, species_center=q)
+        b = x.block(o3_lambda=l, center_type=q)
+        db = dx.block(o3_lambda=l, center_type=q)
         b.values[...] += db.values
 
 

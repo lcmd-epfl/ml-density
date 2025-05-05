@@ -17,7 +17,7 @@ def main():
     power_env = []
     for imol, atnum in enumerate(atomic_numbers):
         print_progress(imol, len(atomic_numbers))
-        power_env.append(read_ps_1mol_l0(f'{p.splitpsfilebase}_{imol}.npz', atnum))
+        power_env.append(read_ps_1mol_l0(f'{p.splitpsfilebase}_{imol}.mts', atnum))
     power_env = np.vstack(power_env)
 
     ref_indices, distances = do_fps(power_env, o.M)

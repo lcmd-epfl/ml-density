@@ -2,7 +2,7 @@
 
 import sys, os
 import numpy as np
-import equistore
+import metatensor
 from libs.config import read_config
 from libs.basis import basis_read
 from libs.functions import moldata_read, print_progress
@@ -19,10 +19,10 @@ def main():
         #if os.path.exists(f'{p.kernelconfbase}{imol}.dat'):
         #    return
         kernel_for_mol(lmax, ref_elements, atomic_numbers[imol],
-                       power_ref, f'{p.splitpsfilebase}_{imol}.npz', f'{p.kernelconfbase}{imol}.npz')
+                       power_ref, f'{p.splitpsfilebase}_{imol}.mts', f'{p.kernelconfbase}{imol}.mts')
 
     atomic_numbers = moldata_read(p.xyzfilename)
-    power_ref = equistore.load(f'{p.powerrefbase}_{o.M}.npz');
+    power_ref = metatensor.load(f'{p.powerrefbase}_{o.M}.mts');
     ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
     lmax, nmax = basis_read(p.basisfilename)
     nmol = len(atomic_numbers)

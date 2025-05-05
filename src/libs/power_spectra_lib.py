@@ -1,6 +1,6 @@
 import gc
 import numpy as np
-import equistore
+import metatensor
 
 
 def reorder_ps_new(power_per_conf, elements, atomic_numbers, power):
@@ -19,10 +19,10 @@ def read_ps_1mol_new1(psfilename, elements, atomic_numbers):
 
 def read_ps_1mol_l0(psfilename, atomic_numbers):
     power_sorted = None
-    power = equistore.load(psfilename)
+    power = metatensor.load(psfilename)
     for q in set(atomic_numbers):
         idx = np.where(atomic_numbers == q)
-        block = power.block(spherical_harmonics_l=0, species_center=q)
+        block = power.block(o3_lambda=0, center_type=q)
         if power_sorted is None:
             power_sorted = np.zeros((len(atomic_numbers), block.values.shape[-1]))
         power_sorted[idx] = np.copy(block.values[:,0,:])

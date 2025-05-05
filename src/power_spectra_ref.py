@@ -2,7 +2,7 @@
 
 import sys
 import numpy as np
-import equistore
+import metatensor
 from libs.config import read_config
 from libs.basis import basis_read
 from libs.functions import moldata_read, get_elements_list
@@ -22,7 +22,7 @@ def main():
     ref_mol_at = get_ref_idx(natoms, ref_indices)
     print(ref_mol_at)
     tensor = merge_ref_ps(lmax, elements, atomic_numbers, ref_mol_at, p.splitpsfilebase)
-    equistore.save(f'{p.powerrefbase}_{o.M}.npz', tensor)
+    metatensor.save(f'{p.powerrefbase}_{o.M}.mts', tensor)
 
 
 def get_ref_idx(natoms, refs):
