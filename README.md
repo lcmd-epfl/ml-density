@@ -8,7 +8,8 @@ git checkout use-rascaline-ps
 
 ## environment
 
-* `cargo`
+* install `cargo`
+* install MPI and OpenMP
 * use `environment.yml` or
 ```
 conda create -n ml-density python=3.11
