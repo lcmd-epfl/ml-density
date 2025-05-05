@@ -3,9 +3,9 @@
 import sys, os
 import numpy as np
 import ase.io
-import equistore
+import metatensor
 from libs.config import read_config
-from libs.lsoap import generate_lambda_soap_wrapper, remove_high_l
+from libs.lsoap import generate_lambda_soap_wrapper, make_rascal_hypers
 from libs.functions import get_elements_list, print_progress
 from libs.basis import basis_read
 from libs.multi import multi_process
@@ -20,19 +20,12 @@ def main():
         #if os.path.exists(f'{p.splitpsfilebase}_{imol}.npz'):
         #    return
         #print(imol)
-        soap = generate_lambda_soap_wrapper(mols[imol], rascal_hypers, neighbor_species=elements, normalize=o.ps_normalize, min_norm=o.ps_min_norm)
-        soap = remove_high_l(soap, lmax)
-        equistore.save(f'{p.splitpsfilebase}_{imol}.npz', soap)
+        soap = generate_lambda_soap_wrapper(mols[imol], rascal_hypers, neighbor_species=elements,
+                                            normalize=o.ps_normalize, min_norm=o.ps_min_norm,
+                                            lmax=lmax)
+        metatensor.save(f'{p.splitpsfilebase}_{imol}.mts', soap)
 
-    rascal_hypers = {
-        "cutoff": o.soap_rcut,
-        "max_radial": o.soap_ncut,
-        "max_angular": o.soap_lcut,
-        "atomic_gaussian_width": o.soap_sigma,
-        "radial_basis": {"Gto": {}},
-        "cutoff_function": {"ShiftedCosine": {"width": 0.5}},
-        "center_atom_weight": 1.0,
-    }
+    rascal_hypers = make_rascal_hypers(o.soap_rcut, o.soap_ncut, o.soap_lcut, o.soap_sigma)
 
     lmax, _ = basis_read(p.basisfilename)
     mols = ase.io.read(p.xyzfilename, ":")

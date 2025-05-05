@@ -33,6 +33,7 @@ in progress... see `sidechains_examples/` and `sbatch_examples`
 
 ## todo
 
+* why are the new PS so big?
 * improve readme
 * add tests
 * replace `print_progress` by `tqdm`

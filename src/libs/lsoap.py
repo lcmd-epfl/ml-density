@@ -1,13 +1,10 @@
 # code from Joe
 
-import os
-import pickle
 import re
-import ase.io
 import numpy as np
 import wigners
-from rascaline import SphericalExpansion
-from equistore import Labels, TensorBlock, TensorMap
+from featomic import SphericalExpansion
+from metatensor import Labels, TensorBlock, TensorMap
 
 # === CG Iteration code, copied into a single place.
 
@@ -282,38 +279,40 @@ def acdc_standardize_keys(descriptor):
     """
 
     key_names = descriptor.keys.names
-    if not "spherical_harmonics_l" in key_names:
+    if not "o3_lambda" in key_names:
         raise ValueError(
-            "Descriptor missing spherical harmonics channel key `spherical_harmonics_l`"
+            "Descriptor missing spherical harmonics channel key `o3_lambda`"
         )
     blocks = []
     keys = []
-    for key, block in descriptor:
+    for key, block in descriptor.items():
         key = tuple(key)
-        if not "inversion_sigma" in key_names:
+        if not "o3_sigma" in key_names:
             key = (1,) + key
         if not "order_nu" in key_names:
             key = (1,) + key
         keys.append(key)
         property_names = _remove_suffix(block.properties.names, "_1")
-        blocks.append(
-            TensorBlock(
-                values=block.values,
-                samples=block.samples,
-                components=block.components,
-                properties=Labels(
-                    property_names,
-                    np.asarray(block.properties.view(dtype=np.int32)).reshape(
-                        -1, len(property_names)
-                    ),
-                ),
-            )
-        )
 
-    if not "inversion_sigma" in key_names:
-        key_names = ("inversion_sigma",) + key_names
+        newblock = TensorBlock(
+                       values=block.values,
+                       samples=block.samples,
+                       components=block.components,
+                       properties=Labels(
+                           property_names,
+                           np.asarray(block.properties.view(dimensions=['n']), dtype=np.int32).reshape(-1, len(property_names)),
+                       ),
+                   )
+        for parameter, grad in block.gradients():
+            newgrad = TensorBlock(values=grad.values, samples=grad.samples,
+                                   components=grad.components, properties=newblock.properties)
+            newblock.add_gradient(parameter, newgrad)
+        blocks.append(newblock)
+
+    if not "o3_sigma" in key_names:
+        key_names = ("o3_sigma",) + tuple(key_names)
     if not "order_nu" in key_names:
-        key_names = ("order_nu",) + key_names
+        key_names = ("order_nu",) + tuple(key_names)
 
     return TensorMap(
         keys=Labels(names=key_names, values=np.asarray(keys, dtype=np.int32)),
@@ -331,7 +330,7 @@ def cg_combine(
 ):
     """
     Performs a CG product of two sets of equivariants. Only requirement is that
-    sparse indices are labeled as ("inversion_sigma", "spherical_harmonics_l",
+    sparse indices are labeled as ("o3_sigma", "o3_lambda",
     "order_nu"). The automatically-determined naming of output features can be
     overridden by giving a list of "feature_names". By defaults, all other key
     labels are combined in an "outer product" mode, i.e. if there is a key-side
@@ -340,13 +339,13 @@ def cg_combine(
     a list `other_keys_match` of keys that should match, these are not
     outer-producted, but combined together. for instance, passing `["species
     center"]` means that the keys with the same species center will be combined
-    together, but yield a single key with the same species_center in the
+    together, but yield a single key with the same center_type in the
     results.
     """
 
     # determines the cutoff in the new features
-    lmax_a = max(x_a.keys["spherical_harmonics_l"])
-    lmax_b = max(x_b.keys["spherical_harmonics_l"])
+    lmax_a = max(x_a.keys["o3_lambda"])
+    lmax_b = max(x_b.keys["o3_lambda"])
     if lcut is None:
         lcut = lmax_a + lmax_b
 
@@ -357,12 +356,12 @@ def cg_combine(
     other_keys_a = tuple(
         name
         for name in x_a.keys.names
-        if name not in ["spherical_harmonics_l", "order_nu", "inversion_sigma"]
+        if name not in ["o3_lambda", "order_nu", "o3_sigma"]
     )
     other_keys_b = tuple(
         name
         for name in x_b.keys.names
-        if name not in ["spherical_harmonics_l", "order_nu", "inversion_sigma"]
+        if name not in ["o3_lambda", "order_nu", "o3_sigma"]
     )
 
     if other_keys_match is None:
@@ -406,9 +405,9 @@ def cg_combine(
     X_grads = {}
 
     # loops over sparse blocks of x_a
-    for index_a, block_a in x_a:
-        lam_a = index_a["spherical_harmonics_l"]
-        sigma_a = index_a["inversion_sigma"]
+    for index_a, block_a in x_a.items():
+        lam_a = index_a["o3_lambda"]
+        sigma_a = index_a["o3_sigma"]
         order_a = index_a["order_nu"]
         properties_a = (
             block_a.properties
@@ -416,9 +415,9 @@ def cg_combine(
         samples_a = block_a.samples
 
         # and x_b
-        for index_b, block_b in x_b:
-            lam_b = index_b["spherical_harmonics_l"]
-            sigma_b = index_b["inversion_sigma"]
+        for index_b, block_b in x_b.items():
+            lam_b = index_b["o3_lambda"]
+            sigma_b = index_b["o3_sigma"]
             order_b = index_b["order_nu"]
             properties_b = block_b.properties
             samples_b = block_b.samples
@@ -506,8 +505,8 @@ def cg_combine(
                 if grad_components is not None:
                     grad_a = block_a.gradient("positions")
                     grad_b = block_b.gradient("positions")
-                    grad_a_data = np.swapaxes(grad_a.data, 1, 2)
-                    grad_b_data = np.swapaxes(grad_b.data, 1, 2)
+                    grad_a_data = np.swapaxes(grad_a.values, 1, 2)
+                    grad_b_data = np.swapaxes(grad_b.values, 1, 2)
                     one_shot_grads = clebsch_gordan.combine_einsum(
                         block_a.values[grad_a.samples["sample"]][
                             neighbor_slice, :, sel_feats[:, 0]
@@ -554,16 +553,15 @@ def cg_combine(
         )
         if grad_components is not None:
             grad_data = np.swapaxes(np.concatenate(X_grads[KEY], axis=-1), 2, 1)
-            newblock.add_gradient(
-                "positions",
-                data=grad_data,
-                samples=X_grad_samples[KEY],
-                components=[grad_components[0], sph_components],
-            )
+
+            newgrad = TensorBlock(values=grad_data, samples=X_grad_samples[KEY],
+                                  components=[grad_components[0], sph_components],
+                                  properties=newblock.properties)
+            newblock.add_gradient( "positions", newgrad)
         nz_blk.append(newblock)
     X = TensorMap(
         Labels(
-            ["order_nu", "inversion_sigma", "spherical_harmonics_l"] + OTHER_KEYS,
+            ["order_nu", "o3_sigma", "o3_lambda"] + OTHER_KEYS,
             np.asarray(nz_idx, dtype=np.int32),
         ),
         nz_blk,
@@ -580,7 +578,6 @@ def cg_increment(
     """Specialized version of the CG product to perform iterations with nu=1 features"""
 
     nu = x_nu.keys["order_nu"][0]
-
     feature_roots = _remove_suffix(x_1.block(0).properties.names)
 
     if nu == 1:
@@ -622,7 +619,7 @@ def _remove_suffix(names, new_suffix=""):
 
 # ===== Start of lambda-SOAP generation code
 
-def generate_lambda_soap(frames: list, rascal_hypers: dict, neighbor_species=None):
+def generate_lambda_soap(frames: list, rascal_hypers: dict, neighbor_species=None, gradients=None):
     """
     Takes a list of frames of ASE loaded structures and a dict of Rascaline
     hyperparameters and generates a lambda-SOAP (i.e. nu=2) representation of
@@ -631,19 +628,19 @@ def generate_lambda_soap(frames: list, rascal_hypers: dict, neighbor_species=Non
 
     # Generate Rascaline hypers and Clebsch-Gordon coefficients
     calculator = SphericalExpansion(**rascal_hypers)
-    cg = ClebschGordanReal(l_max=rascal_hypers["max_angular"])
+    cg = ClebschGordanReal(l_max=rascal_hypers["basis"]["max_angular"])
 
     # Generate descriptor via Spherical Expansion
-    acdc_nu1 = calculator.compute(frames)
+    acdc_nu1 = calculator.compute(frames, gradients=gradients)
 
     # nu=1 features
     acdc_nu1 = acdc_standardize_keys(acdc_nu1)
     if neighbor_species is None:
-        acdc_nu1 = acdc_nu1.keys_to_properties("species_neighbor")
+        acdc_nu1 = acdc_nu1.keys_to_properties("neighbor_type")
     else:
         acdc_nu1 = acdc_nu1.keys_to_properties(
             keys_to_move=Labels(
-            names=("species_neighbor",),
+            names=("neighbor_type",),
             values=np.array(neighbor_species).reshape(-1, 1),
         )
     )
@@ -653,8 +650,8 @@ def generate_lambda_soap(frames: list, rascal_hypers: dict, neighbor_species=Non
         acdc_nu1,
         acdc_nu1,
         clebsch_gordan=cg,
-        lcut=rascal_hypers["max_angular"],
-        other_keys_match=["species_center"],
+        lcut=rascal_hypers["basis"]["max_angular"],
+        other_keys_match=["center_type"],
     )
 
     return acdc_nu2
@@ -663,20 +660,20 @@ def generate_lambda_soap(frames: list, rascal_hypers: dict, neighbor_species=Non
 def clean_lambda_soap(lsoap: TensorMap):
     """
     A function that performs some cleaning of the lambda-SOAP representation,
-        - Drop blocks with ``'inversion_sigma' = -1``
+        - Drop blocks with ``'o3_sigma' = -1``
         - Drop the key name 'order_nu' as they are all = 2, and also the key
-            name 'inversion_sigma' as they are now all = 1
+            name 'o3_sigma' as they are now all = 1
     """
 
     new_keys, new_blocks = [], []
-    for key, block in lsoap:
+    for key, block in lsoap.items():
         if key[1] == 1:
             new_keys.append([key[2], key[3]])
             new_blocks.append(block.copy())
 
     lsoap_cleaned = TensorMap(
         keys=Labels(
-            names=["spherical_harmonics_l", "species_center"], values=np.array(new_keys)
+            names=["o3_lambda", "center_type"], values=np.array(new_keys)
         ),
         blocks=new_blocks,
     )
@@ -691,35 +688,63 @@ def ps_normalize_inplace(vals, min_norm=MIN_NORM):
     if norm > min_norm:
         vals /= norm
     else:
-        vals[...] = 0
+        vals[...] = 0.0
+    return norm
+
+
+def ps_normalize_gradient_inplace(idx, grad, values, norm, min_norm=MIN_NORM):
+    # print(grad[idx,:,:].shape)  # natoms-in-mol * 3 * (2*l+1) * nfeatures
+    # print(values.shape)         # (2*l+1) * nfeatures
+    if norm > min_norm:
+        if values.shape[0]==1:
+            t1 = np.einsum('kxmi,mi->kx', grad[idx], values)
+            dnorm = np.einsum('kx,mi->kxmi', t1, values)
+        else:
+            p = values @ values.T
+            p1 = np.einsum('Mf,kxmf->Mmkx', values, grad[idx])
+            p2 = p1.transpose(1,0,2,3)
+            t1 = np.einsum('Mm,Mmkx->kx', p, p1+p2)
+            dnorm = 0.5*np.einsum('kx,mi->kxmi', t1, values)
+        grad[idx,...] -= dnorm
+        grad[idx,...] /= norm
+    else:
+        grad[idx,...] = 0.0
 
 
 def normalize_tensormap(soap, min_norm=MIN_NORM):
-    for key, block in soap:
+    for key, block in soap.items():
+        norms = np.zeros(len(block.samples))
         for samp in block.samples:
             isamp = block.samples.position(samp)
-            ps_normalize_inplace(block.values[isamp,:,:], min_norm=min_norm)
+            norm = ps_normalize_inplace(block.values[isamp,:,:], min_norm=min_norm)
+
+            if block.has_gradient('positions'):
+                gradient = block.gradient('positions')
+                # get indices for gradient of center id #isamp
+                igsamps = np.array([i for i, gsamp in enumerate(gradient.samples) if gsamp[0] == isamp])
+                ps_normalize_gradient_inplace(igsamps, gradient.values, block.values[isamp,:,:], norm, min_norm=min_norm)
 
 
-def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_species=None, normalize=False, min_norm=MIN_NORM):
+def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_species=None, normalize=True, min_norm=MIN_NORM, lmax=None, gradients=None):
     if not isinstance(mols, list):
-        mols
-    soap = generate_lambda_soap(frames=mols, rascal_hypers=rascal_hypers, neighbor_species=neighbor_species)
+        mols = [mols]
+    soap = generate_lambda_soap(frames=mols, rascal_hypers=rascal_hypers, neighbor_species=neighbor_species, gradients=gradients)
     soap = clean_lambda_soap(soap)
+    if lmax:
+        soap = remove_high_l(soap, lmax)
     if normalize:
-        normalize_tensormap(soap)
+        normalize_tensormap(soap, min_norm=min_norm)
     return soap
 
 
 def remove_high_l(lsoap: TensorMap, lmax: dict):
     """
     A function that performs some cleaning of the lambda-SOAP representation,
-        - Drop the blocks ``('spherical_harmonics_l', 'species_center')``
-          if spherical_harmonics_l > lmax[species_center]
+        - Drop the blocks ``('o3_lambda', 'center_type')``
+          if o3_lambda > lmax[center_type]
     """
-
     new_keys, new_blocks = [], []
-    for (l, q), block in lsoap:
+    for (l, q), block in lsoap.items():
         if l <= lmax[q]:
             new_keys.append((l, q))
             new_blocks.append(block.copy())
@@ -733,11 +758,24 @@ def remove_high_l(lsoap: TensorMap, lmax: dict):
 
 def make_rascal_hypers(soap_rcut, soap_ncut, soap_lcut, soap_sigma):
     return {
-        "cutoff": soap_rcut,
-        "max_radial": soap_ncut,
-        "max_angular": soap_lcut,
-        "atomic_gaussian_width": soap_sigma,
-        "radial_basis": {"Gto": {}},
-        "cutoff_function": {"ShiftedCosine": {"width": 0.5}},
-        "center_atom_weight": 1.0,
-    }
+           "cutoff": {
+               "radius": soap_rcut,
+               "smoothing": {
+                   "type": "ShiftedCosine",
+                   "width": 0.5,
+               }
+           },
+           "density": {
+               "type": "Gaussian",
+               "width": soap_sigma,
+               "center_atom_weight": 1.0,
+           },
+           "basis": {
+               "type": "TensorProduct",
+               "max_angular": soap_lcut,
+               "radial": {
+                   "type": "Gto",
+                   "max_radial": soap_ncut,
+               }
+           }
+       }

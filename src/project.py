@@ -2,7 +2,7 @@
 
 import sys
 import numpy as np
-import equistore
+import metatensor
 from libs.config import read_config
 from libs.basis import basis_read
 from libs.functions import moldata_read, print_progress, get_elements_list, nao_for_mol
@@ -32,14 +32,14 @@ def main():
             over      = np.load(f'{p.overfilebase}{imol}.npy')
             good_over = over[np.ix_(idx,idx)]
             over_tmap = matrix2tmap(atoms, lmax, nmax, good_over)
-            equistore.save(f'{p.goodoverfilebase}{imol}.npz', over_tmap)
+            metatensor.save(f'{p.goodoverfilebase}{imol}.mts', over_tmap)
         else:
-            good_over = tmap2matrix(atoms, lmax, nmax, equistore.load(f'{p.goodoverfilebase}{imol}.npz'))
+            good_over = tmap2matrix(atoms, lmax, nmax, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'))
 
         proj = good_over @ good_coef
         proj_tmap = vector2tmap(atoms, lmax, nmax, proj)
-        equistore.save(f'{p.baselinedwbase}{imol}.npz', proj_tmap)
-    equistore.save(p.avfile, averages2tmap(av_coefs))
+        metatensor.save(f'{p.baselinedwbase}{imol}.mts', proj_tmap)
+    metatensor.save(p.avfile, averages2tmap(av_coefs))
 
 
 def load_coefs(atomic_numbers, coefffilebase):
