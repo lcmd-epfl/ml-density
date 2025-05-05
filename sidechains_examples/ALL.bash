@@ -1,8 +1,8 @@
-path=../GIT/SOURCE
-#$path/project.py
-#$path/training_selection.py
-#$path/get_power_spectra.py
+path=../src
 
+$path/project.py
+$path/training_selection.py
+$path/get_power_spectra.py
 $path/environments.py
 $path/power_spectra_ref.py
 $path/rmatrix.py
