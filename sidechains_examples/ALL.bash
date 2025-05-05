@@ -12,3 +12,9 @@ $path/get_matrices.py b
 $path/regression.py
 $path/prediction.py
 $path/compute_error.py > error.txt
+
+# $path/coefficients.py
+
+# $path/extrapolation.py
+# $path/ex_power_spectra.py
+# $path/ex_kernels.py

@@ -19,6 +19,11 @@ matrix_label_names = SimpleNamespace(
 
 _molid_name = 'mol_id'
 
+
+def keys2set(keys):
+    return set(tuple(i) for i in keys)
+
+
 def averages2tmap(averages):
     tm_label_vals = []
     tensor_blocks = []
@@ -278,7 +283,7 @@ def join(tensors):
     if not all(tensor.keys.names==tensors[0].keys.names for tensor in tensors):
         raise Exception(f'Cannot merge tensors with different label names')
 
-    tm_label_vals = sorted(list(set().union(*[set(tuple(i) for i in tensor.keys) for tensor in tensors])))
+    tm_label_vals = sorted(list(set().union(*[keys2set(tensor.keys) for tensor in tensors])))
     tm_labels = metatensor.Labels(tensors[0].keys.names, np.array(tm_label_vals))
 
     blocks = {}
@@ -368,7 +373,7 @@ def sph2vector(atoms, lmax, nmax, tensor):
 
 
 def tmap_add(x, dx):
-    for (l, q) in set(x.keys).intersection(set(dx.keys)):
+    for (l, q) in keys2set(x.keys).intersection(keys2set(dx.keys)):
         b = x.block(o3_lambda=l, center_type=q)
         db = dx.block(o3_lambda=l, center_type=q)
         b.values[...] += db.values

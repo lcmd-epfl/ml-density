@@ -21,7 +21,7 @@ def main():
         print_progress(imol, len(atomic_numbers_ex))
         kernel_for_mol(lmax, ref_elements, atoms, power_ref,
                        f'{p.powerexbase}_{imol}.mts',
-                       f'{p.kernelexbase}{imol}.dat')
+                       f'{p.kernelexbase}{imol}.mts')
 
 
 if __name__=='__main__':
