@@ -14,7 +14,7 @@ def main():
 
     atomic_numbers_ex = moldata_read(p.xyzexfilename)
     lmax, _ = basis_read(p.basisfilename)
-    ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
+    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
     power_ref = equistore.load(f'{p.powerrefbase}_{o.M}.npz');
 
     for imol, atoms in enumerate(atomic_numbers_ex):

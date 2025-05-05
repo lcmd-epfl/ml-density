@@ -16,7 +16,7 @@ def main():
     o, p = read_config(sys.argv)
 
     lmax, nmax = basis_read(p.basisfilename)
-    ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
+    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
     totsize = nao_for_mol(ref_elements, lmax, nmax)
 
     k_MM = equistore.load(f'{p.kmmbase}{o.M}.npz')

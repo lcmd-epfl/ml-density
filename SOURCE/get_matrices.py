@@ -16,7 +16,7 @@ def main():
     lmax, nmax = basis_read(p.basisfilename)
 
     # reference environments
-    ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
+    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
     totsize = nao_for_mol(ref_elements, lmax, nmax)
 
     # training set selection

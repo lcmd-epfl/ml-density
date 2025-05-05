@@ -23,7 +23,7 @@ def main():
 
     atomic_numbers = moldata_read(p.xyzfilename)
     power_ref = equistore.load(f'{p.powerrefbase}_{o.M}.npz');
-    ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
+    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
     lmax, nmax = basis_read(p.basisfilename)
     nmol = len(atomic_numbers)
 

@@ -23,8 +23,7 @@ def main():
     ref_indices, distances = do_fps(power_env, o.M)
     ref_elements = np.hstack(atomic_numbers)[ref_indices]
 
-    np.savetxt(f'{p.refsselfilebase}{o.M}.txt',  ref_indices,  fmt='%d')
-    np.savetxt(f'{p.qrefsselfilebase}{o.M}.txt', ref_elements, fmt='%d')
+    np.savetxt(f'{p.refsselfilebase}{o.M}.txt',  np.vstack((ref_indices, ref_elements)).T,  fmt='%d')
 
     for i, d in enumerate(distances):
         print(i+1, d)

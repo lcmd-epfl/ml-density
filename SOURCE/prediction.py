@@ -16,7 +16,7 @@ def main():
 
     atomic_numbers = moldata_read(p.xyzfilename)
     lmax, nmax = basis_read(p.basisfilename)
-    ref_elements = np.loadtxt(f'{p.qrefsselfilebase}{o.M}.txt', dtype=int)
+    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
 
     for frac in o.fracs:
         weights = np.load(f'{p.weightsfilebase}_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy')

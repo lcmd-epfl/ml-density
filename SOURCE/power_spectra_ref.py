@@ -16,7 +16,7 @@ def main():
     elements = get_elements_list(atomic_numbers)
     natoms = np.array([len(atoms) for atoms in atomic_numbers])
 
-    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)
+    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,0]
     lmax, _ = basis_read(p.basisfilename)
 
     ref_mol_at = get_ref_idx(natoms, ref_indices)
