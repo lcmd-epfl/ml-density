@@ -11,7 +11,7 @@ def print_batches(nfrac, ntrains, paths):
 
 def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
     proj = equistore.load(f'{path_proj}{conf}.npz')
-    k_NM = equistore.load(f'{path_kern}{conf}.dat.npz')
+    k_NM = equistore.load(f'{path_kern}{conf}.npz')
     for (l1, q1), pblock in proj:
         msize1 = 2*l1+1
         kblock = k_NM.block(spherical_harmonics_l=l1, species_center=q1)

@@ -28,6 +28,6 @@ def run_prediction(test_configs, atomic_numbers,
     predictions = []
     for i, (imol, atoms) in enumerate(zip(test_configs, atomic_numbers)):
         print_progress(i, len(test_configs))
-        kernel = equistore.load(f'{kernelbase}{imol}.dat.npz')
+        kernel = equistore.load(f'{kernelbase}{imol}.npz')
         predictions.append(compute_prediction(atoms, lmax, nmax, kernel, weights, averages=averages))
     return predictions

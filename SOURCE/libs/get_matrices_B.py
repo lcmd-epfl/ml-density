@@ -31,7 +31,7 @@ def mpos(i, j):
 def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
 
     over = equistore.load(f'{path_over}{conf}.npz')
-    k_NM = equistore.load(f'{path_kern}{conf}.dat.npz')
+    k_NM = equistore.load(f'{path_kern}{conf}.npz')
 
     for (l1, l2, q1, q2), oblock in over:
         msize1 = 2*l1+1
