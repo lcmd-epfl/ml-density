@@ -1,5 +1,5 @@
 USE_MPI = 1
-USE_OMP = 0
+USE_OMP = 1
 
 EQUISTORE_PATH=$(shell python -c 'import metatensor; print(metatensor.__path__[0])')
 EQUISTORE_INCL_PATH=$(EQUISTORE_PATH)/include/
@@ -23,7 +23,7 @@ W= -Warray-bounds -Wmaybe-uninitialized -Wmissing-braces -Wparentheses -Wsequenc
 all: get_matrices.so warn
 
 %.so: %.o get_matrices_work.o
-	$(CC) $^ -L$(EQUISTORE_LINK_PATH) -l:libmetatensor.so -lstdc++ -shared -Wl,-rpath=$(EQUISTORE_LINK_PATH),-soname,$@ -o $@
+	$(CC) $(OMPFLAG) $^ -L$(EQUISTORE_LINK_PATH) -l:libmetatensor.so -lstdc++ -shared -Wl,-rpath=$(EQUISTORE_LINK_PATH),-soname,$@ -o $@
 
 get_matrices_work.o: get_matrices_work.cpp
 	$(CC) $(DEF) $(OMPFLAG) $(W) -I$(EQUISTORE_INCL_PATH) $^ -c --std=c++11 -O2 -fPIC -o $@
