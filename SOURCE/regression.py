@@ -23,6 +23,7 @@ def set_variable_values():
 
 [fracs,M,reg,jit] = set_variable_values()
 
+EPSILON         = 5E-13
 kmmbase         = conf.paths['kmm_base']
 avecfilebase    = conf.paths['avec_base']
 bmatfilebase    = conf.paths['bmat_base']
@@ -93,7 +94,20 @@ for frac in fracs:
         bmatfile.encode('ascii'))
   print(ret)
 
-  weights = spl.solve(mat, Avec, assume_a='sym', overwrite_a=True, overwrite_b=True)
+  #weights = spl.solve(mat, Avec, assume_a='sym', overwrite_a=True, overwrite_b=True)
+
+  # long way to solve the equation, in a way that avoids numerical instabilities
+  diag,proj = spl.eigh(mat)
+  print('EIGEN:', diag)
+  accepted_values = abs(diag) > EPSILON
+  diag2 = diag[accepted_values]
+  proj2 = proj.T[accepted_values, :]
+  Y2 = proj2 @ Avec
+  W2 = Y2 / diag2
+  weights = proj2.T @ W2
+  remainder = mat @ weights - Avec
+  print("closeness:", np.sqrt(remainder@remainder))
+
   del Avec
   np.save(weightsfile, weights)
   del weights

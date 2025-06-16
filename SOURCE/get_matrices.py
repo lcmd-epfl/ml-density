@@ -8,6 +8,7 @@ from functions import moldata_read,get_elements_list,get_atomicindx,basis_info,g
 import os
 import ctypes
 import ctypes_def
+from posix import RTLD_LAZY
 
 path = get_config_path(sys.argv)
 conf = Config(config_path=path)
@@ -77,8 +78,8 @@ kernel_sizes = get_kernel_sizes(train_configs, ref_elements, el_dict, M, lmax, a
 
 ################################################################################
 
-get_matrices = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/get_matrices.so")
-#get_matrices = ctypes.CDLL(os.path.dirname(sys.argv[0])+"/get_matrices.so", ctypes.RTLD_GLOBAL)
+#get_matrices = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/get_matrices.so")
+get_matrices = ctypes.CDLL(os.path.dirname(sys.argv[0])+"/get_matrices.so", ctypes.RTLD_GLOBAL|RTLD_LAZY)
 
 argtypes = [
   ctypes.c_int,
