@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-import itertools
 import numpy as np
 from tqdm import tqdm
 import metatensor
@@ -18,7 +17,7 @@ def main():
 
     mols = compound.xyz_to_mol_all(p.xyzfilename, basis=o.basisname, ignore=True)
     atomic_numbers = moldata_read(p.xyzfilename)
-    nenv = dict(zip(*get_elements_list(atomic_numbers, return_counts=True)))
+    nenv = dict(zip(*get_elements_list(atomic_numbers, return_counts=True), strict=True))
 
     basis = Basis(o.basisname, elements=nenv.keys())
     ao_indices = [basis.index(atoms) for atoms in atomic_numbers]
@@ -27,7 +26,7 @@ def main():
 
     av_coefs = get_averages(nenv, basis, coefficients, ao_indices)
 
-    for imol, (coef, mol, ao_index) in tqdm([*enumerate(zip(coefficients, mols, ao_indices))]):
+    for imol, (coef, mol, ao_index) in tqdm([*enumerate(zip(coefficients, mols, ao_indices, strict=True))]):
 
         coef = reorder.reorder_ao(mol, coef, dest='gpr', src=o.coeff_order)
         np.save(f'{p.goodcoeffilebase}{imol}.npy', coef)
@@ -65,13 +64,13 @@ def remove_averages(ao_index, coef, av_coefs):
 
 
 def get_averages(nenv, basis, coefficients, ao_indices):
-    av_coefs = {q: np.zeros(basis.nmax[(q, 0)]) for q in nenv.keys()}
+    av_coefs = {q: np.zeros(basis.nmax[(q, 0)]) for q in nenv}
 
-    for coef, ao_index in zip(coefficients, ao_indices):
+    for coef, ao_index in zip(coefficients, ao_indices, strict=True):
         for iat, q in enumerate(ao_index.atoms):
             av_coefs[q] += coef[ao_index.find(iat=iat, l=0)]
 
-    for q in av_coefs.keys():
+    for q in av_coefs:
         av_coefs[q] /= nenv[q]
     return av_coefs
 

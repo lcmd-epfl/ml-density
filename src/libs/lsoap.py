@@ -36,7 +36,7 @@ def ps_normalize_gradient_inplace(idx, grad, values, norm, min_norm=MIN_NORM):
 
 
 def normalize_tensormap(soap, min_norm=MIN_NORM):
-    for key, block in soap.items():
+    for _key, block in soap.items():  # noqa PERF102
         for samp in block.samples:
             isamp = block.samples.position(samp)
             norm = ps_normalize_inplace(block.values[isamp,:,:], min_norm=min_norm)
@@ -87,7 +87,7 @@ class EquivariantPowerSpectrum_custom(EquivariantPowerSpectrum):
         """
         nu_target = 2
         l_list_idxs = [ keys.names.index(f"l_{o3_lambda}") for o3_lambda in range(1, nu_target + 1) ]
-        keys_to_keep: List[int] = []
+        keys_to_keep = []
         for key_idx in range(len(keys)):
             key = keys.entry(key_idx)
             l_list_values = _dispatch.to_int_list(key.values[l_list_idxs])
@@ -138,7 +138,7 @@ def make_rascal_hypers(soap_rcut, soap_ncut, soap_lcut, soap_sigma):
                "smoothing": {
                    "type": "ShiftedCosine",
                    "width": 0.5,
-               }
+               },
            },
            "density": {
                "type": "Gaussian",
@@ -151,6 +151,6 @@ def make_rascal_hypers(soap_rcut, soap_ncut, soap_lcut, soap_sigma):
                "radial": {
                    "type": "Gto",
                    "max_radial": soap_ncut,
-               }
-           }
+               },
+           },
        }

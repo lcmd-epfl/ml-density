@@ -28,12 +28,11 @@ def main():
     nfrac, ntrains, train_configs = get_training_sets(p.trainfilename, o.fracs)
     ntrain = ntrains[-1]
     atomic_numbers_train = atomic_numbers[train_configs]
-    natoms_train = np.array([len(atoms) for atoms in atomic_numbers_train])
     atom_counting = get_atomicindx(elements, atomic_numbers_train)
 
     # basis set info
     lmax, nmax = basis_read(p.basisfilename)
-    bsize, alnum, annum = basis_info(elements, lmax, nmax);
+    bsize, alnum, annum = basis_info(elements, lmax, nmax)
 
     # problem dimensionality
     totsize = sum(bsize[ref_elements_idx])
@@ -79,6 +78,7 @@ def main():
         get_matrices.get_a.restype = ctypes.c_int
         get_matrices.get_a.argtypes = argtypes
         ret = get_matrices.get_a(*args)
+    return ret
 
 
 def basis_info(elements, lmax, nmax):

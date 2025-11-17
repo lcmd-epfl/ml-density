@@ -22,7 +22,7 @@ def scatter_jobs(Nproc, nproc, comm, bra, ket, do_mol):
         for imol in range(bra, ket+Nproc-1):
             (npr, im) = comm.recv(source=MPI.ANY_SOURCE)
             im = imol if imol<ket else -1
-            comm.send(im, dest=npr);
+            comm.send(im, dest=npr)
             print(f'sent {npr} : {im}', flush=True)
     else:
         imol = -1

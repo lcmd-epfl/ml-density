@@ -4,7 +4,7 @@ import sys
 import numpy as np
 from libs.config import read_config
 from libs.basis import basis_read
-from libs.functions import moldata_read, nao_for_mol, get_training_sets
+from libs.functions import nao_for_mol, get_training_sets
 from libs.get_matrices_A import get_a
 from libs.get_matrices_B import get_b
 
@@ -12,7 +12,6 @@ from libs.get_matrices_B import get_b
 def main():
     o, p = read_config(sys.argv)
 
-    atomic_numbers = moldata_read(p.xyzfilename)
     lmax, nmax = basis_read(p.basisfilename)
 
     # reference environments

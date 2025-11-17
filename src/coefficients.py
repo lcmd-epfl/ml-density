@@ -21,7 +21,7 @@ def main():
         print('fraction =', frac)
         predictfile = f'{p.predictfilebase}_test_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.mts'
         predictions = split(metatensor.load(predictfile))
-        for itest, (imol, c) in enumerate(zip(test_configs, predictions)):
+        for itest, (imol, c) in enumerate(zip(test_configs, predictions, strict=True)):
             print_progress(itest, ntest)
             tmap_add(c, averages)
             rho = tmap2vector(atomic_numbers[imol], lmax, nmax, c)

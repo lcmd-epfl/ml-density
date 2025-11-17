@@ -1,5 +1,5 @@
 import sys
-import os, os.path
+import os
 from types import SimpleNamespace
 import configparser
 import numpy as np
@@ -7,9 +7,9 @@ import numpy as np
 DEFAULT_PATH = 'config.txt'
 
 
-class Config(object):
+class Config:
     def __init__(self, config_path=DEFAULT_PATH):
-        if config_path==None:
+        if config_path is None:
             config_path = DEFAULT_PATH
         if not os.path.isfile(config_path):
             print(f'Cannot open configuration file "{config_path}"')
@@ -120,7 +120,7 @@ def check_paths(conf):
       'basisfile',
       'ex_xyzfile',
       'chargesfile',
-      'averages_file'
+      'averages_file',
       ]
 
     paths1 = [

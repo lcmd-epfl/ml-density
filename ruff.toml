@@ -1,0 +1,65 @@
+exclude = [
+    ".git",
+    ".pytest_cache",
+    ".ruff_cache",
+]
+
+line-length = 128
+indent-width = 4
+
+target-version = "py313"
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[lint]
+
+allowed-confusables = ["ρ", "×", "–", "γ"]
+
+select = [
+  "A", "E",  "F",  "B",
+  "S", "COM", "C4", "EXE", "ICN", "PIE", "PLR1714", "ARG",
+  "PERF",  "FURB",  "PLE",  "TRY002",  "W",  "UP",  "RUF", "SIM", "NPY",
+# "D", # later
+# "FIX", "TD", # later
+]
+ignore = [
+"E722",     # bare except
+"NPY002",   # random
+"UP031",    # format
+
+"E741",     # ambiguous variable name
+"E731",     # do not assign lambda expression
+"E501",     # line length
+"RUF015",   # single element slice
+"SIM3",     # yoda condition
+"SIM114",   # combine if branches
+"SIM108",   # use ternary operator
+"D105",     # missing docstring in magic method
+"D107",     # missing docstring in __init__
+"D203",     # blank line required before class docstring
+"D204",     # blank line required after class docstring
+"D213",     # multi-line docstring summary should start at the second line
+"D413",     # missing blank line after last section
+]
+
+preview = false
+
+extend-select = ["DOC"]
+extend-ignore = [
+# pathlib
+  "FURB101", "FURB103",
+# whitespaces
+  "E201", "E202", "E203", "E211",
+  "E221", "E222", "E225", "E226", "E228",
+  "E231", "E241", "E271", "E272",
+# lambda
+  "FURB118",
+]
+
+[lint.per-file-ignores]
+"src/get_matrices_C.py" = ["COM819"]  # prohibited-trailing-comma
+

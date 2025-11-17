@@ -7,27 +7,27 @@ vector_label_names = SimpleNamespace(
     tm = ['o3_lambda', 'center_type'],
     block_prop = ['radial_channel'],
     block_samp = ['atom_id'],
-    block_comp = ['spherical_harmonics_m']
+    block_comp = ['spherical_harmonics_m'],
     )
 
 matrix_label_names = SimpleNamespace(
     tm = ['o3_lambda1', 'o3_lambda2', 'center_type1', 'center_type2'],
     block_prop = ['radial_channel1', 'radial_channel2'],
     block_samp = ['atom_id1', 'atom_id2'],
-    block_comp = ['spherical_harmonics_m1', 'spherical_harmonics_m2']
+    block_comp = ['spherical_harmonics_m1', 'spherical_harmonics_m2'],
     )
 
 _molid_name = 'mol_id'
 
 
 def keys2set(keys):
-    return set(tuple(i) for i in keys)
+    return {tuple(i) for i in keys}
 
 
 def averages2tmap(averages):
     tm_label_vals = []
     tensor_blocks = []
-    for q in averages.keys():
+    for q in averages:
         tm_label_vals.append((0,q))
         values = averages[q].reshape(1,1,-1)
         prop_label_vals = np.arange(values.shape[-1]).reshape(-1,1)
@@ -43,7 +43,7 @@ def averages2tmap(averages):
 
 
 def kernels2tmap(atom_charges, kernel):
-    tm_label_vals = sorted(list(kernel.keys()), key=lambda x: x[::-1])
+    tm_label_vals = sorted(kernel.keys(), key=lambda x: x[::-1])
     tensor_blocks = []
     for (l, q) in tm_label_vals:
         values = np.ascontiguousarray(np.array(kernel[(l, q)]).transpose(0,2,3,1))
@@ -93,9 +93,9 @@ def vector2tmap(atom_charges, lmax, nmax, c):
 
     # Fill in the blocks
 
-    iq = {q:0 for q in elements}
+    iq = dict.fromkeys(elements, 0)
     i = 0
-    for iat, q in enumerate(atom_charges):
+    for q in atom_charges:
         for l in range(lmax[q]+1):
             msize = 2*l+1
             nsize = blocks[(l,q)].shape[-1]
@@ -140,7 +140,7 @@ def sparseindices_fill(lmax, nmax, atoms):
 
 
 def tmap2matrix(atom_charges, lmax, nmax, tensor):
-    nao = int(round(np.sqrt(_get_tsize(tensor))))
+    nao = round(np.sqrt(_get_tsize(tensor)))
     dm = np.zeros((nao, nao))
     idx = sparseindices_fill(lmax, nmax, atom_charges)
     for (l1, l2, q1, q2), block in tensor.items():
@@ -205,9 +205,9 @@ def merge_ref_ps(lmax, elements, atomic_numbers, idx, splitpsfilebase):
 def join(tensors):
 
     if not all(tensor.keys.names==tensors[0].keys.names for tensor in tensors):
-        raise Exception(f'Cannot merge tensors with different label names')
+        raise ValueError('Cannot merge tensors with different label names')
 
-    tm_label_vals = sorted(list(set().union(*[keys2set(tensor.keys) for tensor in tensors])))
+    tm_label_vals = sorted(set().union(*[keys2set(tensor.keys) for tensor in tensors]))
     tm_labels = metatensor.Labels(tensors[0].keys.names, np.array(tm_label_vals))
 
     blocks = {}
@@ -221,12 +221,12 @@ def join(tensors):
         blocks[key] = []
         block_samp_label_vals[key] = []
         for imol,tensor in enumerate(tensors):
-            if not label in tensor.keys:
+            if label not in tensor.keys:
                 continue
             block = tensor.block(label)
             blocks[key].append(block.values)
             block_samp_label_vals[key].extend([(imol, *s) for s in block.samples])
-            if not key in block_comp_labels:
+            if key not in block_comp_labels:
                 block_comp_labels[key] = block.components
                 block_prop_labels[key] = block.properties
 
@@ -244,7 +244,7 @@ def join(tensors):
 def split(tensor):
 
     if tensor.sample_names[0]!=_molid_name:
-        raise Exception(f'Tensor does not seem to contain several molecules')
+        raise ValueError('Tensor does not seem to contain several molecules')
 
     # Check if the molecule indices are continuous
     mollist = sorted(set(np.hstack([np.array(tensor.block(keys).samples.values.tolist())[:,0] for keys in tensor.keys])))
@@ -279,7 +279,7 @@ def split(tensor):
             blocks[key] = block.values[sampleidx]
             block_samp_labels[key] = metatensor.Labels(tensor.sample_names[1:], np.array(samplelbl)[:,1:])
 
-        tm_label_vals = sorted(list(blocks.keys()))
+        tm_label_vals = sorted(blocks.keys())
         tm_labels = metatensor.Labels(tensor.keys.names, np.array(tm_label_vals))
         tensor_blocks = [metatensor.TensorBlock(values=blocks[key], samples=block_samp_labels[key], components=block_comp_labels[key], properties=block_prop_labels[key]) for key in tm_label_vals]
         tensors[imol] = metatensor.TensorMap(keys=tm_labels, blocks=tensor_blocks)
@@ -289,10 +289,9 @@ def split(tensor):
 
 def sph2vector(atoms, lmax, nmax, tensor):
     c = []
-    for iat, q in enumerate(atoms):
+    for q in atoms:
         c.append(np.squeeze(tensor.block(o3_lambda=0, center_type=q).values))
-        for l in range(1, lmax[q]+1):
-            c.append(np.zeros((2*l+1)*nmax[(q,l)]))
+        c.extend([np.zeros((2*l+1)*nmax[(q,l)]) for l in range(1, lmax[q]+1)])
     return np.hstack(c)
 
 
@@ -304,7 +303,7 @@ def tmap_add(x, dx):
 
 
 def kmm2tmap(qsamples, kernel):
-    tm_label_vals = sorted(list(kernel.keys()), key=lambda x: x[::-1])
+    tm_label_vals = sorted(kernel.keys(), key=lambda x: x[::-1])
     tensor_blocks = []
     for (l, q) in tm_label_vals:
         values = kernel[(l, q)].reshape(-1, 2*l+1, 2*l+1, 1)

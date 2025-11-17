@@ -3,7 +3,7 @@ from ase.data import atomic_numbers
 
 
 def basis_read(filename):
-    (basis, Lmax, Nmax) = basis_read_full(filename)
+    _, Lmax, Nmax = basis_read_full(filename)
     return Lmax, Nmax
 
 
@@ -12,7 +12,7 @@ def basis_read_full(filename):
     msg_incorrect = 'Incorrect basis file format!'
     msg_lorder    = 'Basis set should be in the ascending L order'
 
-    with open(filename, 'r') as f:
+    with open(filename) as f:
         lines = [i.strip() for i in f.read().split('\n')]
 
     angular_momenta = {}
@@ -34,7 +34,7 @@ def basis_read_full(filename):
           i += 1
 
       elif lines[i].isdigit():
-          if q == None or len(angular_momenta[q])>0:
+          if q is None or len(angular_momenta[q])>0:
               raise SystemExit(msg_incorrect)
           nbf = int(lines[i])
           i += 1
@@ -59,7 +59,7 @@ def basis_read_full(filename):
         if llist == sorted(llist):
             SystemExit(msg_lorder)
         Lmax[q] = max(llist)
-        for l, nsize in zip(*np.unique(np.array(angular_momenta[q]), return_counts=True)):
+        for l, nsize in zip(*np.unique(np.array(angular_momenta[q]), return_counts=True), strict=True):
             Nmax[(q,l)] = nsize
 
     return basis, Lmax, Nmax

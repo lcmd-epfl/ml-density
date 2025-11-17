@@ -13,7 +13,6 @@ def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
     proj = metatensor.load(f'{path_proj}{conf}.mts')
     k_NM = metatensor.load(f'{path_kern}{conf}.mts')
     for (l1, q1), pblock in proj.items():
-        msize1 = 2*l1+1
         kblock = k_NM.block(o3_lambda=l1, center_type=q1)
         ablock = Avec.block(o3_lambda=l1, center_type=q1)
         for iiref1 in range(np.count_nonzero(ref_elem==q1)):
