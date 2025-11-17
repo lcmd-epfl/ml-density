@@ -5,47 +5,44 @@ import itertools
 import numpy as np
 from tqdm import tqdm
 import metatensor
+from qstack import compound, reorder, equio
 from libs.config import read_config
-from libs.functions import moldata_read, get_elements_list, nao_for_mol, Basis
-from libs.tmap import averages2tmap, vector2tmap, matrix2tmap, tmap2matrix
+from libs.functions import moldata_read, get_elements_list, Basis
+from libs.tmap import averages2tmap
 
 
 def main():
     o, p = read_config(sys.argv)
 
     print(f'{o.copy_metric=}')
-    print(f'{o.reorder_ao=}')
 
+    mols = compound.xyz_to_mol_all(p.xyzfilename, basis=o.basisname, ignore=True)
     atomic_numbers = moldata_read(p.xyzfilename)
     nenv = dict(zip(*get_elements_list(atomic_numbers, return_counts=True)))
 
     basis = Basis(o.basisname, elements=nenv.keys())
+    ao_indices = [basis.index(atoms) for atoms in atomic_numbers]
 
     coefficients = load_coefs(len(atomic_numbers), p.coefffilebase)
 
-    av_coefs = get_averages(nenv, basis, coefficients, atomic_numbers)
+    av_coefs = get_averages(nenv, basis, coefficients, ao_indices)
 
-    for imol, (coef, atoms) in tqdm([*enumerate(zip(coefficients, atomic_numbers))]):
+    for imol, (coef, mol, ao_index) in tqdm([*enumerate(zip(coefficients, mols, ao_indices))]):
 
-        ao_index = basis.index(atoms)
+        coef = reorder.reorder_ao(mol, coef, dest='gpr', src=o.coeff_order)
+        np.save(f'{p.goodcoeffilebase}{imol}.npy', coef)
 
-        idx = reorder_idx(ao_index, o.reorder_ao)
-
-        good_coef = coef[idx]
-        np.save(f'{p.goodcoeffilebase}{imol}.npy', good_coef)
-        good_coef = remove_averages(ao_index, good_coef, av_coefs)
+        coef = remove_averages(ao_index, coef, av_coefs)
 
         if o.copy_metric:
-            over      = np.load(f'{p.overfilebase}{imol}.npy')
-            good_over = over[np.ix_(idx,idx)]
-            over_tmap = matrix2tmap(atoms, basis.lmax, basis.nmax, good_over)
-            metatensor.save(f'{p.goodoverfilebase}{imol}.mts', over_tmap)
+            over = np.load(f'{p.overfilebase}{imol}.npy')
+            over = reorder.reorder_ao(mol, over, dest='gpr', src=o.overlap_order)
+            metatensor.save(f'{p.goodoverfilebase}{imol}.mts', equio.array_to_tensormap(mol, over, src='gpr'))
         else:
-            good_over = tmap2matrix(atoms, basis.lmax, basis.nmax, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'))
+            over = equio.tensormap_to_array(mol, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'), dest='gpr', fast=True)
 
-        proj = good_over @ good_coef
-        proj_tmap = vector2tmap(atoms, basis.lmax, basis.nmax, proj)
-        metatensor.save(f'{p.baselinedwbase}{imol}.mts', proj_tmap)
+        proj = over @ coef
+        metatensor.save(f'{p.baselinedwbase}{imol}.mts', equio.array_to_tensormap(mol, proj, src='gpr'))
     metatensor.save(p.avfile, averages2tmap(av_coefs))
 
 
@@ -67,25 +64,11 @@ def remove_averages(ao_index, coef, av_coefs):
     return coef_new
 
 
-def reorder_idx(ao_index, reorder_ao=False):
-    idx = np.arange(ao_index.nao, dtype=int)
-    if reorder_ao:
-        for iat in range(ao_index.nat):
-            ao1 = ao_index.find(iat=iat, l=1)
-            if len(ao1)==0:
-                continue
-            idx[ao1] = idx[ao1+np.tile([1,1,-2], len(ao1)//3)]
-    return idx
-
-
-
-
-def get_averages(nenv, basis, coefficients, atomic_numbers):
+def get_averages(nenv, basis, coefficients, ao_indices):
     av_coefs = {q: np.zeros(basis.nmax[(q, 0)]) for q in nenv.keys()}
 
-    for coef, atoms in zip(coefficients, atomic_numbers):
-        ao_index = basis.index(atoms)
-        for iat, q in enumerate(atoms):
+    for coef, ao_index in zip(coefficients, ao_indices):
+        for iat, q in enumerate(ao_index.atoms):
             av_coefs[q] += coef[ao_index.find(iat=iat, l=0)]
 
     for q in av_coefs.keys():
