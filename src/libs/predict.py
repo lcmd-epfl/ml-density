@@ -26,7 +26,7 @@ def run_prediction(test_configs, atomic_numbers,
     weights = vector2tmap(ref_elements, lmax, nmax, weights)
 
     predictions = []
-    for i, (imol, atoms) in enumerate(zip(test_configs, atomic_numbers)):
+    for i, (imol, atoms) in enumerate(zip(test_configs, atomic_numbers, strict=True)):
         print_progress(i, len(test_configs))
         kernel = metatensor.load(f'{kernelbase}{imol}.mts')
         predictions.append(compute_prediction(atoms, lmax, nmax, kernel, weights, averages=averages))

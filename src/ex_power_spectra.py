@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-import numpy as np
 import ase.io
 import metatensor
 from libs.config import read_config

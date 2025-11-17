@@ -16,7 +16,7 @@ class ClebschGordanReal:
         # real-to-complex and complex-to-real transformations as matrices
         r2c = {}
         c2r = {}
-        for L in range(0, self._l_max + 1):
+        for L in range(self._l_max + 1):
             r2c[L] = _real2complex(L)
             c2r[L] = np.conjugate(r2c[L]).T
 
@@ -157,7 +157,7 @@ class ClebschGordanReal:
         # runs over the tuple of (partly) decoupled terms
         for ltuple, lcomponents in decoupled.items():
             # each is a list of L terms
-            for lc in lcomponents.keys():
+            for lc in lcomponents:
 
                 # this is the actual matrix-valued coupled term,
                 # of shape (..., 2l1+1, 2l2+1), transforming as Y^m1_l1 Y^m2_l2
@@ -213,13 +213,13 @@ class ClebschGordanReal:
             )
             for L in range(max(l1, l2) - min(l1, l2), min(self._l_max, (l1 + l2)) + 1):
                 # supports missing L components, e.g. if they are zero because of symmetry
-                if not L in lcomponents:
+                if L not in lcomponents:
                     continue
                 for M in range(2 * L + 1):
                     for m1, m2, cg in self._cg[(l1, l2, L)][M]:
                         dec_term[..., m1, m2] += cg * lcomponents[L][..., M]
             # stores the result with a key that drops the l's we have just decoupled
-            if not ltuple[2:] in decoupled:
+            if ltuple[2:] not in decoupled:
                 decoupled[ltuple[2:]] = {}
             decoupled[ltuple[2:]][l2] = dec_term
 
@@ -279,7 +279,7 @@ def acdc_standardize_keys(descriptor):
     """
 
     key_names = descriptor.keys.names
-    if not "o3_lambda" in key_names:
+    if "o3_lambda" not in key_names:
         raise ValueError(
             "Descriptor missing spherical harmonics channel key `o3_lambda`"
         )
@@ -287,9 +287,9 @@ def acdc_standardize_keys(descriptor):
     keys = []
     for key, block in descriptor.items():
         key = tuple(key)
-        if not "o3_sigma" in key_names:
+        if "o3_sigma" not in key_names:
             key = (1,) + key
-        if not "order_nu" in key_names:
+        if "order_nu" not in key_names:
             key = (1,) + key
         keys.append(key)
         property_names = _remove_suffix(block.properties.names, "_1")
@@ -309,9 +309,9 @@ def acdc_standardize_keys(descriptor):
             newblock.add_gradient(parameter, newgrad)
         blocks.append(newblock)
 
-    if not "o3_sigma" in key_names:
+    if "o3_sigma" not in key_names:
         key_names = ("o3_sigma",) + tuple(key_names)
-    if not "order_nu" in key_names:
+    if "order_nu" not in key_names:
         key_names = ("order_nu",) + tuple(key_names)
 
     return TensorMap(
@@ -462,14 +462,9 @@ def cg_combine(
                 np.indices((len(properties_a), len(properties_b))).reshape(2, -1).T
             )
 
-            prop_ids_a = []
-            prop_ids_b = []
-            for n_a, f_a in enumerate(properties_a):
-                prop_ids_a.append(tuple(f_a) + (lam_a,))
-            for n_b, f_b in enumerate(properties_b):
-                prop_ids_b.append(tuple(f_b) + (lam_b,))
-            prop_ids_a = np.asarray(prop_ids_a)
-            prop_ids_b = np.asarray(prop_ids_b)
+            prop_ids_a = np.array([tuple(f_a) + (lam_a,) for f_a in properties_a])
+            prop_ids_b = np.array([tuple(f_b) + (lam_b,) for f_b in properties_b])
+
             sel_idx = np.hstack(
                 [prop_ids_a[sel_feats[:, 0]], prop_ids_b[sel_feats[:, 1]]]
             )
@@ -486,7 +481,7 @@ def cg_combine(
                     S,
                     L,
                 ) + OTHERS
-                if not KEY in X_idx:
+                if KEY not in X_idx:
                     X_idx[KEY] = []
                     X_blocks[KEY] = []
                     X_samples[KEY] = block_b.samples
@@ -712,8 +707,7 @@ def ps_normalize_gradient_inplace(idx, grad, values, norm, min_norm=MIN_NORM):
 
 
 def normalize_tensormap(soap, min_norm=MIN_NORM):
-    for key, block in soap.items():
-        norms = np.zeros(len(block.samples))
+    for block in soap.values():
         for samp in block.samples:
             isamp = block.samples.position(samp)
             norm = ps_normalize_inplace(block.values[isamp,:,:], min_norm=min_norm)

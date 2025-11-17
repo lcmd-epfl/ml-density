@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-import numpy as np
 import metatensor
 from libs.basis import basis_read
 from libs.config import read_config

@@ -33,7 +33,6 @@ def main():
             predictfile = f'{p.predictfilebase}_training_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.mts'
         predictions = split(metatensor.load(predictfile))
 
-        dn_av = 0.0
         total_error_N      = 0.0
         total_error_abs    = 0.0
         total_error_rel    = 0.0

@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import metatensor
 from libs.config import read_config
-from libs.functions import moldata_read, get_elements_list
+from libs.functions import moldata_read
 from libs.basis import basis_read
 from libs.predict import run_prediction
 from libs.tmap import tmap2vector
@@ -22,7 +22,7 @@ def main():
                                  lmax, nmax, weights, ref_elements,
                                  p.kernelexbase, averages=averages)
 
-    for imol, (atoms, c) in enumerate(zip(atomic_numbers_ex, predictions)):
+    for imol, (atoms, c) in enumerate(zip(atomic_numbers_ex, predictions, strict=True)):
         np.savetxt(f'{p.outexfilebase}gpr_{imol}.dat', tmap2vector(atoms, lmax, nmax, c))
 
 

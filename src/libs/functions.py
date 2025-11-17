@@ -1,9 +1,6 @@
-import copy
-import itertools
 import numpy as np
 import ase.io
 from ase.data import chemical_symbols
-import pyscf
 from qstack.tools import slice_generator
 from qstack import compound
 
@@ -108,11 +105,12 @@ class Basis:
         for q in elements:
             atom = compound.make_atom(chemical_symbols[q], basis=basisname)
             _, l, _ = compound.basis_flatten(atom, return_both=False)
-            assert np.all(sorted(l)==l)
+            if not np.all(sorted(l)==l):
+                raise ValueError("Basis functions are not sorted by angular momentum")
             lmax[q] = l[-1]
             n = []
             m = []
-            for li, nao_l in zip(*np.unique(l, return_counts=True)):
+            for li, nao_l in zip(*np.unique(l, return_counts=True), strict=True):
                 msize = 2*li+1
                 nmax[q,li] = nao_l//msize
                 n.append( np.repeat(np.arange(nmax[q,li]), msize))

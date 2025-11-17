@@ -18,14 +18,15 @@ def kernel_nm_sparse_indices(lmax, ref_elements, atomic_numbers):
 
 
 def kernel_nm(atom_charges, soap, soap_ref, imol=0):
-    keys1 = set([tuple(key) for key in soap.keys])
-    keys2 = set([tuple(key) for key in soap_ref.keys])
+    keys1 = {tuple(key) for key in soap.keys}
+    keys2 = {tuple(key) for key in soap_ref.keys}
     keys  = sorted(keys1 & keys2, key=lambda x: x[::-1])
     kernel = {key: [] for key in keys}
 
     for iat, q in enumerate(atom_charges):
         for (l, q_) in keys:
-            if q_!=q: continue
+            if q_!=q:
+                continue
             block = soap.block(o3_lambda=l, center_type=q)
             isamp = block.samples.position((imol, iat))
             vals  = block.values[isamp,:,:]
@@ -72,7 +73,7 @@ def kernel_mm(lmax, power_ref):
     for (l, q), rblock in power_ref.items():
         msize = 2*l+1
         nsamp = len(rblock.samples)
-        if not q in samples:
+        if q not in samples:
             samples[q] = list(rblock.samples)
         k_MM[(l, q)] = np.zeros((nsamp, nsamp, msize, msize))
         for iiref1 in range(nsamp):
@@ -83,9 +84,9 @@ def kernel_mm(lmax, power_ref):
                 k_MM[(l, q)][iiref1, iiref2] = dot
                 if iiref1!=iiref2:
                     k_MM[(l, q)][iiref2, iiref1] = dot.T
-    for q in lmax.keys():
+    for lm, q in lmax.items():
         # Mind the descending order of l
-        for l in range(lmax[q], -1, -1):
+        for l in range(lm, -1, -1):
             k_MM[(l, q)] *= k_MM[(0, q)]
 
     return kmm2tmap(samples, k_MM)

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-import sys, os
-import numpy as np
+import sys
 import ase.io
 import metatensor
 from tqdm import trange
@@ -17,6 +16,7 @@ def main():
     o, p = read_config(sys.argv)
 
     def do_mol(imol):
+        #import os
         #if os.path.exists(f'{p.splitpsfilebase}_{imol}.mts'):
         #    return
         #print(imol)
