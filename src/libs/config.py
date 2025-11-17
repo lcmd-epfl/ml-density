@@ -68,6 +68,7 @@ def read_config(argv):
         o.use_charges  = conf.get_option('charges'     , 0               , int         )
         o.ps_min_norm  = conf.get_option('ps_min_norm' , 1e-20           , float       )
         o.ps_normalize = conf.get_option('ps_normalize', True            , conf.bool   )
+        o.basisname    = conf.get_option('basisname'   , 'cc-pvqz-jkfit' , str         )
         return o
 
     def get_all_paths():

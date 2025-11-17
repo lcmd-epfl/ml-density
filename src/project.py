@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 import sys
+import itertools
 import numpy as np
+from tqdm import tqdm
 import metatensor
 from libs.config import read_config
-from libs.basis import basis_read
-from libs.functions import moldata_read, print_progress, get_elements_list, nao_for_mol
+from libs.functions import moldata_read, get_elements_list, nao_for_mol, Basis
 from libs.tmap import averages2tmap, vector2tmap, matrix2tmap, tmap2matrix
 
 
@@ -16,35 +17,41 @@ def main():
     print(f'{o.reorder_ao=}')
 
     atomic_numbers = moldata_read(p.xyzfilename)
-    lmax, nmax = basis_read(p.basisfilename)
-    coefficients = load_coefs(atomic_numbers, p.coefffilebase)
-    av_coefs = get_averages(lmax, nmax, coefficients, atomic_numbers)
+    nenv = dict(zip(*get_elements_list(atomic_numbers, return_counts=True)))
 
-    for imol, (coef, atoms) in enumerate(zip(coefficients, atomic_numbers)):
-        print_progress(imol, len(atomic_numbers))
-        idx = reorder_idx(atoms, lmax, nmax, o.reorder_ao)
+    basis = Basis(o.basisname, elements=nenv.keys())
+
+    coefficients = load_coefs(len(atomic_numbers), p.coefffilebase)
+
+    av_coefs = get_averages(nenv, basis, coefficients, atomic_numbers)
+
+    for imol, (coef, atoms) in tqdm([*enumerate(zip(coefficients, atomic_numbers))]):
+
+        ao_index = basis.index(atoms)
+
+        idx = reorder_idx(ao_index, o.reorder_ao)
 
         good_coef = coef[idx]
         np.save(f'{p.goodcoeffilebase}{imol}.npy', good_coef)
-        good_coef = remove_averages(atoms, lmax, nmax, good_coef, av_coefs)
+        good_coef = remove_averages(ao_index, good_coef, av_coefs)
 
         if o.copy_metric:
             over      = np.load(f'{p.overfilebase}{imol}.npy')
             good_over = over[np.ix_(idx,idx)]
-            over_tmap = matrix2tmap(atoms, lmax, nmax, good_over)
+            over_tmap = matrix2tmap(atoms, basis.lmax, basis.nmax, good_over)
             metatensor.save(f'{p.goodoverfilebase}{imol}.mts', over_tmap)
         else:
-            good_over = tmap2matrix(atoms, lmax, nmax, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'))
+            good_over = tmap2matrix(atoms, basis.lmax, basis.nmax, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'))
 
         proj = good_over @ good_coef
-        proj_tmap = vector2tmap(atoms, lmax, nmax, proj)
+        proj_tmap = vector2tmap(atoms, basis.lmax, basis.nmax, proj)
         metatensor.save(f'{p.baselinedwbase}{imol}.mts', proj_tmap)
     metatensor.save(p.avfile, averages2tmap(av_coefs))
 
 
-def load_coefs(atomic_numbers, coefffilebase):
+def load_coefs(n, coefffilebase):
     coefficients = []
-    for imol, atoms in enumerate(atomic_numbers):
+    for imol in range(n):
         try:
             coef = np.loadtxt(f'{coefffilebase}{imol}.dat')
         except:
@@ -53,46 +60,35 @@ def load_coefs(atomic_numbers, coefffilebase):
     return coefficients
 
 
-def remove_averages(atoms, lmax, nmax, coef, av_coefs):
+def remove_averages(ao_index, coef, av_coefs):
     coef_new = np.copy(coef)
-    i = 0
-    for q in atoms:
-        coef_new[i:i+nmax[(q,0)]] -= av_coefs[q]
-        for l in range(lmax[q]+1):
-            i += (2*l+1)*nmax[(q,l)]
+    for iat, q in enumerate(ao_index.atoms):
+        coef_new[ao_index.find(iat=iat, l=0)] -= av_coefs[q]
     return coef_new
 
 
-def reorder_idx(atoms, lmax, nmax, reorder_ao=False):
-    nao = nao_for_mol(atoms, lmax, nmax)
-    idx = np.arange(nao, dtype=int)
+def reorder_idx(ao_index, reorder_ao=False):
+    idx = np.arange(ao_index.nao, dtype=int)
     if reorder_ao:
-        i = 0
-        for q in atoms:
-            i += nmax[(q,0)]
-            if(lmax[q]<1):
+        for iat in range(ao_index.nat):
+            ao1 = ao_index.find(iat=iat, l=1)
+            if len(ao1)==0:
                 continue
-            for n in range(nmax[(q,1)]):
-                idx[i  ] = i+1
-                idx[i+1] = i+2
-                idx[i+2] = i
-                i += 3
-            for l in range(2, lmax[q]+1):
-                i += (2*l+1)*nmax[(q,l)]
+            idx[ao1] = idx[ao1+np.tile([1,1,-2], len(ao1)//3)]
     return idx
 
 
-def get_averages(lmax, nmax, coefficients, atomic_numbers):
-    elements, counts = get_elements_list(atomic_numbers, return_counts=True)
-    nenv = dict(zip(elements, counts))
-    av_coefs = {q: np.zeros(nmax[(q, 0)]) for q in elements}
+
+
+def get_averages(nenv, basis, coefficients, atomic_numbers):
+    av_coefs = {q: np.zeros(basis.nmax[(q, 0)]) for q in nenv.keys()}
+
     for coef, atoms in zip(coefficients, atomic_numbers):
-        i = 0
-        for q in atoms:
-            av_coefs[q] += coef[i:i+nmax[(q,0)]]
-            for l in range(lmax[q]+1):
-                i += (2*l+1)*nmax[(q,l)]
-    for q in elements:
+        ao_index = basis.index(atoms)
+        for iat, q in enumerate(atoms):
+            av_coefs[q] += coef[ao_index.find(iat=iat, l=0)]
+
+    for q in av_coefs.keys():
         av_coefs[q] /= nenv[q]
     return av_coefs
 

@@ -1,7 +1,11 @@
 import copy
+import itertools
 import numpy as np
 import ase.io
 from ase.data import chemical_symbols
+import pyscf
+from qstack.tools import slice_generator
+from qstack import compound
 
 
 def moldata_read(xyzfilename):
@@ -102,3 +106,77 @@ def do_fps(x, d=0):
         nd = n2 + n2[iy[i]] - 2.0*np.dot(x,x[iy[i]])
         dl = np.minimum(dl,nd)
     return iy, measure
+
+
+
+class Basis:
+    #def __init__(self, lmax, nmax):
+    #    ao = {}
+    #    for q in lmax.keys():
+    #        ao[q] = []
+    #        for l in range(lmax[q]+1):
+    #            for n in range(nmax[(q,l)]):
+    #                for m in range(-l, l+1):
+    #                    ao[q].append((q, l, n, m))
+    #        ao[q] = np.array(ao[q])
+    #    self.ao = ao
+    #    self.lmax = lmax
+    #    self.nmax = nmax
+    def __init__(self, basisname, elements):
+        lmax = {}
+        nmax = {}
+        ao = {}
+        for q in elements:
+            atom = compound.make_atom(chemical_symbols[q], basis=basisname)
+            _, l, _ = compound.basis_flatten(atom, return_both=False)
+            assert np.all(sorted(l)==l)
+            lmax[q] = l[-1]
+            n = []
+            m = []
+            for li, nao_l in zip(*np.unique(l, return_counts=True)):
+                msize = 2*li+1
+                nmax[q,li] = nao_l//msize
+                n.append( np.repeat(np.arange(nmax[q,li]), msize))
+                m.append( np.tile(np.arange(msize)-li, nmax[q,li]))  # cannot use m from basis_flatten because of pyscf ordering
+            ao[q] = np.vstack((np.ones_like(l)*q, l, np.hstack(n), np.hstack(m))).T
+        self.ao = ao
+        self.lmax = lmax
+        self.nmax = nmax
+
+
+    def cat(self, atoms):
+        limits = list(slice_generator(atoms, inc=lambda q: len(self.ao[q])))
+        ao = np.zeros((limits[-1][1].stop, 5), dtype=int)
+        for iat, (q, i) in enumerate(limits):
+            ao[i,0] = iat
+            ao[i,1:] = self.ao[q]
+        return ao
+
+    def index(self, atoms):
+        return AOIndex(atoms, self)
+
+
+class AOIndex:
+    def __init__(self, atoms, basis):
+        self.ao = basis.cat(atoms)
+        self.nao = len(self.ao)
+        self.nat = len(atoms)
+        self.atoms = atoms
+
+    def find(self, iat=None, q=None, l=None, n=None, m=None):
+        conditions = []
+        if iat is not None:
+            conditions.append(self.ao[:,0]==iat)
+        if q is not None:
+            conditions.append(self.ao[:,1]==q)
+        if l is not None:
+            conditions.append(self.ao[:,2]==l)
+        if n is not None:
+            conditions.append(self.ao[:,3]==n)
+        if m is not None:
+            conditions.append(self.ao[:,4]==m)
+
+        if len(conditions)==0:
+            return np.arange(len(self.ao))
+        else:
+            return np.where(np.prod(conditions, axis=0))[0]
