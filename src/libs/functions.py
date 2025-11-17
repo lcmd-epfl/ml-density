@@ -10,9 +10,7 @@ from qstack import compound
 
 def moldata_read(xyzfilename):
     mols = ase.io.read(xyzfilename, ":")
-    atomic_numbers = []
-    for i, mol in enumerate(mols):
-        atomic_numbers.append(mol.get_atomic_numbers())
+    atomic_numbers = [mol.get_atomic_numbers() for mol in mols]
     return np.array(atomic_numbers, dtype=object)
 
 
@@ -88,25 +86,6 @@ def get_test_set(filename, nmol):
     train_selection = np.loadtxt(filename, dtype=int)
     test_configs = np.setdiff1d(range(nmol), train_selection)
     return len(test_configs), test_configs
-
-
-def do_fps(x, d=0):
-    # Code from Giulio Imbalzano
-    n = len(x)
-    if d==0:
-        d = n
-    iy = np.zeros(d,int)
-    measure = np.zeros(d-1,float)
-    iy[0] = 0
-    # Faster evaluation of Euclidean distance
-    n2 = np.sum(x*x, axis=1)
-    dl = n2 + n2[iy[0]] - 2.0*np.dot(x,x[iy[0]])
-    for i in range(1,d):
-        iy[i], measure[i-1] = np.argmax(dl), np.amax(dl)
-        nd = n2 + n2[iy[i]] - 2.0*np.dot(x,x[iy[i]])
-        dl = np.minimum(dl,nd)
-    return iy, measure
-
 
 
 class Basis:

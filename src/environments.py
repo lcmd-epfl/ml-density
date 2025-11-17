@@ -2,9 +2,11 @@
 
 import sys
 import numpy as np
+from tqdm import tqdm
 from ase.data import chemical_symbols
+from qstack.mathutils.fps import do_fps
 from libs.config import read_config
-from libs.functions import moldata_read, get_elements_list, do_fps, print_progress
+from libs.functions import moldata_read, get_elements_list
 from libs.power_spectra_lib import read_ps_1mol_l0
 
 
@@ -15,9 +17,8 @@ def main():
     elements = get_elements_list(atomic_numbers)
 
     power_env = []
-    for imol, atnum in enumerate(atomic_numbers):
-        print_progress(imol, len(atomic_numbers))
-        power_env.append(read_ps_1mol_l0(f'{p.splitpsfilebase}_{imol}.mts', atnum))
+    for imol, atoms in enumerate(tqdm(atomic_numbers)):
+        power_env.append(read_ps_1mol_l0(f'{p.splitpsfilebase}_{imol}.mts', atoms))
     power_env = np.vstack(power_env)
 
     ref_indices, distances = do_fps(power_env, o.M)
