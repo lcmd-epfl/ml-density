@@ -1,4 +1,17 @@
-# installation
+# ML-density
+
+SA-GPR model for electron density
+
+Used in:
+* https://doi.org/10.1063/5.0033326
+* https://doi.org/10.1021/acs.jpclett.1c01425
+* https://doi.org/10.1063/5.0055393
+
+Based on:
+* https://doi.org/10.1021/acscentsci.8b00551
+* https://doi.org/10.1039/C9SC02696G
+
+## Installation
 
 ```
 git clone https://github.com/lcmd-epfl/ml-density/
@@ -6,7 +19,7 @@ cd ml-density/
 git checkout use-rascaline-ps
 ```
 
-## environment
+### Environment
 
 * install `cargo`
 * install MPI and OpenMP
@@ -23,18 +36,18 @@ pip install metatensor-core==0.1.14
 pip install git+https://github.com/metatensor/featomic.git@4968429ece4f5fc7935047d0c2e813cac21018ab
 ```
 
-## build
+### Build
 
 If planning to use the C library:
 ```
 make -C src/clibs
 ```
 
-## usage
+## Usage
 
 in progress... see `sidechains_examples/` and `sbatch_examples`
 
-## todo
+## TODO
 
 * improve readme
 * add tests
