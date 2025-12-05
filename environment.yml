@@ -1,0 +1,16 @@
+name: ml-density
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy=1.23
+  - pip=25.1.1
+  - scipy=1.10
+  - numba=0.60.0
+  - pip:
+    - mpi4py==3.1.4
+    - ase==3.22
+    - wigners==0.3
+    - metatensor-core==0.1.14
+    - git+https://github.com/metatensor/featomic.git@4968429ece4f5fc7935047d0c2e813cac21018ab

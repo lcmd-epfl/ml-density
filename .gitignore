@@ -1,4 +1,12 @@
+*.o
 *.so
 *.pyc
 *.pyc.*
 *.swp
+
+sidechains_examples/INNER/
+sidechains_examples/error.txt
+sidechains_examples/extra/PS_0.mts
+sidechains_examples/extra/kernel0.dat.mts
+sidechains_examples/extra/kernel0.mts
+sidechains_examples/extra/rho_gpr_0.dat
