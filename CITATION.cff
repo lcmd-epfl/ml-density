@@ -1,14 +1,15 @@
 cff-version: 1.2.0
-message: If you use this software, please cite it using the metadata from this file.
-title: 'lcmd-epfl/ml-density: SA-GPR model for electron density'
+message: "If you use this software, please cite it using the metadata from this file."
+title: "lcmd-epfl/ml-density: SA-GPR model for electron density"
 authors:
-- family-names: Briling
-  given-names: Ksenia R.
+- family-names: "Briling"
+  given-names: "Ksenia R."
   orcid: https://orcid.org/0000-0003-2250-9898
-  affiliation: LCMD EPFL
-license:
-- MIT
-repository-code: https://github.com/lcmd-epfl/ml-density/
+  affiliation: "LCMD EPFL"
+date-released: 2025-12-09
+version: 2.0-rc1
+license: MIT
+repository-code: "https://github.com/lcmd-epfl/ml-density"
 type: software
 references:
 - title: "Transferable Machine-Learning Model of the Electron Density"
