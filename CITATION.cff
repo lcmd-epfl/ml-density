@@ -1,0 +1,65 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using the metadata from this file.
+title: 'lcmd-epfl/ml-density: SA-GPR model for electron density'
+authors:
+- family-names: Briling
+  given-names: Ksenia R.
+  orcid: https://orcid.org/0000-0003-2250-9898
+  affiliation: LCMD EPFL
+license:
+- MIT
+repository-code: https://github.com/lcmd-epfl/ml-density/
+type: software
+references:
+- title: "Transferable Machine-Learning Model of the Electron Density"
+  type: article
+  doi: 10.1021/acscentsci.8b00551
+  authors:
+  - family-names: Grisafi
+    given-names: Andrea
+    orcid: https://orcid.org/0000-0003-1433-125X
+  - family-names: Fabrizio
+    given-names: Alberto
+    orcid: https://orcid.org/0000-0002-4440-3149
+  - family-names: Meyer
+    given-names: Benjamin
+  - family-names: Wilkins
+    given-names: David M.
+  - family-names: Ceriotti
+    given-names: Michele
+    orcid: https://orcid.org/0000-0003-2571-2832
+  - family-names: Corminboeuf
+    given-names: Clemence
+    orcid: https://orcid.org/0000-0001-7993-2879
+- title: "Electron density learning of non-covalent systems"
+  type: article
+  doi: 10.1039/C9SC02696G
+  authors:
+  - family-names: Fabrizio
+    given-names: Alberto
+    orcid: https://orcid.org/0000-0002-4440-3149
+  - family-names: Grisafi
+    given-names: Andrea
+    orcid: https://orcid.org/0000-0003-1433-125X
+  - family-names: Meyer
+    given-names: Benjamin
+  - family-names: Ceriotti
+    given-names: Michele
+    orcid: https://orcid.org/0000-0003-2571-2832
+  - family-names: Corminboeuf
+    given-names: Clemence
+    orcid: https://orcid.org/0000-0001-7993-2879
+- title: "Impact of quantum-chemical metrics on the machine learning prediction of electron density"
+  type: article
+  doi: 10.1063/5.0055393
+  year: 2021
+  authors:
+  - family-names: Briling
+    given-names: Ksenia R.
+    orcid: https://orcid.org/0000-0003-2250-9898
+  - family-names: Fabrizio
+    given-names: Alberto
+    orcid: https://orcid.org/0000-0002-4440-3149
+  - family-names: Corminboeuf
+    given-names: Clemence
+    orcid: https://orcid.org/0000-0001-7993-2879
