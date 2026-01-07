@@ -4,8 +4,7 @@ import sys
 import numpy as np
 import metatensor
 from libs.config import read_config
-from libs.basis import basis_read
-from libs.functions import moldata_read, get_elements_list
+from libs.functions import moldata_read, get_elements_list, Basis
 from libs.tmap import merge_ref_ps
 
 
@@ -17,11 +16,11 @@ def main():
     natoms = np.array([len(atoms) for atoms in atomic_numbers])
 
     ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,0]
-    lmax, _ = basis_read(p.basisfilename)
+    basis = Basis(o.basisname, elements)
 
     ref_mol_at = get_ref_idx(natoms, ref_indices)
     print(ref_mol_at)
-    tensor = merge_ref_ps(lmax, elements, atomic_numbers, ref_mol_at, p.splitpsfilebase)
+    tensor = merge_ref_ps(basis.lmax, elements, atomic_numbers, ref_mol_at, p.splitpsfilebase)
     metatensor.save(f'{p.powerrefbase}_{o.M}.mts', tensor)
 
 

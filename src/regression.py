@@ -6,22 +6,21 @@ import numpy as np
 import scipy.linalg as spl
 from numba import jit
 import metatensor
-from libs.basis import basis_read
 from libs.config import read_config
-from libs.functions import nao_for_mol
+from libs.functions import nao_for_mol, Basis
 from libs.tmap import sparseindices_fill
 
 
 def main():
     o, p = read_config(sys.argv)
 
-    lmax, nmax = basis_read(p.basisfilename)
     ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
-    totsize = nao_for_mol(ref_elements, lmax, nmax)
+    basis = Basis(o.basisname, set(ref_elements))
+    totsize = nao_for_mol(ref_elements, basis.lmax, basis.nmax)
 
     k_MM = metatensor.load(f'{p.kmmbase}{o.M}.mts')
     mat  = np.ndarray((totsize,totsize))
-    idx = sparseindices_fill(lmax, nmax, ref_elements)
+    idx = sparseindices_fill(basis.lmax, basis.nmax, ref_elements)
 
     print(f'problem dimensionality = {totsize}')
 
@@ -32,7 +31,7 @@ def main():
         Avec = np.loadtxt(avecfile)
         mat[:] = 0
 
-        fill_matrix(mat, k_MM, bmatfile, idx, nmax, o.jit, o.reg)
+        fill_matrix(mat, k_MM, bmatfile, idx, basis.nmax, o.jit, o.reg)
 
         weights = spl.solve(mat, Avec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
         np.save(weightsfile, weights)
