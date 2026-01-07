@@ -1,7 +1,7 @@
 import numpy as np
 from featomic import SphericalExpansion
 from featomic.clebsch_gordan import EquivariantPowerSpectrum
-from metatensor import Labels, TensorMap, operations
+from metatensor import Labels, operations
 
 
 MIN_NORM = 1e-10
@@ -37,7 +37,6 @@ def ps_normalize_gradient_inplace(idx, grad, values, norm, min_norm=MIN_NORM):
 
 def normalize_tensormap(soap, min_norm=MIN_NORM):
     for key, block in soap.items():
-        norms = np.zeros(len(block.samples))
         for samp in block.samples:
             isamp = block.samples.position(samp)
             norm = ps_normalize_inplace(block.values[isamp,:,:], min_norm=min_norm)
@@ -93,7 +92,7 @@ def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_speci
     if lmax is None:
         selected_keys = Labels(["o3_sigma"], np.array([[1]]).T)
     else:
-        selected_keys = np.pad(select_keys(lmax), ((0,0),(1,0)), constant_values=1)
+        selected_keys = np.vstack([np.pad(np.arange(l+1)[:,None], ((0,0),(1, 1)), constant_values=(1,q)) for q, l in lmax.items()])
         selected_keys = Labels(["o3_sigma", "o3_lambda", "center_type"], selected_keys)
 
     soap = calculator.compute(mols, neighbors_to_properties=True, selected_keys=selected_keys)
@@ -102,17 +101,6 @@ def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_speci
     if normalize:
         normalize_tensormap(soap, min_norm=min_norm)
     return soap
-
-
-def select_keys(lmax: dict):
-    return np.vstack([np.pad(np.arange(l+1)[:,None], ((0,0),(0, 1)), constant_values=q) for q, l in lmax.items()])
-
-
-def remove_high_l(lsoap: TensorMap, lmax: dict):
-    """Drop the blocks ``('o3_lambda', 'center_type')`` if o3_lambda > lmax[center_type]."""
-    selected_keys = select_keys(lmax)
-    selected_keys = Labels(["o3_lambda", "center_type"], selected_keys)
-    return operations.filter_blocks(lsoap, selected_keys)
 
 
 def make_rascal_hypers(soap_rcut, soap_ncut, soap_lcut, soap_sigma):

@@ -5,7 +5,7 @@ import numpy as np
 import ase.io
 import metatensor
 from libs.config import read_config
-from libs.lsoap import generate_lambda_soap_wrapper, remove_high_l, make_rascal_hypers
+from libs.lsoap import generate_lambda_soap_wrapper, make_rascal_hypers
 from libs.functions import get_elements_list, print_progress, moldata_read
 from libs.basis import basis_read
 
@@ -32,8 +32,9 @@ def main():
 
     for imol, mol in enumerate(mols_ex):
         print_progress(imol, len(mols_ex))
-        soap = generate_lambda_soap_wrapper(mol, rascal_hypers, neighbor_species=elements, normalize=o.ps_normalize, min_norm=o.ps_min_norm)
-        soap = remove_high_l(soap, lmax)
+        soap = generate_lambda_soap_wrapper(mol, rascal_hypers, neighbor_species=elements,
+                                            normalize=o.ps_normalize, min_norm=o.ps_min_norm,
+                                            lmax=lmax)
         metatensor.save(f'{p.powerexbase}_{imol}.mts', soap)
 
 
