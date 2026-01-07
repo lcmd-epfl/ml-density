@@ -40,7 +40,6 @@ def normalize_tensormap(soap, min_norm=MIN_NORM):
         for samp in block.samples:
             isamp = block.samples.position(samp)
             norm = ps_normalize_inplace(block.values[isamp,:,:], min_norm=min_norm)
-
             if block.has_gradient('positions'):
                 gradient = block.gradient('positions')
                 # get indices for gradient of center id #isamp
@@ -51,12 +50,14 @@ def normalize_tensormap(soap, min_norm=MIN_NORM):
 class EquivariantPowerSpectrum_custom(EquivariantPowerSpectrum):
 
     def __init__(self, calculator_1, calculator_2=None, neighbor_types=None, *, dtype=None, device=None,
-                 filter_redundant_keys=True):
+                 filter_redundant_keys='all'):
 
         super().__init__(calculator_1, calculator_2, neighbor_types, dtype=dtype, device=device)
 
-        if filter_redundant_keys is True:
+        if filter_redundant_keys == 'all':
             from featomic.clebsch_gordan._density_correlations import _filter_redundant_keys
+        elif filter_redundant_keys == 'odd':
+            _filter_redundant_keys = self.filter_redundant_keys_odd
         else:
             _filter_redundant_keys = None
 
@@ -76,6 +77,25 @@ class EquivariantPowerSpectrum_custom(EquivariantPowerSpectrum):
              device=None,
          )
 
+    def filter_redundant_keys_odd(self, keys):
+        from featomic.clebsch_gordan import _dispatch
+        """
+        Filter redundant keys from the ``keys`` to only keep keys where the l values are
+        sorted (i.e. l1 <= l2 <= ... <= ln). These are redundant when handling
+        auto-correlations of a density.
+        Keep also all keys where o3_lambda is even.
+        """
+        nu_target = 2
+        l_list_idxs = [ keys.names.index(f"l_{o3_lambda}") for o3_lambda in range(1, nu_target + 1) ]
+        keys_to_keep: List[int] = []
+        for key_idx in range(len(keys)):
+            key = keys.entry(key_idx)
+            l_list_values = _dispatch.to_int_list(key.values[l_list_idxs])
+            is_l_sorted = _dispatch.all(_dispatch.int_array_like(l_list_values, like=key.values) == _dispatch.int_array_like(sorted(l_list_values), like=key.values))
+            if is_l_sorted or (key["o3_lambda"]%2==0):
+                keys_to_keep.append(key_idx)
+        return keys_to_keep
+
 
 def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_species=None, normalize=True, min_norm=MIN_NORM, lmax=None, gradients=None):
 
@@ -86,8 +106,16 @@ def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_speci
         mols = [mols]
 
     spex_calculator = SphericalExpansion(**rascal_hypers)
-    #calculator = EquivariantPowerSpectrum(spex_calculator, neighbor_types=neighbor_species)
-    calculator = EquivariantPowerSpectrum_custom(spex_calculator, neighbor_types=neighbor_species, filter_redundant_keys=False)
+
+    # filter redundant keys to make PS smaller
+    # but break compatibility with previous results because lead to different kernels with even L>0
+    # calculator = EquivariantPowerSpectrum(spex_calculator, neighbor_types=neighbor_species)
+
+    # legacy: do no filter redundant keys
+    # calculator = EquivariantPowerSpectrum_custom(spex_calculator, neighbor_types=neighbor_species, filter_redundant_keys=False)
+
+    # new: filter only odd redundant keys so the PS are smaller but still compatible with previous results for even L
+    calculator = EquivariantPowerSpectrum_custom(spex_calculator, neighbor_types=neighbor_species, filter_redundant_keys='odd')
 
     if lmax is None:
         selected_keys = Labels(["o3_sigma"], np.array([[1]]).T)
