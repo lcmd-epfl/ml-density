@@ -4,7 +4,8 @@ import re
 import numpy as np
 import wigners
 from featomic import SphericalExpansion
-from metatensor import Labels, TensorBlock, TensorMap
+from featomic.clebsch_gordan import EquivariantPowerSpectrum
+from metatensor import Labels, TensorBlock, TensorMap, operations
 
 # === CG Iteration code, copied into a single place.
 
@@ -667,8 +668,8 @@ def clean_lambda_soap(lsoap: TensorMap):
 
     new_keys, new_blocks = [], []
     for key, block in lsoap.items():
-        if key[1] == 1:
-            new_keys.append([key[2], key[3]])
+        if key['o3_sigma'] == 1:
+            new_keys.append([key['o3_lambda'], key['center_type']])
             new_blocks.append(block.copy())
 
     lsoap_cleaned = TensorMap(
@@ -725,11 +726,103 @@ def normalize_tensormap(soap, min_norm=MIN_NORM):
                 ps_normalize_gradient_inplace(igsamps, gradient.values, block.values[isamp,:,:], norm, min_norm=min_norm)
 
 
+
+
+class EquivariantPowerSpectrum_custom(EquivariantPowerSpectrum):
+
+    def __init__(self, calculator_1, calculator_2=None, neighbor_types=None, *, dtype=None, device=None,
+                 filter_redundant_keys=True):
+
+        super().__init__(calculator_1, calculator_2, neighbor_types, dtype=dtype, device=device)
+
+        if filter_redundant_keys is True:
+            from featomic.clebsch_gordan._density_correlations import _filter_redundant_keys
+        else:
+            _filter_redundant_keys = None
+
+        import json
+        parameters_1 = json.loads(self.calculator_1.parameters)
+        if self.calculator_2 is None:
+                parameters_2 = parameters_1
+        max_angular = parameters_1['basis']['max_angular'] + parameters_2['basis']['max_angular']
+
+        from featomic.clebsch_gordan._cg_product import ClebschGordanProduct
+        self._cg_product = ClebschGordanProduct(
+             max_angular=max_angular,
+             cg_backend=None,
+             keys_filter=_filter_redundant_keys,
+             arrays_backend=None,
+             dtype=None,
+             device=None,
+         )
+
+
+
+
+
+
 def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_species=None, normalize=True, min_norm=MIN_NORM, lmax=None, gradients=None):
+    if gradients is not None:
+        raise NotImplementedError("Gradients are not implemented yet")
     if not isinstance(mols, list):
         mols = [mols]
+    import time
+
+    start = time.time()
     soap = generate_lambda_soap(frames=mols, rascal_hypers=rascal_hypers, neighbor_species=neighbor_species, gradients=gradients)
+    end = time.time()
+    print("Time taken: ", end - start)
+
+
     soap = clean_lambda_soap(soap)
+    if lmax:
+        soap = remove_high_l(soap, lmax)
+    soap_old = soap
+    print(soap)
+
+    #print()
+
+    spex_calculator = SphericalExpansion(**rascal_hypers)
+    #calculator = EquivariantPowerSpectrum(spex_calculator, neighbor_types=neighbor_species)
+    calculator = EquivariantPowerSpectrum_custom(spex_calculator, neighbor_types=neighbor_species, filter_redundant_keys=False)
+
+
+
+
+
+
+
+
+
+
+    if lmax is None:
+        selected_keys = Labels(["o3_sigma"], np.array([[1]]).T)
+    else:
+        selected_keys = np.vstack([np.pad(np.arange(l+1)[:,None], ((0,0),(1, 1)), constant_values=(1,q)) for q, l in lmax.items()])
+        selected_keys = Labels(["o3_sigma", "o3_lambda", "center_type"], selected_keys)
+
+    start = time.time()
+    soap = calculator.compute(mols, neighbors_to_properties=True, selected_keys=selected_keys)
+    soap = operations.remove_dimension(soap, "keys", "o3_sigma")
+    end = time.time()
+    print("Time taken: ", end - start)
+
+    #soap = clean_lambda_soap(soap)
+
+    print()
+
+    for key in soap_old.keys:
+        soap_old_block = soap_old.block(key)
+        soap_block = soap.block(key)
+        diff = np.linalg.norm(soap_old_block.values - soap_block.values)
+        print(key, diff)
+
+
+
+    exit(0)
+
+
+
     if lmax:
         soap = remove_high_l(soap, lmax)
     if normalize:
