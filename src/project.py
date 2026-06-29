@@ -4,7 +4,8 @@ import sys
 import numpy as np
 from tqdm import tqdm
 import metatensor
-from qstack import compound, reorder, equio
+from qstack import compound, reorder
+from qstack.io import metatensor as equio
 from libs.config import read_config
 from libs.functions import moldata_read, get_elements_list, Basis
 from libs.tmap import averages2tmap
