@@ -20,11 +20,13 @@ matrix_label_names = SimpleNamespace(
 _molid_name = 'mol_id'
 
 
-def keys2set(keys):
+def keys2set(keys: metatensor.Labels) -> set[tuple]:
+    '''Convert TensorMap keys to a set of tuples.'''
     return set(tuple(i) for i in keys)
 
 
-def averages2tmap(averages):
+def averages2tmap(averages: dict[int, np.ndarray]) -> metatensor.TensorMap:
+    '''Pack per-element average coefficient vectors into a TensorMap.'''
     tm_label_vals = []
     tensor_blocks = []
     for q in averages.keys():
@@ -42,7 +44,8 @@ def averages2tmap(averages):
     return tensor
 
 
-def kernels2tmap(atom_charges, kernel):
+def kernels2tmap(atom_charges: np.ndarray, kernel: dict) -> metatensor.TensorMap:
+    '''Pack per-(l, q) kernel blocks into a TensorMap.'''
     tm_label_vals = sorted(list(kernel.keys()), key=lambda x: x[::-1])
     tensor_blocks = []
     for (l, q) in tm_label_vals:
@@ -60,8 +63,8 @@ def kernels2tmap(atom_charges, kernel):
 
 
 
-def vector2tmap(atom_charges, lmax, nmax, c):
-
+def vector2tmap(atom_charges: np.ndarray, lmax: dict, nmax: dict, c: np.ndarray) -> metatensor.TensorMap:
+    '''Convert a flat coefficient vector to a symmetry-adapted TensorMap.'''
     elements = np.unique(atom_charges)
 
     tm_label_vals = []
@@ -108,11 +111,13 @@ def vector2tmap(atom_charges, lmax, nmax, c):
     return tensor
 
 
-def _get_tsize(tensor):
+def _get_tsize(tensor: metatensor.TensorMap) -> int:
+    '''Return total number of elements across all blocks of a TensorMap.'''
     return sum([np.prod(tensor.block(key).values.shape) for key in tensor.keys])
 
 
-def tmap2vector(atom_charges, lmax, nmax, tensor):
+def tmap2vector(atom_charges: np.ndarray, lmax: dict, nmax: dict, tensor: metatensor.TensorMap) -> np.ndarray:
+    '''Convert a symmetry-adapted TensorMap back to a flat coefficient vector.'''
     nao = _get_tsize(tensor)
     c = np.zeros(nao)
     i = 0
@@ -129,7 +134,8 @@ def tmap2vector(atom_charges, lmax, nmax, tensor):
     return c
 
 
-def matrix2tmap(atom_charges, lmax, nmax, dm):
+def matrix2tmap(atom_charges: np.ndarray, lmax: dict, nmax: dict, dm: np.ndarray) -> metatensor.TensorMap:
+    '''Convert a flat overlap/density matrix to a symmetry-adapted TensorMap.'''
 
     def pairs(list1, list2):
         return np.array([(i,j) for i in list1 for j in list2])
@@ -205,7 +211,8 @@ def matrix2tmap(atom_charges, lmax, nmax, dm):
     return tensor
 
 
-def sparseindices_fill(lmax, nmax, atoms):
+def sparseindices_fill(lmax: dict, nmax: dict, atoms: np.ndarray) -> np.ndarray:
+    '''Build an index array mapping (atom, l) to flat vector offsets.'''
     idx = np.zeros((len(atoms), max(lmax.values())+1), dtype=int)
     i = 0
     for iat, q in enumerate(atoms):
@@ -215,7 +222,8 @@ def sparseindices_fill(lmax, nmax, atoms):
     return idx
 
 
-def tmap2matrix(atom_charges, lmax, nmax, tensor):
+def tmap2matrix(atom_charges: np.ndarray, lmax: dict, nmax: dict, tensor: metatensor.TensorMap) -> np.ndarray:
+    '''Convert a symmetry-adapted TensorMap back to a flat matrix.'''
     nao = int(round(np.sqrt(_get_tsize(tensor))))
     dm = np.zeros((nao, nao))
     idx = sparseindices_fill(lmax, nmax, atom_charges)
@@ -235,8 +243,8 @@ def tmap2matrix(atom_charges, lmax, nmax, tensor):
     return dm
 
 
-def merge_ref_ps(lmax, elements, atomic_numbers, idx, splitpsfilebase):
-
+def merge_ref_ps(lmax: dict, elements: np.ndarray, atomic_numbers: np.ndarray, idx: np.ndarray, splitpsfilebase: str) -> metatensor.TensorMap:
+    '''Gather power spectra of FPS-selected reference environments into one TensorMap.'''
     keys = [(l, q) for q in elements for l in range(lmax[q]+1)]
 
     tm_labels = None
@@ -278,8 +286,8 @@ def merge_ref_ps(lmax, elements, atomic_numbers, idx, splitpsfilebase):
     return tensor
 
 
-def join(tensors):
-
+def join(tensors: list[metatensor.TensorMap]) -> metatensor.TensorMap:
+    '''Join per-molecule TensorMaps into a single TensorMap with a mol_id dimension.'''
     if not all(tensor.keys.names==tensors[0].keys.names for tensor in tensors):
         raise Exception(f'Cannot merge tensors with different label names')
 
@@ -317,8 +325,8 @@ def join(tensors):
     return tensor
 
 
-def split(tensor):
-
+def split(tensor: metatensor.TensorMap) -> list[metatensor.TensorMap] | dict[int, metatensor.TensorMap]:
+    '''Split a multi-molecule TensorMap into per-molecule TensorMaps.'''
     if tensor.sample_names[0]!=_molid_name:
         raise Exception(f'Tensor does not seem to contain several molecules')
 
@@ -363,7 +371,8 @@ def split(tensor):
     return tensors
 
 
-def sph2vector(atoms, lmax, nmax, tensor):
+def sph2vector(atoms: np.ndarray, lmax: dict, nmax: dict, tensor: metatensor.TensorMap) -> np.ndarray:
+    '''Extract l=0 blocks and zero-pad higher l to form a flat vector.'''
     c = []
     for iat, q in enumerate(atoms):
         c.append(np.squeeze(tensor.block(o3_lambda=0, center_type=q).values))
@@ -372,14 +381,16 @@ def sph2vector(atoms, lmax, nmax, tensor):
     return np.hstack(c)
 
 
-def tmap_add(x, dx):
+def tmap_add(x: metatensor.TensorMap, dx: metatensor.TensorMap) -> None:
+    '''Add dx to x in-place for all matching blocks.'''
     for (l, q) in keys2set(x.keys).intersection(keys2set(dx.keys)):
         b = x.block(o3_lambda=l, center_type=q)
         db = dx.block(o3_lambda=l, center_type=q)
         b.values[...] += db.values
 
 
-def kmm2tmap(qsamples, kernel):
+def kmm2tmap(qsamples: dict, kernel: dict) -> metatensor.TensorMap:
+    '''Pack the K_MM reference-reference kernel into a TensorMap.'''
     tm_label_vals = sorted(list(kernel.keys()), key=lambda x: x[::-1])
     tensor_blocks = []
     for (l, q) in tm_label_vals:

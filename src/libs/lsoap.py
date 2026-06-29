@@ -1,13 +1,14 @@
 import numpy as np
 from featomic import SphericalExpansion
 from featomic.clebsch_gordan import EquivariantPowerSpectrum
-from metatensor import Labels, operations
+from metatensor import Labels, operations, TensorMap
 
 
 MIN_NORM = 1e-10
 
 
-def ps_normalize_inplace(vals, min_norm=MIN_NORM):
+def ps_normalize_inplace(vals: np.ndarray, min_norm: float = MIN_NORM) -> float:
+    '''Normalize a power spectrum block in-place and return its norm.'''
     norm = np.sqrt(np.linalg.norm(vals @ vals.T))
     if norm > min_norm:
         vals /= norm
@@ -16,8 +17,8 @@ def ps_normalize_inplace(vals, min_norm=MIN_NORM):
     return norm
 
 
-def ps_normalize_gradient_inplace(idx, grad, values, norm, min_norm=MIN_NORM):
-    # print(grad[idx,:,:].shape)  # natoms-in-mol * 3 * (2*l+1) * nfeatures
+def ps_normalize_gradient_inplace(idx: np.ndarray, grad: np.ndarray, values: np.ndarray, norm: float, min_norm: float = MIN_NORM) -> None:
+    '''Apply normalization chain rule to power spectrum gradients in-place.'''
     # print(values.shape)         # (2*l+1) * nfeatures
     if norm > min_norm:
         if values.shape[0]==1:
@@ -35,7 +36,8 @@ def ps_normalize_gradient_inplace(idx, grad, values, norm, min_norm=MIN_NORM):
         grad[idx,...] = 0.0
 
 
-def normalize_tensormap(soap, min_norm=MIN_NORM):
+def normalize_tensormap(soap: TensorMap, min_norm: float = MIN_NORM) -> None:
+    '''Normalize all power spectrum blocks and their gradients in-place.'''
     for key, block in soap.items():
         for samp in block.samples:
             isamp = block.samples.position(samp)
@@ -97,7 +99,7 @@ class EquivariantPowerSpectrum_custom(EquivariantPowerSpectrum):
         return keys_to_keep
 
 
-def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_species=None, normalize=True, min_norm=MIN_NORM, lmax=None, gradients=None):
+def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_species: list = None, normalize: bool = True, min_norm: float = MIN_NORM, lmax: dict = None, gradients: list = None) -> TensorMap:
 
     if gradients is not None:
         raise NotImplementedError("Gradients are not implemented yet")
@@ -131,7 +133,8 @@ def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_speci
     return soap
 
 
-def make_rascal_hypers(soap_rcut, soap_ncut, soap_lcut, soap_sigma):
+def make_rascal_hypers(soap_rcut: float, soap_ncut: int, soap_lcut: int, soap_sigma: float) -> dict:
+    '''Build the featomic SphericalExpansion hyperparameters dictionary.'''
     return {
            "cutoff": {
                "radius": soap_rcut,

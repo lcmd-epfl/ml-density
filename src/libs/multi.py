@@ -3,7 +3,8 @@ from mpi4py import MPI
 from libs.functions import print_progress
 
 
-def print_nodes(Nproc, nproc, comm):
+def print_nodes(Nproc: int, nproc: int, comm: MPI.Comm) -> None:
+    '''Print the hostname of each MPI rank.'''
     sys.stdout.flush()
     msg = f'proc {nproc:3d} : {MPI.Get_processor_name()}'
     if nproc == 0:
@@ -17,7 +18,8 @@ def print_nodes(Nproc, nproc, comm):
     comm.barrier()
 
 
-def scatter_jobs(Nproc, nproc, comm, bra, ket, do_mol):
+def scatter_jobs(Nproc: int, nproc: int, comm: MPI.Comm, bra: int, ket: int, do_mol: callable) -> None:
+    '''Distribute molecule indices [bra, ket) across MPI ranks.'''
     if nproc == 0:
         for imol in range(bra, ket+Nproc-1):
             (npr, im) = comm.recv(source=MPI.ANY_SOURCE)
@@ -35,7 +37,8 @@ def scatter_jobs(Nproc, nproc, comm, bra, ket, do_mol):
         print(f'{nproc} : finished', flush=True)
 
 
-def multi_process(nmol, do_mol):
+def multi_process(nmol: int, do_mol: callable) -> None:
+    '''Run do_mol over nmol molecules, parallelized with MPI if available.'''
     comm = MPI.COMM_WORLD
     Nproc = comm.Get_size()
     nproc = comm.Get_rank()

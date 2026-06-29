@@ -1,29 +1,34 @@
-import copy
 import numpy as np
 import ase.io
-from ase.data import chemical_symbols
 
 
-def moldata_read(xyzfilename):
+def moldata_read(xyzfilename: str) -> np.ndarray:
+    '''Read (possibly concatenated) XYZ file.
+
+    Returns object array of shape (nmol,) where each element is a 1D int array of atomic numbers for that molecule.'''
     mols = ase.io.read(xyzfilename, ":")
     atomic_numbers = []
-    for i, mol in enumerate(mols):
+    for mol in mols:
         atomic_numbers.append(mol.get_atomic_numbers())
     return np.array(atomic_numbers, dtype=object)
 
 
-def get_elements_list(atomic_numbers, return_counts=False):
+def get_elements_list(atomic_numbers: np.ndarray, return_counts: bool = False) -> np.ndarray:
+    '''Return sorted unique elements across all molecules.'''
     return np.unique(np.concatenate(atomic_numbers), return_counts=return_counts)
 
 
-def print_progress(i, n):
+def print_progress(i: int, n: int) -> None:
+    '''Print a progress bar for step i out of n.'''
     npad = len(str(n))
-    strg = "Doing point %*i of %*i (%5.1f %%)"%(npad,i+1,npad,n,100 * float(i+1)/n)
+    # strg = "Doing point %*i of %*i (%5.1f %%)"%(npad,i+1,npad,n,100 * float(i+1)/n)
+    strg = f"Doing point {i+1:{npad}d} of {n:{npad}d} ({100 * (i+1) / n:5.1f} %)"
     end  = '\r' if i<n-1 else '\n'
     print(strg, end=end, flush=True)
 
 
-def number_of_electrons_ao(basis, atoms):
+def number_of_electrons_ao(basis: dict, atoms: np.ndarray) -> np.ndarray:
+    '''Return per-AO electron number contributions from s-type Gaussians.'''
     def nel_contrib(a):
         # L2 norm = (pi/(2.0*a))^3/4  (\int \phi^2(\vec r) \de^3 \vec r)^(1/2)
         # L1 int  = (pi/a)^3/2        (\int \phi(\vec r) \de^3 \vec r)
@@ -51,12 +56,14 @@ def number_of_electrons_ao(basis, atoms):
     return np.array(nel)
 
 
-def correct_number_of_electrons(c, S, q, N):
+def correct_number_of_electrons(c: np.ndarray, S: np.ndarray, q: np.ndarray, N: float) -> np.ndarray:
+    '''Project coefficients c so that the integrated density equals N electrons.'''
     S1q  = np.linalg.solve(S, q)
     return c + S1q * (N - c@q)/(q@S1q)
 
 
-def nao_for_mol(atoms, lmax, nmax):
+def nao_for_mol(atoms: np.ndarray, lmax: dict, nmax: dict) -> int:
+    '''Return total number of auxiliary basis functions for a molecule.'''
     nao = 0
     for q in atoms:
         for l in range(lmax[q]+1):
@@ -64,7 +71,8 @@ def nao_for_mol(atoms, lmax, nmax):
     return nao
 
 
-def get_training_set(filename, fraction=1.0, sort=True):
+def get_training_set(filename: str, fraction: float = 1.0, sort: bool = True) -> tuple[int, np.ndarray]:
+    '''Load training indices and return the first fraction of them.'''
     train_selection = np.loadtxt(filename, dtype=int, ndmin=1)
     n = int(fraction*len(train_selection))
     train_configs = train_selection[0:n]
@@ -73,20 +81,23 @@ def get_training_set(filename, fraction=1.0, sort=True):
     return n, train_configs
 
 
-def get_training_sets(filename, fractions):
+def get_training_sets(filename: str, fractions: np.ndarray) -> tuple[int, np.ndarray, np.ndarray]:
+    '''Load training indices for multiple fractions at once.'''
     train_selection = np.loadtxt(filename, dtype=int, ndmin=1)
     n = (fractions*len(train_selection)).astype(int)
     train_configs = train_selection[0:n[-1]]
     return len(n), n, train_configs
 
 
-def get_test_set(filename, nmol):
+def get_test_set(filename: str, nmol: int) -> tuple[int, np.ndarray]:
+    '''Return number of molecules and their indices in the testing set (molecules not in the training set).'''
     train_selection = np.loadtxt(filename, dtype=int)
     test_configs = np.setdiff1d(range(nmol), train_selection)
     return len(test_configs), test_configs
 
 
-def do_fps(x, d=0):
+def do_fps(x: np.ndarray, d: int = 0) -> tuple[np.ndarray, np.ndarray]:
+    '''Farthest Point Sampling: select d maximally diverse points from x.'''
     # Code from Giulio Imbalzano
     n = len(x)
     if d==0:

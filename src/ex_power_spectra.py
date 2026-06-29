@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+'''Compute SOAP power spectra for extrapolation molecules.'''
 
 import sys
 import numpy as np
@@ -10,7 +11,7 @@ from libs.functions import get_elements_list, print_progress, moldata_read
 from libs.basis import basis_read
 
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
 
     mols_ex = ase.io.read(p.xyzexfilename, ":")
@@ -22,7 +23,7 @@ def main():
         print(f'Different elements in the molecule and in the training set: {elements_ex} and {elements}')
         exit(1)
 
-    lmax, _ = basis_read(p.basisfilename)
+    _, lmax, _ = basis_read(p.basisfilename)
     rascal_hypers = make_rascal_hypers(o.soap_rcut, o.soap_ncut, o.soap_lcut, o.soap_sigma)
 
     print(f'{rascal_hypers=}')

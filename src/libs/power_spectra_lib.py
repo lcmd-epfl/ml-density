@@ -3,7 +3,8 @@ import numpy as np
 import metatensor
 
 
-def reorder_ps_new(power_per_conf, elements, atomic_numbers, power):
+def reorder_ps_new(power_per_conf: np.ndarray, elements: np.ndarray, atomic_numbers: np.ndarray, power: np.ndarray) -> None:
+    '''Reorder power spectrum rows from element-sorted to atom-index order (in-place).'''
     i=0
     for q in elements:
         idx = np.where(atomic_numbers == q)
@@ -11,13 +12,15 @@ def reorder_ps_new(power_per_conf, elements, atomic_numbers, power):
         i+=len(idx[0])
     return
 
-def read_ps_1mol_new1(psfilename, elements, atomic_numbers):
+def read_ps_1mol_new1(psfilename: str, elements: np.ndarray, atomic_numbers: np.ndarray) -> np.ndarray:
+    '''Load and reorder one molecule's power spectrum from a .npy file.'''
     power = np.squeeze(np.load(psfilename))
     power_per_conf = np.zeros_like(power)
     reorder_ps_new(power_per_conf, elements, atomic_numbers, power)
     return power_per_conf
 
-def read_ps_1mol_l0(psfilename, atomic_numbers):
+def read_ps_1mol_l0(psfilename: str, atomic_numbers: np.ndarray) -> np.ndarray:
+    '''Load the l=0 power spectrum block for one molecule from a .mts file.'''
     power_sorted = None
     power = metatensor.load(psfilename)
     for q in set(atomic_numbers):

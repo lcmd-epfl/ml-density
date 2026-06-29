@@ -3,7 +3,8 @@ import metatensor
 from libs.tmap import kernels2tmap, kmm2tmap
 
 
-def kernel_nm_sparse_indices(lmax, ref_elements, atomic_numbers):
+def kernel_nm_sparse_indices(lmax: dict, ref_elements: np.ndarray, atomic_numbers: np.ndarray) -> tuple[int, np.ndarray]:
+    '''Compute flat index offsets for the sparse K_NM kernel representation.'''
     llmax = max(lmax.values())
     kernel_sparse_indices = np.zeros((len(ref_elements), len(atomic_numbers), llmax+1), dtype=int)
     kernel_size = 0
@@ -17,7 +18,8 @@ def kernel_nm_sparse_indices(lmax, ref_elements, atomic_numbers):
     return kernel_size, kernel_sparse_indices
 
 
-def kernel_nm(atom_charges, soap, soap_ref, imol=0):
+def kernel_nm(atom_charges: np.ndarray, soap: metatensor.TensorMap, soap_ref: metatensor.TensorMap, imol: int = 0) -> metatensor.TensorMap:
+    '''Compute the K_NM kernel between one molecule's power spectrum and the references.'''
     keys1 = set([tuple(key) for key in soap.keys])
     keys2 = set([tuple(key) for key in soap_ref.keys])
     keys  = sorted(keys1 & keys2, key=lambda x: x[::-1])
@@ -40,9 +42,9 @@ def kernel_nm(atom_charges, soap, soap_ref, imol=0):
     return kernel
 
 
-def kernel_nm_flatten(kernel_size, kernel_sparse_indices,
-                      ref_elements, atomic_numbers, k_NM):
-
+def kernel_nm_flatten(kernel_size: int, kernel_sparse_indices: np.ndarray,
+                      ref_elements: np.ndarray, atomic_numbers: np.ndarray, k_NM: metatensor.TensorMap) -> np.ndarray:
+    '''Flatten the K_NM TensorMap into a 1D array using sparse indices.'''
     k_NM_flat = np.zeros(kernel_size)
     for (l, q) in k_NM.keys:
         nq = np.count_nonzero(atomic_numbers==q)
@@ -55,7 +57,8 @@ def kernel_nm_flatten(kernel_size, kernel_sparse_indices,
     return k_NM_flat
 
 
-def kernel_for_mol(lmax, ref_elements, atomic_numbers, power_ref, power_file, kernel_file, save_txt=False):
+def kernel_for_mol(lmax: dict, ref_elements: np.ndarray, atomic_numbers: np.ndarray, power_ref: metatensor.TensorMap, power_file: str, kernel_file: str, save_txt: bool = False) -> None:
+    '''Compute and save the K_NM kernel for one molecule.'''
     power = metatensor.load(power_file)
     k_NM = kernel_nm(atomic_numbers, power, power_ref)
     metatensor.save(f'{kernel_file}', k_NM)
@@ -65,8 +68,8 @@ def kernel_for_mol(lmax, ref_elements, atomic_numbers, power_ref, power_file, ke
         np.savetxt(f'{kernel_file}.dat', k_NM_flat)
 
 
-def kernel_mm(lmax, power_ref):
-
+def kernel_mm(lmax: dict, power_ref: metatensor.TensorMap) -> metatensor.TensorMap:
+    '''Compute the reference-reference kernel matrix K_MM.'''
     samples = {}
     k_MM = {}
     for (l, q), rblock in power_ref.items():

@@ -1,21 +1,44 @@
 #!/usr/bin/env python3
+'''
+Compute prediction errors against reference density coefficients.
+Print mean absolute error (MAE) and mean relative error (MRE) for each fraction of training molecules.
+Example:
+              baselined    relative      ( absolute )   nel_pred /  nel_ref (  N  )
+mol # 0 ( 0):     9.150 %  6.98e-03 %    ( 1.06e-01 )    79.9043 /  79.9988 (  80 )     (corr N:    9.065 %)
+  0 ( 0)      : test index (molecule index)
+  baselined   : baselined relative error, (c0 - c)^T S (c0 - c) / (c0 - c_av)^T S (c0 - c_av)
+  relative    : relative error, (c0 - c)^T S (c0 - c) / c0^T S c0
+  absolute    : absolute error, (c0 - c)^T S (c0 - c)
+  nel_pred    : predicted number of electrons, q^T c
+  nel_ref     : reference number of electrons, q^T c0
+  N           : expected number of electrons (from nuclear charges or charge file)
+  corr N      : baselined relative error after electron number correction
+where
+c = predicted coefficients
+c0 = reference (ab initio) coefficients
+c_av = per-element average coefficients.
+
+c_av is subtracted before training and added back at prediction time.
+The baselined error normalizes by (c0 - c_av), measuring only the ML-predicted part,
+making it the honest measure of error.
+'''
 
 import sys
 import numpy as np
 import metatensor
 from libs.config import read_config
-from libs.basis import basis_read_full
+from libs.basis import basis_read
 from libs.functions import moldata_read, number_of_electrons_ao, correct_number_of_electrons, get_test_set, get_training_set
 from libs.tmap import split, tmap2vector, tmap2matrix, sph2vector
 
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
     training = 'training' in sys.argv[1:]
 
     averages = metatensor.load(p.avfile)
     atomic_numbers = moldata_read(p.xyzfilename)
-    basis, lmax, nmax = basis_read_full(p.basisfilename)
+    basis, lmax, nmax = basis_read(p.basisfilename)
     nmol = len(atomic_numbers)
 
     if o.use_charges:
@@ -33,7 +56,7 @@ def main():
             predictfile = f'{p.predictfilebase}_training_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.mts'
         predictions = split(metatensor.load(predictfile))
 
-        dn_av = 0.0
+        # dn_av = 0.0
         total_error_N      = 0.0
         total_error_abs    = 0.0
         total_error_rel    = 0.0
@@ -82,6 +105,8 @@ def main():
 
             s1 = f'mol # {itest:{len(str(ntest))}} ({imol:{len(str(nmol))}}):  '
             s2 = f'{error_rel_bl:8.3f} %  {error_rel:.2e} %    ( {error:.2e} )   {nel:8.4f} / {nel0:8.4f} ( {N:3d} )     (corr N: {errorn_rel_bl:8.3f} %)'
+            if itest == 0:
+                print(f'{"":<{len(s1)-1}}{"baselined":<10}  {"relative":^10}     ( {"absolute":^8} )   {"nel_pred":>8} / {"nel_ref":>8} ( {"N":^3} )')
             print(s1+s2)
 
         print(f'\n{frac=}\tMAE = {total_error_rel_bl/ntest:.2e} %  {total_error_rel/ntest:.2e} %    ( {total_error_abs/ntest:.2e} )', end='')

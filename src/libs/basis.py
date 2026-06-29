@@ -2,13 +2,14 @@ import numpy as np
 from ase.data import atomic_numbers
 
 
-def basis_read(filename):
-    (basis, Lmax, Nmax) = basis_read_full(filename)
-    return Lmax, Nmax
+def basis_read(filename: str) -> tuple[dict, dict, dict]:
+    '''Read a basis set file in the custom .d2k format.
 
-
-def basis_read_full(filename):
-
+    Returns (basis, lmax, nmax):
+      basis: {atomic_number: [(l, [(exponent, coefficient), ...]), ...]}
+      lmax:  {atomic_number: max_angular_momentum}
+      nmax:  {(atomic_number, l): number_of_shells}
+    '''
     msg_incorrect = 'Incorrect basis file format!'
     msg_lorder    = 'Basis set should be in the ascending L order'
 
@@ -19,7 +20,7 @@ def basis_read_full(filename):
     basis = {}
     q = None
     i = 0
-    while i<len(lines):
+    while i < len(lines):
 
       if len(lines[i]) > 2 and lines[i][0:2] == 'O-':
           q = lines[i].split(' ')[1]
@@ -34,7 +35,7 @@ def basis_read_full(filename):
           i += 1
 
       elif lines[i].isdigit():
-          if q == None or len(angular_momenta[q])>0:
+          if q == None or len(angular_momenta[q]) > 0:
               raise SystemExit(msg_incorrect)
           nbf = int(lines[i])
           i += 1
@@ -53,23 +54,34 @@ def basis_read_full(filename):
       else:
           raise SystemExit(msg_incorrect)
 
-    Lmax = {}
-    Nmax = {}
+    lmax = {}
+    nmax = {}
     for q, llist in angular_momenta.items():
-        if llist == sorted(llist):
-            SystemExit(msg_lorder)
-        Lmax[q] = max(llist)
+        if llist != sorted(llist):
+            raise SystemExit(msg_lorder)
+        lmax[q] = max(llist)
         for l, nsize in zip(*np.unique(np.array(angular_momenta[q]), return_counts=True)):
-            Nmax[(q,l)] = nsize
+            nmax[(q,l)] = nsize
 
-    return basis, Lmax, Nmax
+    return basis, lmax, nmax
 
 
-def basis_print(basis):
+def basis_print(basis: dict) -> None:
+    '''Print basis set shells and primitives.'''
     for q in basis:
-        print(q)
+        print("Atomic number:", q)
         for l, prim in basis[q]:
             n = len(prim)
             print(f'{l=} {n=}')
             for i in prim:
                 print(i)
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) < 2:
+        print('Usage: python basis.py <basisfile>')
+        exit(1)
+    basis, lmax, nmax = basis_read(sys.argv[1])
+    basis_print(basis)
+    print("lmax:", lmax)
+    print("nmax:", nmax)

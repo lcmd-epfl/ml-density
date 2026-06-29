@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+'''Project density coefficients onto the symmetry-adapted basis and compute averages.'''
 
 import sys
 import numpy as np
@@ -9,14 +10,14 @@ from libs.functions import moldata_read, print_progress, get_elements_list, nao_
 from libs.tmap import averages2tmap, vector2tmap, matrix2tmap, tmap2matrix
 
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
 
     print(f'{o.copy_metric=}')
     print(f'{o.reorder_ao=}')
 
     atomic_numbers = moldata_read(p.xyzfilename)
-    lmax, nmax = basis_read(p.basisfilename)
+    _, lmax, nmax = basis_read(p.basisfilename)
     coefficients = load_coefs(atomic_numbers, p.coefffilebase)
     av_coefs = get_averages(lmax, nmax, coefficients, atomic_numbers)
 
@@ -42,9 +43,10 @@ def main():
     metatensor.save(p.avfile, averages2tmap(av_coefs))
 
 
-def load_coefs(atomic_numbers, coefffilebase):
+def load_coefs(atomic_numbers: np.ndarray, coefffilebase: str) -> list[np.ndarray]:
+    '''Load density fitting coefficients for all molecules from .dat or .npy files.'''
     coefficients = []
-    for imol, atoms in enumerate(atomic_numbers):
+    for imol in range(len(atomic_numbers)):
         try:
             coef = np.loadtxt(f'{coefffilebase}{imol}.dat')
         except:
@@ -53,7 +55,8 @@ def load_coefs(atomic_numbers, coefffilebase):
     return coefficients
 
 
-def remove_averages(atoms, lmax, nmax, coef, av_coefs):
+def remove_averages(atoms: np.ndarray, lmax: dict, nmax: dict, coef: np.ndarray, av_coefs: dict) -> np.ndarray:
+    '''Subtract per-element average l=0 coefficients from a coefficient vector.'''
     coef_new = np.copy(coef)
     i = 0
     for q in atoms:
@@ -63,7 +66,8 @@ def remove_averages(atoms, lmax, nmax, coef, av_coefs):
     return coef_new
 
 
-def reorder_idx(atoms, lmax, nmax, reorder_ao=False):
+def reorder_idx(atoms: np.ndarray, lmax: dict, nmax: dict, reorder_ao: bool = False) -> np.ndarray:
+    '''Build index permutation to reorder p-orbital m-components (e.g. PySCF convention).'''
     nao = nao_for_mol(atoms, lmax, nmax)
     idx = np.arange(nao, dtype=int)
     if reorder_ao:
@@ -72,7 +76,7 @@ def reorder_idx(atoms, lmax, nmax, reorder_ao=False):
             i += nmax[(q,0)]
             if(lmax[q]<1):
                 continue
-            for n in range(nmax[(q,1)]):
+            for _ in range(nmax[(q,1)]):
                 idx[i  ] = i+1
                 idx[i+1] = i+2
                 idx[i+2] = i
@@ -82,7 +86,8 @@ def reorder_idx(atoms, lmax, nmax, reorder_ao=False):
     return idx
 
 
-def get_averages(lmax, nmax, coefficients, atomic_numbers):
+def get_averages(lmax: dict, nmax: dict, coefficients: list[np.ndarray], atomic_numbers: np.ndarray) -> dict[int, np.ndarray]:
+    '''Compute per-element average l=0 density coefficients across all molecules.'''
     elements, counts = get_elements_list(atomic_numbers, return_counts=True)
     nenv = dict(zip(elements, counts))
     av_coefs = {q: np.zeros(nmax[(q, 0)]) for q in elements}

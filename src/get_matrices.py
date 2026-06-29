@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+'''
+Build A = sum_n K_NM^T w_n (target projection), 
+if sys.argv[1] == 'b' or 'B', build B = sum_n K_NM^T S_n K_NM (Gram matrix)
+for the KRR linear system.
+'''
 
 import sys
 import numpy as np
@@ -9,11 +14,11 @@ from libs.get_matrices_A import get_a
 from libs.get_matrices_B import get_b
 
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
 
     atomic_numbers = moldata_read(p.xyzfilename)
-    lmax, nmax = basis_read(p.basisfilename)
+    _, lmax, nmax = basis_read(p.basisfilename)
 
     # reference environments
     ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]

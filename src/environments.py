@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+'''Select M sparse reference environments via Farthest Point Sampling.'''
 
 import sys
 import numpy as np
@@ -8,7 +9,7 @@ from libs.functions import moldata_read, get_elements_list, do_fps, print_progre
 from libs.power_spectra_lib import read_ps_1mol_l0
 
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
 
     atomic_numbers = moldata_read(p.xyzfilename)
@@ -35,7 +36,7 @@ def main():
 
     nuniq = len(np.unique(ref_indices))
     if nuniq != len(ref_indices):
-        print(f'Warning: I have found only {nuniq} unique environments')
+        print(f'Warning: Only {nuniq} unique environments have been found, while {len(ref_indices)} have been requested.')
 
 
 if __name__=='__main__':
