@@ -4,8 +4,7 @@ import sys
 import numpy as np
 import metatensor
 from libs.config import read_config
-from libs.basis import basis_read
-from libs.functions import moldata_read, print_progress
+from libs.functions import moldata_read, print_progress, Basis
 from libs.kernels_lib import kernel_for_mol
 from libs.multi import multi_process
 
@@ -19,13 +18,13 @@ def main():
         #import os
         #if os.path.exists(f'{p.kernelconfbase}{imol}.dat'):
         #    return
-        kernel_for_mol(lmax, ref_elements, atomic_numbers[imol],
+        kernel_for_mol(basis.lmax, ref_elements, atomic_numbers[imol],
                        power_ref, f'{p.splitpsfilebase}_{imol}.mts', f'{p.kernelconfbase}{imol}.mts')
 
     atomic_numbers = moldata_read(p.xyzfilename)
     power_ref = metatensor.load(f'{p.powerrefbase}_{o.M}.mts')
     ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
-    lmax, _ = basis_read(p.basisfilename)
+    basis = Basis(o.basisname, elements=set(ref_elements))
     nmol = len(atomic_numbers)
 
     if USEMPI==0:

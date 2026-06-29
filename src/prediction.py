@@ -4,8 +4,7 @@ import sys
 import numpy as np
 import metatensor
 from libs.config import read_config
-from libs.functions import moldata_read, get_test_set, get_training_set
-from libs.basis import basis_read
+from libs.functions import moldata_read, get_test_set, get_training_set, Basis
 from libs.predict import run_prediction
 from libs.tmap import join
 
@@ -15,8 +14,8 @@ def main():
     training = 'training' in sys.argv[1:]
 
     atomic_numbers = moldata_read(p.xyzfilename)
-    lmax, nmax = basis_read(p.basisfilename)
     ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
+    basis = Basis(o.basisname, elements=set(ref_elements))
 
     for frac in o.fracs:
         weights = np.load(f'{p.weightsfilebase}_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy')
@@ -29,7 +28,7 @@ def main():
 
         print(f'Number of testing molecules = {ntest}')
         predictions = run_prediction(test_configs, atomic_numbers[test_configs],
-                                     lmax, nmax, weights, ref_elements,
+                                     basis.lmax, basis.nmax, weights, ref_elements,
                                      p.kernelconfbase)
         predictions = join(predictions)
         metatensor.save(predictfile, predictions)

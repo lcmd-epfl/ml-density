@@ -76,7 +76,6 @@ def read_config(argv):
     def get_all_paths():
         p = SimpleNamespace()
         p.xyzfilename      = conf.paths.get('xyzfile')
-        p.basisfilename    = conf.paths.get('basisfile')
         p.chargefilename   = conf.paths.get('chargesfile')
         p.coefffilebase    = conf.paths.get('coeff_base')
         p.overfilebase     = conf.paths.get('over_base')
@@ -117,7 +116,6 @@ def read_config(argv):
 def check_paths(conf):
     paths0 = [
       'xyzfile',
-      'basisfile',
       'ex_xyzfile',
       'chargesfile',
       'averages_file',

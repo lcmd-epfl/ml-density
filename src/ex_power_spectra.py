@@ -5,8 +5,7 @@ import ase.io
 import metatensor
 from libs.config import read_config
 from libs.lsoap import generate_lambda_soap_wrapper, make_rascal_hypers
-from libs.functions import get_elements_list, print_progress, moldata_read
-from libs.basis import basis_read
+from libs.functions import get_elements_list, print_progress, moldata_read, Basis
 
 
 def main():
@@ -21,19 +20,19 @@ def main():
         print(f'Different elements in the molecule and in the training set: {elements_ex} and {elements}')
         exit(1)
 
-    lmax, _ = basis_read(p.basisfilename)
+    basis = Basis(o.basisname, elements=elements_ex)
     rascal_hypers = make_rascal_hypers(o.soap_rcut, o.soap_ncut, o.soap_lcut, o.soap_sigma)
 
     print(f'{rascal_hypers=}')
     print(f'{elements=}')
-    print(f'{lmax=}')
+    print(f'{basis.lmax=}')
     print(f'{o.ps_min_norm=} {o.ps_normalize=}')
 
     for imol, mol in enumerate(mols_ex):
         print_progress(imol, len(mols_ex))
         soap = generate_lambda_soap_wrapper(mol, rascal_hypers, neighbor_species=elements,
                                             normalize=o.ps_normalize, min_norm=o.ps_min_norm,
-                                            lmax=lmax)
+                                            lmax=basis.lmax)
         metatensor.save(f'{p.powerexbase}_{imol}.mts', soap)
 
 

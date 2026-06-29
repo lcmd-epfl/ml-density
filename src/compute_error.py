@@ -3,10 +3,16 @@
 import sys
 import numpy as np
 import metatensor
+from pyscf.gto import M as make_pyscf_mol
+from qstack.fields.moments import r2_c as rho_moments
 from libs.config import read_config
-from libs.basis import basis_read_full
-from libs.functions import moldata_read, number_of_electrons_ao, correct_number_of_electrons, get_test_set, get_training_set
+from libs.functions import moldata_read, get_test_set, get_training_set, Basis
 from libs.tmap import split, tmap2vector, tmap2matrix, sph2vector
+
+
+def correct_number_of_electrons(c, S, q, N):
+    S1q = np.linalg.solve(S, q)
+    return c + S1q * (N - c@q)/(q@S1q)
 
 
 def main():
@@ -15,7 +21,7 @@ def main():
 
     averages = metatensor.load(p.avfile)
     atomic_numbers = moldata_read(p.xyzfilename)
-    basis, lmax, nmax = basis_read_full(p.basisfilename)
+    basis = Basis(o.basisname, elements=set(averages.keys.column('center_type')))
     nmol = len(atomic_numbers)
 
     if o.use_charges:
@@ -48,11 +54,14 @@ def main():
             elif o.use_charges==2:
                 N  = molcharges[imol]
 
-            S = tmap2matrix(atoms, lmax, nmax, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'))
-            qvec = number_of_electrons_ao(basis, atoms)
+            S = tmap2matrix(atoms, basis.lmax, basis.nmax, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'))
+
+            mol = make_pyscf_mol(atom=[[q, (0, 0, 0)]  for q in atoms], basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
+            qvec = rho_moments(mol, rho=None, moments=(0,), per_atom=False)[0]
+
             c0   = np.load(f'{p.goodcoeffilebase}{imol}.npy')
-            c_bl = tmap2vector(atoms, lmax, nmax, predictions[itest])
-            c_av = sph2vector(atoms, lmax, nmax, averages)
+            c_bl = tmap2vector(atoms, basis.lmax, basis.nmax, predictions[itest])
+            c_av = sph2vector(atoms, basis.lmax, basis.nmax, averages)
 
             c0_bl = c0 - c_av
             nel0  = qvec @ c0

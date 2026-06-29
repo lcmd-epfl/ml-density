@@ -22,42 +22,6 @@ def print_progress(i, n):
     print(strg, end=end, flush=True)
 
 
-def number_of_electrons_ao(basis, atoms):
-
-    def nel_contrib(a):
-        # L2 norm = (pi/(2.0*a))^3/4  (\int \phi^2(\vec r) \de^3 \vec r)^(1/2)
-        # L1 int  = (pi/a)^3/2        (\int \phi(\vec r) \de^3 \vec r)
-        # nel_contrib = L1/L2
-        return pow(2.0*np.pi/a, 0.75)
-
-    def ssover(a1, a2):
-        # <G(a1)|G(a2)> = gau3int(a1+a2) / np.sqrt(gau3int(2*a1) * gau3int(2*a2))
-        # gau3int(a): np.power(np.pi/a, 1.5)
-        return np.power(np.sqrt(a1*a2)/(0.5*(a1+a2)), 1.5)
-
-    def renorm_orbital(a, w):
-        aa = np.zeros((len(a), len(a)))
-        for i, ai in enumerate(a):
-            for j, aj in enumerate(a):
-                aa[i,j] = ssover(ai, aj)
-        return 1.0/np.sqrt(w @ aa @ w)
-
-    nel = []
-    for q in atoms:
-        for l, gto in basis[q]:
-            if l==0:
-                a, w = np.array(gto).T
-                nel.append(renorm_orbital(a, w) * w @ nel_contrib(a))
-            else:
-                nel.extend([0]*(2*l+1))
-    return np.array(nel)
-
-
-def correct_number_of_electrons(c, S, q, N):
-    S1q  = np.linalg.solve(S, q)
-    return c + S1q * (N - c@q)/(q@S1q)
-
-
 def nao_for_mol(atoms, lmax, nmax):
     nao = 0
     for q in atoms:
@@ -102,6 +66,8 @@ class Basis:
     #    self.lmax = lmax
     #    self.nmax = nmax
     def __init__(self, basisname, elements):
+        self.basisname = basisname
+        self.elements = sorted(elements)
         lmax = {}
         nmax = {}
         ao = {}
@@ -122,6 +88,10 @@ class Basis:
         self.ao = ao
         self.lmax = lmax
         self.nmax = nmax
+
+    def __repr__(self):
+        with np.printoptions(legacy="1.25"):
+            return f'Basis("{self.basisname}", {self.elements})'
 
     def cat(self, atoms):
         limits = list(slice_generator(atoms, inc=lambda q: len(self.ao[q])))

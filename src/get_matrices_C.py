@@ -5,8 +5,7 @@ import os
 import ctypes
 import numpy as np
 from libs.config import read_config
-from libs.basis import basis_read
-from libs.functions import moldata_read, get_elements_list, get_training_sets
+from libs.functions import moldata_read, get_elements_list, get_training_sets, Basis, nao_for_mol
 
 
 def main():
@@ -31,11 +30,11 @@ def main():
     atom_counting = get_atomicindx(elements, atomic_numbers_train)
 
     # basis set info
-    lmax, nmax = basis_read(p.basisfilename)
-    bsize, alnum, annum = basis_info(elements, lmax, nmax)
+    basis = Basis(o.basisname, elements=set(ref_elements))
+    alnum, annum = basis_info(basis)
 
     # problem dimensionality
-    totsize = sum(bsize[ref_elements_idx])
+    totsize = nao_for_mol(ref_elements, basis.lmax, basis.nmax)
 
     # C arguments
     outputfiles = (ctypes.c_char_p * nfrac)()
@@ -81,18 +80,15 @@ def main():
     return ret
 
 
-def basis_info(elements, lmax, nmax):
-    nel = len(elements)
-    llmax = max(lmax.values())
-    bsize = np.zeros(nel, dtype=int)
+def basis_info(basis):
+    nel = len(basis.elements)
     alnum = np.zeros(nel, dtype=int)
-    annum = np.zeros((llmax+1, nel), dtype=int)
-    for iq, q in enumerate(elements):
-        alnum[iq] = lmax[q]+1
-        for l in range(lmax[q]+1):
-            annum[l,iq] = nmax[(q,l)]
-            bsize[iq]  += nmax[(q,l)]*(2*l+1)
-    return bsize, alnum, annum
+    annum = np.zeros((max(basis.lmax.values())+1, nel), dtype=int)
+    for iq, q in enumerate(basis.elements):
+        alnum[iq] = basis.lmax[q]+1
+        for l in range(alnum[iq]):
+            annum[l,iq] = basis.nmax[(q,l)]
+    return alnum, annum
 
 
 def get_atomicindx(elements, atomic_numbers):

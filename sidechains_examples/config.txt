@@ -18,7 +18,6 @@ ps_normalize = true
 [paths]
 xyzfile          = 16.xyz
 chargesfile      = charges.dat
-basisfile        = cc-pvqz-jkfit.1.d2k
 basisname        = cc-pvqz-jkfit
 over_base        = ALL_J/mol_
 coeff_base       = ALL_C/mol_
