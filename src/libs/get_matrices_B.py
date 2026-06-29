@@ -8,7 +8,8 @@ if USE_MPI:
     from mpi4py import MPI
 
 
-def print_mem(totsize, ntrain):
+def print_mem(totsize: int, ntrain: int) -> None:
+    '''Print memory estimate for the Gram matrix.'''
     b2mib = 1.0/(1<<20)
     b2gib = 1.0/(1<<30)
     size = symsize(totsize)*np.array(0.0).itemsize
@@ -19,17 +20,18 @@ def print_mem(totsize, ntrain):
     return
 
 
-def symsize(M):
+def symsize(M: int) -> int:
+    '''Return packed size of an M x M symmetric matrix.'''
     return (M*(M+1))>>1
 
 
-def mpos(i, j):
-    # A[i+j*(j+1)/2], i <= j, 0 <= j < N
+def mpos(i: int, j: int) -> int:
+    '''Return packed index for element (i, j) of a symmetric matrix, i <= j.'''
     return (i)+(((j)*((j)+1))>>1)
 
 
-def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
-
+def do_work_b(idx: np.ndarray, nmax: dict, conf: int, ref_elem: np.ndarray, path_over: str, path_kern: str, Bmat: np.ndarray) -> None:
+    '''Accumulate one molecule's contribution to the Gram matrix B = sum_n K_NM^T S_n K_NM.'''
     over = metatensor.load(f'{path_over}{conf}.mts')
     k_NM = metatensor.load(f'{path_kern}{conf}.mts')
 
@@ -64,67 +66,68 @@ def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
                             Bmat[i12a:i12b] += dB[n2,im2,n2,:im2+1]
 
 
-def get_b(lmax, nmax, totsize, ref_elem, nfrac, ntrains, trrange,
-          path_over, path_kern, paths_bmat):
+def get_b(lmax: dict, nmax: dict, totsize: int, ref_elem: np.ndarray, nfrac: int, ntrains: np.ndarray, trrange: np.ndarray,
+          path_over: str, path_kern: str, paths_bmat: list[str]) -> None:
+    '''Build the Gram matrix B = sum_n K_NM^T S_n K_NM and save to disk.'''
 
-  def do_mol(imol):
-      do_work_b(idx, nmax, trrange[imol], ref_elem, path_over, path_kern, Bmat)
+    def do_mol(imol):
+        do_work_b(idx, nmax, trrange[imol], ref_elem, path_over, path_kern, Bmat)
 
-  Bmat = np.zeros(symsize(totsize))
-  idx = sparseindices_fill(lmax, nmax, ref_elem)
-  ntrains = np.pad(ntrains, (0, 1), 'constant', constant_values=0)
+    Bmat = np.zeros(symsize(totsize))
+    idx = sparseindices_fill(lmax, nmax, ref_elem)
+    ntrains = np.pad(ntrains, (0, 1), 'constant', constant_values=0)
 
-  if USE_MPI:
-      Nproc = MPI.COMM_WORLD.Get_size()
-      nproc = MPI.COMM_WORLD.Get_rank()
-      print_nodes(Nproc, nproc, MPI.COMM_WORLD)
-      t = 0.0
-      if nproc==0:
-          print_mem(totsize, ntrains[-2])
-          t = MPI.Wtime()
-      MPI.COMM_WORLD.barrier()
-  else:
-      nproc = 0
-      Nproc = 1
+    if USE_MPI:
+        Nproc = MPI.COMM_WORLD.Get_size()
+        nproc = MPI.COMM_WORLD.Get_rank()
+        print_nodes(Nproc, nproc, MPI.COMM_WORLD)
+        t = 0.0
+        if nproc==0:
+            print_mem(totsize, ntrains[-2])
+            t = MPI.Wtime()
+        MPI.COMM_WORLD.barrier()
+    else:
+        nproc = 0
+        Nproc = 1
 
-  if nproc==0:
-      print_batches(nfrac, ntrains, paths_bmat)
-  if USE_MPI:
-      MPI.COMM_WORLD.barrier()
+    if nproc==0:
+        print_batches(nfrac, ntrains, paths_bmat)
+    if USE_MPI:
+        MPI.COMM_WORLD.barrier()
 
-  if Nproc==1:
-      for ifrac in range(nfrac):
-          for imol in range(ntrains[ifrac-1], ntrains[ifrac]):
-              print(f'{nproc:4d}: {imol:4d}', flush=True)
-              do_mol(imol)
-          Bmat.tofile(paths_bmat[ifrac])
-      if USE_MPI:
-          t = MPI.Wtime () - t
-          print(f'{t=:4.2f}', flush=True)
+    if Nproc==1:
+        for ifrac in range(nfrac):
+            for imol in range(ntrains[ifrac-1], ntrains[ifrac]):
+                print(f'{nproc:4d}: {imol:4d}', flush=True)
+                do_mol(imol)
+            Bmat.tofile(paths_bmat[ifrac])
+        if USE_MPI:
+            t = MPI.Wtime () - t
+            print(f'{t=:4.2f}', flush=True)
 
-  else:
-      bufsize = (1<<30)//np.array(0.0).itemsize  # number of doubles to take 1 GiB
-      if bufsize > symsize(totsize):
-          bufsize = symsize(totsize)
-      div = symsize(totsize)//bufsize
-      rem = symsize(totsize)%bufsize
-      if nproc==0:
-          BMAT = np.zeros(bufsize)
+    else:
+        bufsize = (1<<30)//np.array(0.0).itemsize  # number of doubles to take 1 GiB
+        if bufsize > symsize(totsize):
+            bufsize = symsize(totsize)
+        div = symsize(totsize)//bufsize
+        rem = symsize(totsize)%bufsize
+        if nproc==0:
+            BMAT = np.zeros(bufsize)
 
-      for ifrac in range(nfrac):
-          scatter_jobs(Nproc, nproc, MPI.COMM_WORLD, ntrains[ifrac-1], ntrains[ifrac], do_mol)
-          MPI.COMM_WORLD.barrier()
+        for ifrac in range(nfrac):
+            scatter_jobs(Nproc, nproc, MPI.COMM_WORLD, ntrains[ifrac-1], ntrains[ifrac], do_mol)
+            MPI.COMM_WORLD.barrier()
 
-          if nproc==0:
-              tt = MPI.Wtime()
-              print(f'batch{ifrac}: t={tt-t:4.2f}', flush=True)
-              t = tt
-          for i in range(div+1):
-              size = bufsize if i<div else rem
-              if size==0:
-                  break
-              MPI.COMM_WORLD.Reduce(Bmat[i*bufsize:i*bufsize+size], BMAT[:size] if nproc==0 else None, MPI.SUM, 0)
-              if nproc==0:
-                  print(f'chunk #{i+1}/{div+1 if rem else div} written', flush=True)
-                  with open(paths_bmat[ifrac], 'a' if i else 'w') as f:
-                      BMAT[:size].tofile(f)
+            if nproc==0:
+                tt = MPI.Wtime()
+                print(f'batch{ifrac}: t={tt-t:4.2f}', flush=True)
+                t = tt
+            for i in range(div+1):
+                size = bufsize if i<div else rem
+                if size==0:
+                    break
+                MPI.COMM_WORLD.Reduce(Bmat[i*bufsize:i*bufsize+size], BMAT[:size] if nproc==0 else None, MPI.SUM, 0)
+                if nproc==0:
+                    print(f'chunk #{i+1}/{div+1 if rem else div} written', flush=True)
+                    with open(paths_bmat[ifrac], 'a' if i else 'w') as f:
+                        BMAT[:size].tofile(f)

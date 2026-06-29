@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+'''Compute K_NM kernels between extrapolation molecules and sparse references.'''
 
 import sys
 import numpy as np
@@ -9,11 +10,11 @@ from libs.functions import moldata_read, get_elements_list, print_progress
 from libs.kernels_lib import kernel_for_mol
 
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
 
     atomic_numbers_ex = moldata_read(p.xyzexfilename)
-    lmax, _ = basis_read(p.basisfilename)
+    _, lmax, _ = basis_read(p.basisfilename)
     ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
     power_ref = metatensor.load(f'{p.powerrefbase}_{o.M}.mts');
 

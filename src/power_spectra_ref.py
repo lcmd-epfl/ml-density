@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+'''Gather power spectra of FPS-selected reference environments into one metatensor file.'''
 
 import sys
 import numpy as np
@@ -9,7 +10,7 @@ from libs.functions import moldata_read, get_elements_list
 from libs.tmap import merge_ref_ps
 
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
 
     atomic_numbers = moldata_read(p.xyzfilename)
@@ -17,7 +18,7 @@ def main():
     natoms = np.array([len(atoms) for atoms in atomic_numbers])
 
     ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,0]
-    lmax, _ = basis_read(p.basisfilename)
+    _, lmax, _ = basis_read(p.basisfilename)
 
     ref_mol_at = get_ref_idx(natoms, ref_indices)
     print(ref_mol_at)
@@ -25,7 +26,8 @@ def main():
     metatensor.save(f'{p.powerrefbase}_{o.M}.mts', tensor)
 
 
-def get_ref_idx(natoms, refs):
+def get_ref_idx(natoms: np.ndarray, refs: np.ndarray) -> np.ndarray:
+    '''Convert flat reference indices to (molecule, atom) pairs.'''
     idx_mol = []
     idx_atm = []
     for imol, nat in enumerate(natoms):

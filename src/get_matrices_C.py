@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+'''
+C library implementation of get_matrices.py.
+'''
 
 import sys
 import os
@@ -9,7 +12,7 @@ from libs.basis import basis_read
 from libs.functions import moldata_read, get_elements_list, get_training_sets
 
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
 
     task = 'b' if (len(sys.argv)>1 and sys.argv[1][0].lower()=='b') else 'a'
@@ -32,7 +35,7 @@ def main():
     atom_counting = get_atomicindx(elements, atomic_numbers_train)
 
     # basis set info
-    lmax, nmax = basis_read(p.basisfilename)
+    _, lmax, nmax = basis_read(p.basisfilename)
     bsize, alnum, annum = basis_info(elements, lmax, nmax);
 
     # problem dimensionality
@@ -81,7 +84,8 @@ def main():
         ret = get_matrices.get_a(*args)
 
 
-def basis_info(elements, lmax, nmax):
+def basis_info(elements: np.ndarray, lmax: dict, nmax: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    '''Return per-element basis size, lmax+1 array, and nmax table for the C interface.'''
     nel = len(elements)
     llmax = max(lmax.values())
     bsize = np.zeros(nel, dtype=int)
@@ -95,11 +99,8 @@ def basis_info(elements, lmax, nmax):
     return bsize, alnum, annum
 
 
-def get_atomicindx(elements, atomic_numbers):
-    '''
-    Returns:
-      atom_counting[imol, iq]   number of atoms of element #iq in mol #imol
-    '''
+def get_atomicindx(elements: np.ndarray, atomic_numbers: np.ndarray) -> np.ndarray:
+    '''Return atom_counting[imol, iq]: number of atoms of element #iq in mol #imol.'''
     atom_counting = np.zeros((len(atomic_numbers), len(elements)), dtype=int)
     for imol, atoms in enumerate(atomic_numbers):
         for iq, q in enumerate(elements):

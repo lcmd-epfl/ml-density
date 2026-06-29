@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+'''Predict density coefficients for out-of-sample extrapolation molecules.'''
 
 import sys
 import numpy as np
@@ -9,11 +10,11 @@ from libs.basis import basis_read
 from libs.predict import run_prediction
 from libs.tmap import tmap2vector
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
 
     atomic_numbers_ex = moldata_read(p.xyzexfilename)
-    lmax, nmax = basis_read(p.basisfilename)
+    _, lmax, nmax = basis_read(p.basisfilename)
     averages = metatensor.load(p.avfile)
     ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
     weights = np.load(f'{p.weightsfilebase}_M{o.M}_trainfrac{o.fracs[-1]}_reg{o.reg}_jit{o.jit}.npy')

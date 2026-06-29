@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
+'''Compute SOAP power spectra for all training molecules.'''
 
-import sys, os
-import numpy as np
+import sys
 import ase.io
 import metatensor
 from libs.config import read_config
@@ -13,7 +13,7 @@ from libs.multi import multi_process
 USEMPI=1
 
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
 
     def do_mol(imol):
@@ -27,7 +27,7 @@ def main():
 
     rascal_hypers = make_rascal_hypers(o.soap_rcut, o.soap_ncut, o.soap_lcut, o.soap_sigma)
 
-    lmax, _ = basis_read(p.basisfilename)
+    _, lmax, _ = basis_read(p.basisfilename)
     mols = ase.io.read(p.xyzfilename, ":")
     elements = get_elements_list([mol.get_atomic_numbers() for mol in mols])
 

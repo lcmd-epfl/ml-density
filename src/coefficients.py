@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+'''Export predicted density coefficients as flat vectors for the test set.'''
 
 import sys
 import numpy as np
@@ -9,11 +10,11 @@ from libs.functions import moldata_read, get_test_set, print_progress
 from libs.tmap import split, tmap2vector, tmap_add
 
 
-def main():
+def main() -> None:
     o, p = read_config(sys.argv)
 
     atomic_numbers = moldata_read(p.xyzfilename)
-    lmax, nmax = basis_read(p.basisfilename)
+    _, lmax, nmax = basis_read(p.basisfilename)
     ntest, test_configs = get_test_set(p.trainfilename, len(atomic_numbers))
     averages = metatensor.load(p.avfile)
 
