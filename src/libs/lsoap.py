@@ -55,23 +55,23 @@ class EquivariantPowerSpectrum_custom(EquivariantPowerSpectrum):
         super().__init__(calculator_1, calculator_2, neighbor_types, dtype=dtype, device=device)
 
         if filter_redundant_keys == 'all':
-            from featomic.clebsch_gordan._density_correlations import _filter_redundant_keys
+            from featomic.clebsch_gordan._density_correlations import _filter_redundant_keys as keys_filter
         elif filter_redundant_keys == 'odd':
-            _filter_redundant_keys = self.filter_redundant_keys_odd
+            keys_filter = self.filter_redundant_keys_odd
         else:
-            _filter_redundant_keys = None
+            keys_filter = None
 
         import json
         parameters_1 = json.loads(self.calculator_1.parameters)
         if self.calculator_2 is None:
-                parameters_2 = parameters_1
+            parameters_2 = parameters_1
         max_angular = parameters_1['basis']['max_angular'] + parameters_2['basis']['max_angular']
 
         from featomic.clebsch_gordan._cg_product import ClebschGordanProduct
         self._cg_product = ClebschGordanProduct(
              max_angular=max_angular,
              cg_backend=None,
-             keys_filter=_filter_redundant_keys,
+             keys_filter=keys_filter,
              arrays_backend=None,
              dtype=None,
              device=None,

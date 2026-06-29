@@ -9,6 +9,7 @@ from libs.basis import basis_read
 from libs.predict import run_prediction
 from libs.tmap import tmap2vector
 
+
 def main():
     o, p = read_config(sys.argv)
 

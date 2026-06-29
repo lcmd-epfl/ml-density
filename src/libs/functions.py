@@ -23,15 +23,18 @@ def print_progress(i, n):
 
 
 def number_of_electrons_ao(basis, atoms):
+
     def nel_contrib(a):
         # L2 norm = (pi/(2.0*a))^3/4  (\int \phi^2(\vec r) \de^3 \vec r)^(1/2)
         # L1 int  = (pi/a)^3/2        (\int \phi(\vec r) \de^3 \vec r)
         # nel_contrib = L1/L2
         return pow(2.0*np.pi/a, 0.75)
+
     def ssover(a1, a2):
         # <G(a1)|G(a2)> = gau3int(a1+a2) / np.sqrt(gau3int(2*a1) * gau3int(2*a2))
         # gau3int(a): np.power(np.pi/a, 1.5)
         return np.power(np.sqrt(a1*a2)/(0.5*(a1+a2)), 1.5)
+
     def renorm_orbital(a, w):
         aa = np.zeros((len(a), len(a)))
         for i, ai in enumerate(a):
@@ -119,7 +122,6 @@ class Basis:
         self.ao = ao
         self.lmax = lmax
         self.nmax = nmax
-
 
     def cat(self, atoms):
         limits = list(slice_generator(atoms, inc=lambda q: len(self.ao[q])))

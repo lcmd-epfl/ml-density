@@ -5,7 +5,7 @@ from libs.tmap import vector2tmap, tmap2vector
 
 def print_batches(nfrac, ntrains, paths):
     for i in range(nfrac):
-       print(f'batch {i:2d} [{ntrains[i-1]}--{ntrains[i]}):\t {paths[i]}')
+        print(f'batch {i:2d} [{ntrains[i-1]}--{ntrains[i]}):\t {paths[i]}')
     print(flush=True)
 
 

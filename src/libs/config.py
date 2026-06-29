@@ -157,15 +157,15 @@ def check_paths(conf):
 
     dirs = []
     for key in paths1:
-      if key in conf.paths:
-          path = conf.paths[key]
-          path = os.path.dirname(path)
-          isdir = os.path.isdir(path)
-          if not isdir:
-            #print(f'Cannot find directory "{path}" ("{key}")')
-            dirs.append(path)
-      else:
-        print(f'Cannot find option "{key}"')
+        if key in conf.paths:
+            path = conf.paths[key]
+            path = os.path.dirname(path)
+            isdir = os.path.isdir(path)
+            if not isdir:
+                #print(f'Cannot find directory "{path}" ("{key}")')
+                dirs.append(path)
+        else:
+            print(f'Cannot find option "{key}"')
     print()
 
     for d in sorted(set(dirs)):

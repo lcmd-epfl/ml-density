@@ -29,7 +29,7 @@ def scatter_jobs(Nproc, nproc, comm, bra, ket, do_mol):
         while True:
             comm.send((nproc, imol), dest=0)
             imol = comm.recv(source=0)
-            if(imol<0):
+            if imol<0:
                 break
             do_mol(imol)
         print(f'{nproc} : finished', flush=True)

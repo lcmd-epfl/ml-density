@@ -62,9 +62,9 @@ def fill_matrix(mat, k_MM, bmatfile, idx, nmax, jitter, reg):
                 continue
             dk = reg * kblock.values[iiref12,:,:,0]
             for n in range(nmax[q, l]):
-               i1 = idx[iref1, l] + n*msize
-               i2 = idx[iref2, l] + n*msize
-               mat[i1:i1+msize, i2:i2+msize] += dk
+                i1 = idx[iref1, l] + n*msize
+                i2 = idx[iref2, l] + n*msize
+                mat[i1:i1+msize, i2:i2+msize] += dk
 
 
 if __name__=='__main__':

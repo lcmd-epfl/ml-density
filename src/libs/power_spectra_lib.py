@@ -11,11 +11,13 @@ def reorder_ps_new(power_per_conf, elements, atomic_numbers, power):
         i+=len(idx[0])
     return
 
+
 def read_ps_1mol_new1(psfilename, elements, atomic_numbers):
     power = np.squeeze(np.load(psfilename))
     power_per_conf = np.zeros_like(power)
     reorder_ps_new(power_per_conf, elements, atomic_numbers, power)
     return power_per_conf
+
 
 def read_ps_1mol_l0(psfilename, atomic_numbers):
     power_sorted = None

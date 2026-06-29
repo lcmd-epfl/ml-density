@@ -23,21 +23,17 @@ select = [
   "A", "E",  "F",  "B",
   "S", "COM", "C4", "EXE", "ICN", "PIE", "PLR1714", "ARG",
   "PERF",  "FURB",  "PLE",  "TRY002",  "W",  "UP",  "RUF", "SIM", "NPY",
-# "D", # later
-# "FIX", "TD", # later
+# "D", # later TODO
+# "FIX", "TD", # later TODO
 ]
 ignore = [
-"E722",     # bare except
+"E722",     # bare except TODO
+
 "NPY002",   # random
 "UP031",    # format
-
 "E741",     # ambiguous variable name
-"E731",     # do not assign lambda expression
 "E501",     # line length
-"RUF015",   # single element slice
-"SIM3",     # yoda condition
-"SIM114",   # combine if branches
-"SIM108",   # use ternary operator
+
 "D105",     # missing docstring in magic method
 "D107",     # missing docstring in __init__
 "D203",     # blank line required before class docstring
@@ -46,20 +42,21 @@ ignore = [
 "D413",     # missing blank line after last section
 ]
 
-preview = false
+preview = true
 
 extend-select = ["DOC"]
 extend-ignore = [
+  "FURB118", # lambda->operator TODO
+  "RUF031", # Avoid parentheses for tuples in subscripts TODO
+  "E265", # Block comment TODO
 # pathlib
   "FURB101", "FURB103",
 # whitespaces
   "E201", "E202", "E203", "E211",
-  "E221", "E222", "E225", "E226", "E228",
+  "E221", "E222", "E225", "E226", "E227", "E228",
   "E231", "E241", "E271", "E272",
-# lambda
-  "FURB118",
 ]
 
 [lint.per-file-ignores]
 "src/get_matrices_C.py" = ["COM819"]  # prohibited-trailing-comma
-
+"src/libs/tmap.py" = ["E251"]

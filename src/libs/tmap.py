@@ -59,7 +59,6 @@ def kernels2tmap(atom_charges, kernel):
     return tensor
 
 
-
 def vector2tmap(atom_charges, lmax, nmax, c):
 
     elements = np.unique(atom_charges)
@@ -109,7 +108,7 @@ def vector2tmap(atom_charges, lmax, nmax, c):
 
 
 def _get_tsize(tensor):
-    return sum([np.prod(tensor.block(key).values.shape) for key in tensor.keys])
+    return sum(np.prod(tensor.block(key).values.shape) for key in tensor.keys)
 
 
 def tmap2vector(atom_charges, lmax, nmax, tensor):
@@ -248,10 +247,7 @@ def split(tensor):
 
     # Check if the molecule indices are continuous
     mollist = sorted(set(np.hstack([np.array(tensor.block(keys).samples.values.tolist())[:,0] for keys in tensor.keys])))
-    if mollist==list(range(len(mollist))):
-        tensors = [None] * len(mollist)
-    else:
-        tensors = {}
+    tensors = [None] * len(mollist) if mollist==list(range(len(mollist))) else {}
 
     # Common labels
     block_comp_labels = {}
