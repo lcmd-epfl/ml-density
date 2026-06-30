@@ -80,14 +80,14 @@ def read_config(argv):
         p.coefffilebase    = conf.paths.get('coeff_base')
         p.overfilebase     = conf.paths.get('over_base')
 
-        p.splitpsfilebase  = conf.paths.get('ps_split_base')
-        p.refsselfilebase  = conf.paths.get('refs_sel_base')
-        p.powerrefbase     = conf.paths.get('ps_ref_base')
+        p._splitpsfilebase  = conf.paths.get('ps_split_base')
+        p._refsselfilebase  = conf.paths.get('refs_sel_base')
+        p._powerrefbase     = conf.paths.get('ps_ref_base')
 
-        p.kmmbase          = conf.paths.get('kmm_base')
+        p._kmmbase          = conf.paths.get('kmm_base')
         p.kernelconfbase   = conf.paths.get('kernel_conf_base')
 
-        p.goodcoeffilebase = conf.paths.get('goodcoef_base')
+        p._goodcoeffilebase = conf.paths.get('goodcoef_base')
         p.goodoverfilebase = conf.paths.get('goodover_base')
         p.baselinedwbase   = conf.paths.get('baselined_w_base')
         p.avfile           = conf.paths.get('averages_file')
@@ -95,8 +95,8 @@ def read_config(argv):
         p.trainfilename    = conf.paths.get('trainingselfile')
         p.avecfilebase     = conf.paths.get('avec_base')
         p.bmatfilebase     = conf.paths.get('bmat_base')
-        p.weightsfilebase  = conf.paths.get('weights_base')
-        p.predictfilebase  = conf.paths.get('predict_base')
+        p._weightsfilebase  = conf.paths.get('weights_base')
+        p._predictfilebase  = conf.paths.get('predict_base')
         p.outfilebase      = conf.paths.get('output_base')
 
         p.xyzexfilename    = conf.paths.get('ex_xyzfile')
@@ -110,6 +110,17 @@ def read_config(argv):
     check_paths(conf)
     o = set_variable_values()
     p = get_all_paths()
+
+    p.reference_environments  = f'{p._refsselfilebase}_{o.M}.csv'
+    p.reference_power_spectra = f'{p._powerrefbase}_{o.M}.mts'
+    p.kernel_mm               = f'{p._kmmbase}{o.M}.mts'
+
+    p.weights                 = f'{p._weightsfilebase}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.npy'
+    p.predictions             = f'{p._predictfilebase}_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
+
+    p.power_spectrum          = f'{p._splitpsfilebase}_{{}}.mts'
+    p.clean_coefficients      = f'{p._goodcoeffilebase}_{{}}.npy'
+
     return o, p
 
 
@@ -138,7 +149,6 @@ def check_paths(conf):
       'ps_ref_base',
       'ps_split_base',
       'refs_sel_base',
-      'qrefs_sel_base',
       'weights_base',
       'trainingselfile',
       'ex_ps_base',

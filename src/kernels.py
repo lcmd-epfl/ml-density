@@ -19,11 +19,11 @@ def main():
         #if os.path.exists(f'{p.kernelconfbase}{imol}.dat'):
         #    return
         kernel_for_mol(basis.lmax, ref_elements, atomic_numbers[imol],
-                       power_ref, f'{p.splitpsfilebase}_{imol}.mts', f'{p.kernelconfbase}{imol}.mts')
+                       power_ref, p.power_spectrum.format(imol), f'{p.kernelconfbase}{imol}.mts')
 
     atomic_numbers = moldata_read(p.xyzfilename)
-    power_ref = metatensor.load(f'{p.powerrefbase}_{o.M}.mts')
-    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
+    power_ref = metatensor.load(p.reference_power_spectra)
+    ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     basis = Basis(o.basisname, elements=set(ref_elements))
     nmol = len(atomic_numbers)
 

@@ -12,8 +12,8 @@ def main():
     o, p = read_config(sys.argv)
 
     atomic_numbers_ex = moldata_read(p.xyzexfilename)
-    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
-    power_ref = metatensor.load(f'{p.powerrefbase}_{o.M}.mts')
+    ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
+    power_ref = metatensor.load(p.reference_power_spectra)
     basis = Basis(o.basisname, elements=set(ref_elements))
 
     for imol, atoms in enumerate(atomic_numbers_ex):

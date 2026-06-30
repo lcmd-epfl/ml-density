@@ -33,10 +33,10 @@ def main():
         print(f'fraction = {frac}')
         if not training:
             ntest, test_configs = get_test_set(p.trainfilename, nmol)
-            predictfile = f'{p.predictfilebase}_test_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.mts'
+            predictfile = p.predictions.format(subset='test', train_frac=frac)
         else:
             ntest, test_configs = get_training_set(p.trainfilename, frac)
-            predictfile = f'{p.predictfilebase}_training_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.mts'
+            predictfile = p.predictions.format(subset='training', train_frac=frac)
         predictions = split(metatensor.load(predictfile))
 
         total_error_N      = 0.0
@@ -59,7 +59,7 @@ def main():
             mol = make_pyscf_mol(atom=[[q, (0, 0, 0)]  for q in atoms], basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
             qvec = rho_moments(mol, rho=None, moments=(0,), per_atom=False)[0]
 
-            c0   = np.load(f'{p.goodcoeffilebase}{imol}.npy')
+            c0   = np.load(p.clean_coefficients.format(imol))
             c_bl = tmap2vector(atoms, basis, predictions[itest])
             c_av = sph2vector(atoms, basis, averages)
 

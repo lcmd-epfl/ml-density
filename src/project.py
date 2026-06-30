@@ -30,7 +30,7 @@ def main():
     for imol, (coef, mol, ao_index) in tqdm([*enumerate(zip(coefficients, mols, ao_indices, strict=True))]):
 
         coef = reorder.reorder_ao(mol, coef, dest='gpr', src=o.coeff_order)
-        np.save(f'{p.goodcoeffilebase}{imol}.npy', coef)
+        np.save(p.clean_coefficients.format(imol), coef)
 
         coef = remove_averages(ao_index, coef, av_coefs)
 

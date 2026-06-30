@@ -20,7 +20,7 @@ def main():
     elements = get_elements_list(atomic_numbers)
 
     # reference environments
-    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
+    ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     ref_elements_idx = np.zeros_like(ref_elements)
     for iq, q in enumerate(elements):
         ref_elements_idx[np.where(ref_elements==q)] = iq

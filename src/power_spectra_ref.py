@@ -17,11 +17,11 @@ def main():
 
     basis = Basis(o.basisname, elements)
 
-    refs = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')
+    refs = pd.read_csv(p.reference_environments)
     ref_mol_at = np.vstack((refs['q'], refs['mol'], refs['atom_in_mol'])).T
 
-    tensor = merge_ref_ps(basis.lmax, ref_mol_at, p.splitpsfilebase)
-    metatensor.save(f'{p.powerrefbase}_{o.M}.mts', tensor)
+    tensor = merge_ref_ps(basis.lmax, ref_mol_at, p.power_spectrum)
+    metatensor.save(p.reference_power_spectra, tensor)
 
 
 if __name__=='__main__':

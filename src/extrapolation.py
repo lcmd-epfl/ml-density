@@ -15,9 +15,9 @@ def main():
 
     atomic_numbers_ex = moldata_read(p.xyzexfilename)
     averages = metatensor.load(p.avfile)
-    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
+    ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     basis = Basis(o.basisname, elements=set(ref_elements))
-    weights = np.load(f'{p.weightsfilebase}_M{o.M}_trainfrac{o.fracs[-1]}_reg{o.reg}_jit{o.jit}.npy')
+    weights = np.load(p.weights.format(train_frac=o.fracs[-1]))
 
     predictions = run_prediction(np.arange(len(atomic_numbers_ex)), atomic_numbers_ex,
                                  basis, weights, ref_elements,

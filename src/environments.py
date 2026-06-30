@@ -19,7 +19,7 @@ def main():
 
     power_env, idx_mol, idx_atm = [], [], []
     for imol, atoms in enumerate(tqdm(atomic_numbers)):
-        power_env.append(read_ps_1mol_l0(f'{p.splitpsfilebase}_{imol}.mts', atoms))
+        power_env.append(read_ps_1mol_l0(p.power_spectrum.format(imol), atoms))
         idx_mol.append(np.full_like(atoms, imol))
         idx_atm.append(np.arange(len(atoms)))
     power_env = np.vstack(power_env)
@@ -31,7 +31,7 @@ def main():
                          'mol'        : np.hstack(idx_mol)[ref_indices],
                          'atom_in_mol': np.hstack(idx_atm)[ref_indices],
                          'distance'   : np.hstack(([np.nan], distances))})
-    refs.to_csv(f'{p.refsselfilebase}{o.M}.csv', index=False)
+    refs.to_csv(p.reference_environments, index=False)
     print(refs)
 
     for q in elements:

@@ -19,7 +19,7 @@ def main():
 
     for frac in o.fracs:
         print('fraction =', frac)
-        predictfile = f'{p.predictfilebase}_test_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.mts'
+        predictfile = p.predictions.format(subset='test', train_frac=frac)
         predictions = split(metatensor.load(predictfile))
         for itest, (imol, c) in enumerate(zip(test_configs, predictions, strict=True)):
             print_progress(itest, ntest)

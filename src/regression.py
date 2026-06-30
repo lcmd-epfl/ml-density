@@ -14,11 +14,11 @@ from libs.functions import Basis
 def main():
     o, p = read_config(sys.argv)
 
-    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
+    ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     basis = Basis(o.basisname, np.unique(ref_elements))
     totsize = basis.nao_for_mol(ref_elements)
 
-    k_MM = metatensor.load(f'{p.kmmbase}{o.M}.mts')
+    k_MM = metatensor.load(p.kernel_mm)
     mat  = np.ndarray((totsize,totsize))
     idx = basis.sparse_indices(ref_elements)
 
@@ -27,7 +27,7 @@ def main():
     for frac in o.fracs:
         avecfile    = f'{p.avecfilebase}_M{o.M}_trainfrac{frac}.txt'
         bmatfile    = f'{p.bmatfilebase}_M{o.M}_trainfrac{frac}.dat'
-        weightsfile = f'{p.weightsfilebase}_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy'
+        weightsfile = p.weights.format(train_frac=frac)
         Avec = np.loadtxt(avecfile)
         mat[:] = 0
 

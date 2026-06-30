@@ -11,7 +11,7 @@ from libs.get_matrices_B import get_b
 def main():
     o, p = read_config(sys.argv)
 
-    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
+    ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     basis = Basis(o.basisname, elements=set(ref_elements))
 
     # training set selection
