@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
-import numpy as np
+import pandas as pd
 import metatensor
 from libs.config import read_config
 from libs.functions import moldata_read, print_progress, Basis
@@ -12,7 +12,7 @@ def main():
     o, p = read_config(sys.argv)
 
     atomic_numbers_ex = moldata_read(p.xyzexfilename)
-    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
+    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
     power_ref = metatensor.load(f'{p.powerrefbase}_{o.M}.mts')
     basis = Basis(o.basisname, elements=set(ref_elements))
 

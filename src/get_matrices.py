@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
-import numpy as np
+import pandas as pd
 from libs.config import read_config
 from libs.functions import get_training_sets, Basis
 from libs.get_matrices_A import get_a
@@ -11,7 +11,7 @@ from libs.get_matrices_B import get_b
 def main():
     o, p = read_config(sys.argv)
 
-    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
+    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
     basis = Basis(o.basisname, elements=set(ref_elements))
 
     # training set selection

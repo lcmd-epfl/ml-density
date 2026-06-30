@@ -2,6 +2,7 @@
 
 import sys
 import numpy as np
+import pandas as pd
 import metatensor
 from libs.config import read_config
 from libs.functions import moldata_read, get_test_set, get_training_set, Basis
@@ -14,8 +15,8 @@ def main():
     training = 'training' in sys.argv[1:]
 
     atomic_numbers = moldata_read(p.xyzfilename)
-    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
-    basis = Basis(o.basisname, elements=set(ref_elements))
+    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
+    basis = Basis(o.basisname, elements=np.unique(ref_elements))
 
     for frac in o.fracs:
         weights = np.load(f'{p.weightsfilebase}_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy')

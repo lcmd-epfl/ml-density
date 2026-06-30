@@ -2,6 +2,7 @@
 
 import sys
 import numpy as np
+import pandas as pd
 import metatensor
 from libs.config import read_config
 from libs.functions import moldata_read, get_elements_list, Basis
@@ -13,26 +14,14 @@ def main():
 
     atomic_numbers = moldata_read(p.xyzfilename)
     elements = get_elements_list(atomic_numbers)
-    natoms = np.array([len(atoms) for atoms in atomic_numbers])
 
-    ref_indices = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,0]
     basis = Basis(o.basisname, elements)
 
-    ref_mol_at = get_ref_idx(natoms, ref_indices)
-    print(ref_mol_at)
-    tensor = merge_ref_ps(basis.lmax, elements, atomic_numbers, ref_mol_at, p.splitpsfilebase)
+    refs = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')
+    ref_mol_at = np.vstack((refs['q'], refs['mol'], refs['atom_in_mol'])).T
+
+    tensor = merge_ref_ps(basis.lmax, ref_mol_at, p.splitpsfilebase)
     metatensor.save(f'{p.powerrefbase}_{o.M}.mts', tensor)
-
-
-def get_ref_idx(natoms, refs):
-    idx_mol = []
-    idx_atm = []
-    for imol, nat in enumerate(natoms):
-        idx_mol += [imol] * nat
-        idx_atm += range(nat)
-    ref_imol = np.array(idx_mol)[refs]
-    ref_iat  = np.array(idx_atm)[refs]
-    return np.vstack((ref_imol, ref_iat)).T
 
 
 if __name__=='__main__':

@@ -148,9 +148,9 @@ def tmap2matrix(atom_charges, basis, tensor):
     return dm
 
 
-def merge_ref_ps(lmax, elements, atomic_numbers, idx, splitpsfilebase):
+def merge_ref_ps(lmax, idx, splitpsfilebase):
 
-    keys = [(l, q) for q in elements for l in range(lmax[q]+1)]
+    keys = [(l, q) for q in sorted(lmax.keys()) for l in range(lmax[q]+1)]
 
     tm_labels = None
     block_comp_labels = {}
@@ -159,8 +159,7 @@ def merge_ref_ps(lmax, elements, atomic_numbers, idx, splitpsfilebase):
     blocks = {key: [] for key in keys}
 
     tensor_keys_names = None
-    for iref, (mol_id, atom_id) in enumerate(idx):
-        q = atomic_numbers[mol_id][atom_id]
+    for iref, (q, mol_id, atom_id) in enumerate(idx):
         tensor = metatensor.load(f'{splitpsfilebase}_{mol_id}.mts')
 
         for l in range(lmax[q]+1):

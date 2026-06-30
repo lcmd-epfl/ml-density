@@ -36,6 +36,7 @@ conda create -n ml-density python=3.13
 conda activate ml-density
 conda install pip=25.2
 conda install numpy=2.3
+conda install pandas=2.3
 conda install scipy=1.16.2
 conda install numba=0.62
 conda install mpi4py=4.0

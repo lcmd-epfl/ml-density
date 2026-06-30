@@ -3,6 +3,7 @@
 import sys
 import gc
 import numpy as np
+import pandas as pd
 import scipy.linalg as spl
 from numba import jit
 import metatensor
@@ -13,8 +14,8 @@ from libs.functions import Basis
 def main():
     o, p = read_config(sys.argv)
 
-    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
-    basis = Basis(o.basisname, set(ref_elements))
+    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
+    basis = Basis(o.basisname, np.unique(ref_elements))
     totsize = basis.nao_for_mol(ref_elements)
 
     k_MM = metatensor.load(f'{p.kmmbase}{o.M}.mts')

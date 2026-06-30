@@ -4,6 +4,7 @@ import sys
 import os
 import ctypes
 import numpy as np
+import pandas as pd
 from qstack.mathutils.array import vstack_padding
 from libs.config import read_config
 from libs.functions import moldata_read, get_elements_list, get_training_sets, Basis
@@ -19,7 +20,7 @@ def main():
     elements = get_elements_list(atomic_numbers)
 
     # reference environments
-    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
+    ref_elements = pd.read_csv(f'{p.refsselfilebase}{o.M}.csv')['q'].to_numpy()
     ref_elements_idx = np.zeros_like(ref_elements)
     for iq, q in enumerate(elements):
         ref_elements_idx[np.where(ref_elements==q)] = iq
