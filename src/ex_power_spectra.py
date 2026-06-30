@@ -3,9 +3,10 @@
 import sys
 import ase.io
 import metatensor
+from tqdm import tqdm
 from libs.config import read_config
 from libs.lsoap import generate_lambda_soap_wrapper, make_rascal_hypers
-from libs.functions import get_elements_list, print_progress, moldata_read, Basis
+from libs.functions import get_elements_list, moldata_read, Basis
 
 
 def main():
@@ -28,8 +29,7 @@ def main():
     print(f'{basis.lmax=}')
     print(f'{o.ps_min_norm=} {o.ps_normalize=}')
 
-    for imol, mol in enumerate(mols_ex):
-        print_progress(imol, len(mols_ex))
+    for imol, mol in enumerate(tqdm(mols_ex)):
         soap = generate_lambda_soap_wrapper(mol, rascal_hypers, neighbor_species=elements,
                                             normalize=o.ps_normalize, min_norm=o.ps_min_norm,
                                             lmax=basis.lmax)

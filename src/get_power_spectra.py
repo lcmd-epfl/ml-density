@@ -9,7 +9,7 @@ from libs.lsoap import generate_lambda_soap_wrapper, make_rascal_hypers
 from libs.functions import get_elements_list, Basis
 from libs.multi import multi_process
 
-USEMPI=1
+USEMPI = True
 
 
 def main():
@@ -37,11 +37,11 @@ def main():
     print(f'{o.ps_min_norm=} {o.ps_normalize=}')
 
     nmol = len(mols)
-    if USEMPI==0:
+    if USEMPI:
+        multi_process(nmol, do_mol)
+    else:
         for imol in trange(nmol):
             do_mol(imol)
-    else:
-        multi_process(nmol, do_mol)
 
 
 if __name__=='__main__':

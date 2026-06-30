@@ -1,6 +1,6 @@
 import numpy as np
 import metatensor
-from libs.functions import print_progress
+from tqdm import tqdm
 from libs.tmap import vector2tmap
 
 
@@ -26,8 +26,7 @@ def run_prediction(test_configs, atomic_numbers,
     weights = vector2tmap(ref_elements, basis, weights)
 
     predictions = []
-    for i, (imol, atoms) in enumerate(zip(test_configs, atomic_numbers, strict=True)):
-        print_progress(i, len(test_configs))
+    for imol, atoms in zip(tqdm(test_configs), atomic_numbers, strict=True):
         kernel = metatensor.load(f'{kernelbase}{imol}.mts')
         predictions.append(compute_prediction(atoms, basis, kernel, weights, averages=averages))
     return predictions

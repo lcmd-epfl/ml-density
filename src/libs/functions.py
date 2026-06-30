@@ -15,13 +15,6 @@ def get_elements_list(atomic_numbers, return_counts=False):
     return np.unique(np.concatenate(atomic_numbers), return_counts=return_counts)
 
 
-def print_progress(i, n):
-    npad = len(str(n))
-    strg = "Doing point %*i of %*i (%5.1f %%)"%(npad,i+1,npad,n,100 * float(i+1)/n)
-    end  = '\r' if i<n-1 else '\n'
-    print(strg, end=end, flush=True)
-
-
 def get_training_set(filename, fraction=1.0, sort=True):
     train_selection = np.loadtxt(filename, dtype=int, ndmin=1)
     n = int(fraction*len(train_selection))

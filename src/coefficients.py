@@ -3,8 +3,9 @@
 import sys
 import numpy as np
 import metatensor
+from tqdm import tqdm
 from libs.config import read_config
-from libs.functions import moldata_read, get_test_set, print_progress, Basis
+from libs.functions import moldata_read, get_test_set, Basis
 from libs.tmap import split, tmap2vector, tmap_add
 
 
@@ -15,14 +16,13 @@ def main():
     averages = metatensor.load(p.avfile)
 
     basis = Basis(o.basisname, elements=set(averages.keys.column('center_type')))
-    ntest, test_configs = get_test_set(p.trainfilename, len(atomic_numbers))
+    _, test_configs = get_test_set(p.trainfilename, len(atomic_numbers))
 
     for frac in o.fracs:
         print('fraction =', frac)
         predictfile = p.predictions.format(subset='test', train_frac=frac)
         predictions = split(metatensor.load(predictfile))
-        for itest, (imol, c) in enumerate(zip(test_configs, predictions, strict=True)):
-            print_progress(itest, ntest)
+        for imol, c in zip(tqdm(test_configs), predictions, strict=True):
             tmap_add(c, averages)
             rho = tmap2vector(atomic_numbers[imol], basis, c)
             np.savetxt(f'{p.outfilebase}tf{frac}_gpr_{imol}.dat', rho)

@@ -3,8 +3,9 @@
 import sys
 import pandas as pd
 import metatensor
+from tqdm import tqdm
 from libs.config import read_config
-from libs.functions import moldata_read, print_progress, Basis
+from libs.functions import moldata_read, Basis
 from libs.kernels_lib import kernel_for_mol
 
 
@@ -16,8 +17,7 @@ def main():
     power_ref = metatensor.load(p.reference_power_spectra)
     basis = Basis(o.basisname, elements=set(ref_elements))
 
-    for imol, atoms in enumerate(atomic_numbers_ex):
-        print_progress(imol, len(atomic_numbers_ex))
+    for imol, atoms in enumerate(tqdm(atomic_numbers_ex)):
         kernel_for_mol(basis.lmax, ref_elements, atoms, power_ref,
                        f'{p.powerexbase}_{imol}.mts',
                        f'{p.kernelexbase}{imol}.mts')

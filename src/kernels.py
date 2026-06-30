@@ -3,12 +3,13 @@
 import sys
 import pandas as pd
 import metatensor
+from tqdm import trange
 from libs.config import read_config
-from libs.functions import moldata_read, print_progress, Basis
+from libs.functions import moldata_read, Basis
 from libs.kernels_lib import kernel_for_mol
 from libs.multi import multi_process
 
-USEMPI = 1
+USEMPI = True
 
 
 def main():
@@ -27,12 +28,11 @@ def main():
     basis = Basis(o.basisname, elements=set(ref_elements))
     nmol = len(atomic_numbers)
 
-    if USEMPI==0:
-        for imol in range(nmol):
-            print_progress(imol, nmol)
-            do_mol(imol)
-    else:
+    if USEMPI:
         multi_process(nmol, do_mol)
+    else:
+        for imol in trange(nmol):
+            do_mol(imol)
 
 
 if __name__=='__main__':

@@ -1,6 +1,6 @@
 import sys
+from tqdm import trange
 from mpi4py import MPI
-from libs.functions import print_progress
 
 
 def print_nodes(Nproc, nproc, comm):
@@ -43,8 +43,7 @@ def multi_process(nmol, do_mol):
     print_nodes(Nproc, nproc, comm)
 
     if Nproc == 1:
-        for imol in range(nmol):
-            print_progress(imol, nmol)
+        for imol in trange(nmol):
             do_mol(imol)
     else:
         scatter_jobs(Nproc, nproc, comm, 0, nmol, do_mol)
