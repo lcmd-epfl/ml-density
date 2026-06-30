@@ -1,6 +1,5 @@
 import numpy as np
 import metatensor
-from libs.tmap import sparseindices_fill
 from libs.get_matrices_A import print_batches
 from libs.multi import print_nodes, scatter_jobs
 USE_MPI = 1
@@ -36,8 +35,8 @@ def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
     for (l1, l2, q1, q2), oblock in over.items():
         msize1 = 2*l1+1
         msize2 = 2*l2+1
-        nsize1 = nmax[(q1,l1)]
-        nsize2 = nmax[(q2,l2)]
+        nsize1 = nmax[q1][l1]
+        nsize2 = nmax[q2][l2]
         kblock1 = k_NM.block(o3_lambda=l1, center_type=q1)
         kblock2 = k_NM.block(o3_lambda=l2, center_type=q2)
         oval = oblock.values.reshape(len(kblock1.samples), len(kblock2.samples), msize1, msize2, nsize1, nsize2)
@@ -64,14 +63,16 @@ def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
                             Bmat[i12a:i12b] += dB[n2,im2,n2,:im2+1]
 
 
-def get_b(lmax, nmax, totsize, ref_elem, nfrac, ntrains, trrange,
+def get_b(basis, ref_elem, nfrac, ntrains, trrange,
           path_over, path_kern, paths_bmat):
 
     def do_mol(imol):
-        do_work_b(idx, nmax, trrange[imol], ref_elem, path_over, path_kern, Bmat)
+        do_work_b(idx, basis.nmax, trrange[imol], ref_elem, path_over, path_kern, Bmat)
 
+    totsize = basis.nao_for_mol(ref_elem)
     Bmat = np.zeros(symsize(totsize))
-    idx = sparseindices_fill(lmax, nmax, ref_elem)
+    idx = basis.sparse_indices(ref_elem)
+
     ntrains = np.pad(ntrains, (0, 1), 'constant', constant_values=0)
 
     if USE_MPI:

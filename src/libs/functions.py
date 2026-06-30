@@ -22,14 +22,6 @@ def print_progress(i, n):
     print(strg, end=end, flush=True)
 
 
-def nao_for_mol(atoms, lmax, nmax):
-    nao = 0
-    for q in atoms:
-        for l in range(lmax[q]+1):
-            nao += (2*l+1)*nmax[(q,l)]
-    return nao
-
-
 def get_training_set(filename, fraction=1.0, sort=True):
     train_selection = np.loadtxt(filename, dtype=int, ndmin=1)
     n = int(fraction*len(train_selection))
@@ -53,18 +45,6 @@ def get_test_set(filename, nmol):
 
 
 class Basis:
-    #def __init__(self, lmax, nmax):
-    #    ao = {}
-    #    for q in lmax.keys():
-    #        ao[q] = []
-    #        for l in range(lmax[q]+1):
-    #            for n in range(nmax[(q,l)]):
-    #                for m in range(-l, l+1):
-    #                    ao[q].append((q, l, n, m))
-    #        ao[q] = np.array(ao[q])
-    #    self.ao = ao
-    #    self.lmax = lmax
-    #    self.nmax = nmax
     def __init__(self, basisname, elements):
         self.basisname = basisname
         self.elements = sorted(elements)
@@ -77,17 +57,21 @@ class Basis:
             if not np.all(sorted(l)==l):
                 raise ValueError("Basis functions are not sorted by angular momentum")
             lmax[q] = l[-1]
+            nmax[q] = np.zeros(lmax[q]+1, dtype=int)
             n = []
             m = []
             for li, nao_l in zip(*np.unique(l, return_counts=True), strict=True):
                 msize = 2*li+1
-                nmax[q,li] = nao_l//msize
-                n.append( np.repeat(np.arange(nmax[q,li]), msize))
-                m.append( np.tile(np.arange(msize)-li, nmax[q,li]))  # cannot use m from basis_flatten because of pyscf ordering
+                nmax[q][li] = nao_l//msize
+                n.append( np.repeat(np.arange(nmax[q][li]), msize))
+                m.append( np.tile(np.arange(msize)-li, nmax[q][li]))  # cannot use m from basis_flatten because of pyscf ordering
             ao[q] = np.vstack((np.ones_like(l)*q, l, np.hstack(n), np.hstack(m))).T
         self.ao = ao
         self.lmax = lmax
         self.nmax = nmax
+
+        self.msize = np.array([2*l+1 for l in range(max(lmax.values())+1)])
+        self.nao_atom = {q: nmax[q] @ self.msize[:l+1] for q, l in lmax.items()}
 
     def __repr__(self):
         with np.printoptions(legacy="1.25"):
@@ -101,16 +85,29 @@ class Basis:
             ao[i,1:] = self.ao[q]
         return ao
 
+    def sparse_indices(self, atoms):
+        idx = np.zeros((len(atoms), max(self.lmax.values())+1), dtype=int)
+        i = 0
+        for iat, q in enumerate(atoms):
+            for l in range(self.lmax[q]+1):
+                idx[iat,l] = i
+                i += (2*l+1) * self.nmax[q][l]
+        return idx
+
     def index(self, atoms):
         return AOIndex(atoms, self)
+
+    def nao_for_mol(self, atoms):
+        return sum(self.nao_atom[q] for q in atoms)
 
 
 class AOIndex:
     def __init__(self, atoms, basis):
-        self.ao = basis.cat(atoms)
+        self.basis = basis
+        self.atoms = np.asarray(atoms)
+        self.ao = basis.cat(self.atoms)
         self.nao = len(self.ao)
-        self.nat = len(atoms)
-        self.atoms = atoms
+        self.nat = len(self.atoms)
 
     def find(self, iat=None, q=None, l=None, n=None, m=None):
         conditions = []
@@ -129,3 +126,7 @@ class AOIndex:
             return np.arange(len(self.ao))
         else:
             return np.where(np.prod(conditions, axis=0))[0]
+
+    def __repr__(self):
+        with np.printoptions(legacy="1.25"):
+            return f'AOIndex({self.atoms}, {self.basis})'

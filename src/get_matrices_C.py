@@ -4,8 +4,9 @@ import sys
 import os
 import ctypes
 import numpy as np
+from qstack.mathutils.array import vstack_padding
 from libs.config import read_config
-from libs.functions import moldata_read, get_elements_list, get_training_sets, Basis, nao_for_mol
+from libs.functions import moldata_read, get_elements_list, get_training_sets, Basis
 
 
 def main():
@@ -34,7 +35,7 @@ def main():
     alnum, annum = basis_info(basis)
 
     # problem dimensionality
-    totsize = nao_for_mol(ref_elements, basis.lmax, basis.nmax)
+    totsize = basis.nao_for_mol(ref_elements)
 
     # C arguments
     outputfiles = (ctypes.c_char_p * nfrac)()
@@ -81,13 +82,9 @@ def main():
 
 
 def basis_info(basis):
-    nel = len(basis.elements)
-    alnum = np.zeros(nel, dtype=int)
-    annum = np.zeros((max(basis.lmax.values())+1, nel), dtype=int)
-    for iq, q in enumerate(basis.elements):
-        alnum[iq] = basis.lmax[q]+1
-        for l in range(alnum[iq]):
-            annum[l,iq] = basis.nmax[(q,l)]
+    # basis.elements is ordered
+    alnum = np.array([basis.lmax[q]+1 for q in basis.elements])
+    annum = vstack_padding([basis.nmax[q] for q in basis.elements]).T
     return alnum, annum
 
 

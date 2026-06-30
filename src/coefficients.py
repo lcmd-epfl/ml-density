@@ -24,7 +24,7 @@ def main():
         for itest, (imol, c) in enumerate(zip(test_configs, predictions, strict=True)):
             print_progress(itest, ntest)
             tmap_add(c, averages)
-            rho = tmap2vector(atomic_numbers[imol], basis.lmax, basis.nmax, c)
+            rho = tmap2vector(atomic_numbers[imol], basis, c)
             np.savetxt(f'{p.outfilebase}tf{frac}_gpr_{imol}.dat', rho)
 
 

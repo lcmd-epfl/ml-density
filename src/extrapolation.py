@@ -19,11 +19,11 @@ def main():
     weights = np.load(f'{p.weightsfilebase}_M{o.M}_trainfrac{o.fracs[-1]}_reg{o.reg}_jit{o.jit}.npy')
 
     predictions = run_prediction(np.arange(len(atomic_numbers_ex)), atomic_numbers_ex,
-                                 basis.lmax, basis.nmax, weights, ref_elements,
+                                 basis, weights, ref_elements,
                                  p.kernelexbase, averages=averages)
 
     for imol, (atoms, c) in enumerate(zip(atomic_numbers_ex, predictions, strict=True)):
-        np.savetxt(f'{p.outexfilebase}gpr_{imol}.dat', tmap2vector(atoms, basis.lmax, basis.nmax, c))
+        np.savetxt(f'{p.outexfilebase}gpr_{imol}.dat', tmap2vector(atoms, basis, c))
 
 
 if __name__=='__main__':

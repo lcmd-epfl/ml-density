@@ -1,12 +1,12 @@
 import numpy as np
 import metatensor
-from libs.functions import nao_for_mol, print_progress
+from libs.functions import print_progress
 from libs.tmap import vector2tmap
 
 
-def compute_prediction(atoms, lmax, nmax, kernel, weights, averages=None):
-    nao = nao_for_mol(atoms, lmax, nmax)
-    coeffs = vector2tmap(atoms, lmax, nmax, np.zeros(nao))
+def compute_prediction(atoms, basis, kernel, weights, averages=None):
+    nao = basis.nao_for_mol(atoms)
+    coeffs = vector2tmap(atoms, basis, np.zeros(nao))
     for (l, q), cblock in coeffs.items():
         wblock = weights.block(o3_lambda=l, center_type=q)
         kblock = kernel.block(o3_lambda=l, center_type=q)
@@ -20,14 +20,14 @@ def compute_prediction(atoms, lmax, nmax, kernel, weights, averages=None):
 
 
 def run_prediction(test_configs, atomic_numbers,
-                   lmax, nmax, weights, ref_elements,
+                   basis, weights, ref_elements,
                    kernelbase, averages=None):
 
-    weights = vector2tmap(ref_elements, lmax, nmax, weights)
+    weights = vector2tmap(ref_elements, basis, weights)
 
     predictions = []
     for i, (imol, atoms) in enumerate(zip(test_configs, atomic_numbers, strict=True)):
         print_progress(i, len(test_configs))
         kernel = metatensor.load(f'{kernelbase}{imol}.mts')
-        predictions.append(compute_prediction(atoms, lmax, nmax, kernel, weights, averages=averages))
+        predictions.append(compute_prediction(atoms, basis, kernel, weights, averages=averages))
     return predictions

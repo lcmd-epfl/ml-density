@@ -28,7 +28,7 @@ def main():
 
         print(f'Number of testing molecules = {ntest}')
         predictions = run_prediction(test_configs, atomic_numbers[test_configs],
-                                     basis.lmax, basis.nmax, weights, ref_elements,
+                                     basis, weights, ref_elements,
                                      p.kernelconfbase)
         predictions = join(predictions)
         metatensor.save(predictfile, predictions)

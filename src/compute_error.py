@@ -54,14 +54,14 @@ def main():
             elif o.use_charges==2:
                 N  = molcharges[imol]
 
-            S = tmap2matrix(atoms, basis.lmax, basis.nmax, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'))
+            S = tmap2matrix(atoms, basis, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'))
 
             mol = make_pyscf_mol(atom=[[q, (0, 0, 0)]  for q in atoms], basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
             qvec = rho_moments(mol, rho=None, moments=(0,), per_atom=False)[0]
 
             c0   = np.load(f'{p.goodcoeffilebase}{imol}.npy')
-            c_bl = tmap2vector(atoms, basis.lmax, basis.nmax, predictions[itest])
-            c_av = sph2vector(atoms, basis.lmax, basis.nmax, averages)
+            c_bl = tmap2vector(atoms, basis, predictions[itest])
+            c_av = sph2vector(atoms, basis, averages)
 
             c0_bl = c0 - c_av
             nel0  = qvec @ c0

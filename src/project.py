@@ -65,7 +65,7 @@ def remove_averages(ao_index, coef, av_coefs):
 
 
 def get_averages(nenv, basis, coefficients, ao_indices):
-    av_coefs = {q: np.zeros(basis.nmax[(q, 0)]) for q in nenv}
+    av_coefs = {q: np.zeros(basis.nmax[q][0]) for q in nenv}
 
     for coef, ao_index in zip(coefficients, ao_indices, strict=True):
         for iat, q in enumerate(ao_index.atoms):

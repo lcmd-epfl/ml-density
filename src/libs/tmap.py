@@ -59,7 +59,7 @@ def kernels2tmap(atom_charges, kernel):
     return tensor
 
 
-def vector2tmap(atom_charges, lmax, nmax, c):
+def vector2tmap(atom_charges, basis, c):
 
     elements = np.unique(atom_charges)
 
@@ -73,12 +73,12 @@ def vector2tmap(atom_charges, lmax, nmax, c):
     # Create labels for TensorMap, lables for blocks, and empty blocks
 
     for q in elements:
-        for l in range(lmax[q]+1):
+        for l in range(basis.lmax[q]+1):
             label = (l, q)
             tm_label_vals.append(label)
             samples_count    = np.count_nonzero(atom_charges==q)
             components_count = 2*l+1
-            properties_count = nmax[(q,l)]
+            properties_count = basis.nmax[q][l]
             blocks[label] = np.zeros((samples_count, components_count, properties_count))
             block_comp_label_vals[label] = np.arange(-l, l+1).reshape(-1,1)
             block_prop_label_vals[label] = np.arange(properties_count).reshape(-1,1)
@@ -95,7 +95,7 @@ def vector2tmap(atom_charges, lmax, nmax, c):
     iq = dict.fromkeys(elements, 0)
     i = 0
     for q in atom_charges:
-        for l in range(lmax[q]+1):
+        for l in range(basis.lmax[q]+1):
             msize = 2*l+1
             nsize = blocks[(l,q)].shape[-1]
             cslice = c[i:i+nsize*msize].reshape(nsize,msize).T
@@ -111,13 +111,13 @@ def _get_tsize(tensor):
     return sum(np.prod(tensor.block(key).values.shape) for key in tensor.keys)
 
 
-def tmap2vector(atom_charges, lmax, nmax, tensor):
+def tmap2vector(atom_charges, basis, tensor):
     nao = _get_tsize(tensor)
     c = np.zeros(nao)
     i = 0
     for iat, q in enumerate(atom_charges):
-        for l in range(lmax[q]+1):
-            for n in range(nmax[(q,l)]):
+        for l in range(basis.lmax[q]+1):
+            for n in range(basis.nmax[q][l]):
                 block = tensor.block(o3_lambda=l, center_type=q)
                 id_samp = block.samples.position((iat,))
                 id_prop = block.properties.position((n,))
@@ -128,25 +128,15 @@ def tmap2vector(atom_charges, lmax, nmax, tensor):
     return c
 
 
-def sparseindices_fill(lmax, nmax, atoms):
-    idx = np.zeros((len(atoms), max(lmax.values())+1), dtype=int)
-    i = 0
-    for iat, q in enumerate(atoms):
-        for l in range(lmax[q]+1):
-            idx[iat,l] = i
-            i += (2*l+1) * nmax[(q,l)]
-    return idx
-
-
-def tmap2matrix(atom_charges, lmax, nmax, tensor):
+def tmap2matrix(atom_charges, basis, tensor):
     nao = round(np.sqrt(_get_tsize(tensor)))
     dm = np.zeros((nao, nao))
-    idx = sparseindices_fill(lmax, nmax, atom_charges)
+    idx = basis.sparse_indices(atom_charges)
     for (l1, l2, q1, q2), block in tensor.items():
         msize1 = 2*l1+1
         msize2 = 2*l2+1
-        nsize1 = nmax[(q1,l1)]
-        nsize2 = nmax[(q2,l2)]
+        nsize1 = basis.nmax[q1][l1]
+        nsize2 = basis.nmax[q2][l2]
         ac1 = np.count_nonzero(atom_charges==q1)
         ac2 = np.count_nonzero(atom_charges==q2)
         values = block.values.reshape((ac1, ac2, msize1, msize2, nsize1, nsize2))
@@ -283,12 +273,10 @@ def split(tensor):
     return tensors
 
 
-def sph2vector(atoms, lmax, nmax, tensor):
-    c = []
-    for q in atoms:
-        c.append(np.squeeze(tensor.block(o3_lambda=0, center_type=q).values))
-        c.extend([np.zeros((2*l+1)*nmax[(q,l)]) for l in range(1, lmax[q]+1)])
-    return np.hstack(c)
+def sph2vector(atoms, basis, tensor):
+    return np.hstack([
+            np.pad(np.squeeze(tensor.block(o3_lambda=0, center_type=q).values), (0, basis.nao_atom[q]-basis.nmax[q][0]))
+           for q in atoms])
 
 
 def tmap_add(x, dx):

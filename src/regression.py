@@ -7,8 +7,7 @@ import scipy.linalg as spl
 from numba import jit
 import metatensor
 from libs.config import read_config
-from libs.functions import nao_for_mol, Basis
-from libs.tmap import sparseindices_fill
+from libs.functions import Basis
 
 
 def main():
@@ -16,11 +15,11 @@ def main():
 
     ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
     basis = Basis(o.basisname, set(ref_elements))
-    totsize = nao_for_mol(ref_elements, basis.lmax, basis.nmax)
+    totsize = basis.nao_for_mol(ref_elements)
 
     k_MM = metatensor.load(f'{p.kmmbase}{o.M}.mts')
     mat  = np.ndarray((totsize,totsize))
-    idx = sparseindices_fill(basis.lmax, basis.nmax, ref_elements)
+    idx = basis.sparse_indices(ref_elements)
 
     print(f'problem dimensionality = {totsize}')
 
@@ -61,7 +60,7 @@ def fill_matrix(mat, k_MM, bmatfile, idx, nmax, jitter, reg):
             if iref1<iref2:
                 continue
             dk = reg * kblock.values[iiref12,:,:,0]
-            for n in range(nmax[q, l]):
+            for n in range(nmax[q][l]):
                 i1 = idx[iref1, l] + n*msize
                 i2 = idx[iref2, l] + n*msize
                 mat[i1:i1+msize, i2:i2+msize] += dk
