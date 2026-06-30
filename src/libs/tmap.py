@@ -43,10 +43,10 @@ def averages2tmap(averages):
 
 
 def kernels2tmap(atom_charges, kernel):
-    tm_label_vals = sorted(kernel.keys(), key=lambda x: x[::-1])
+    tm_label_vals = sorted(kernel.keys(), key=lambda x: x[::-1])  # noqa FURB118
     tensor_blocks = []
     for (l, q) in tm_label_vals:
-        values = np.ascontiguousarray(np.array(kernel[(l, q)]).transpose(0,2,3,1))
+        values = np.ascontiguousarray(np.array(kernel[l,q]).transpose(0,2,3,1))
         prop_label_vals = np.arange(values.shape[-1]).reshape(-1,1)
         samp_label_vals = np.where(atom_charges==q)[0].reshape(-1,1)
         comp_label_vals = np.arange(-l, l+1).reshape(-1,1)
@@ -97,9 +97,9 @@ def vector2tmap(atom_charges, basis, c):
     for q in atom_charges:
         for l in range(basis.lmax[q]+1):
             msize = 2*l+1
-            nsize = blocks[(l,q)].shape[-1]
+            nsize = blocks[l,q].shape[-1]
             cslice = c[i:i+nsize*msize].reshape(nsize,msize).T
-            blocks[(l,q)][iq[q],:,:] = cslice
+            blocks[l,q][iq[q],:,:] = cslice
             i += msize*nsize
         iq[q] += 1
     tensor_blocks = [metatensor.TensorBlock(values=blocks[key], samples=block_samp_labels[key], components=[block_comp_labels[key]], properties=block_prop_labels[key]) for key in tm_label_vals]
@@ -286,10 +286,10 @@ def tmap_add(x, dx):
 
 
 def kmm2tmap(qsamples, kernel):
-    tm_label_vals = sorted(kernel.keys(), key=lambda x: x[::-1])
+    tm_label_vals = sorted(kernel.keys(), key=lambda x: x[::-1])  # noqa FURB118
     tensor_blocks = []
     for (l, q) in tm_label_vals:
-        values = kernel[(l, q)].reshape(-1, 2*l+1, 2*l+1, 1)
+        values = kernel[l, q].reshape(-1, 2*l+1, 2*l+1, 1)
         prop_label_vals = np.array(1, ndmin=2)
         samp_label_vals = np.array([(*i, *j) for i in qsamples[q] for j in qsamples[q]])
         comp_label_vals = np.arange(-l, l+1).reshape(-1,1)

@@ -51,7 +51,7 @@ def load_coefs(n, coefffilebase):
     for imol in range(n):
         try:
             coef = np.loadtxt(f'{coefffilebase}{imol}.dat')
-        except:
+        except FileNotFoundError:
             coef = np.load(f'{coefffilebase}{imol}.npy')
         coefficients.append(coef)
     return coefficients

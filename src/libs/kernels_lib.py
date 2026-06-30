@@ -20,7 +20,7 @@ def kernel_nm_sparse_indices(lmax, ref_elements, atomic_numbers):
 def kernel_nm(atom_charges, soap, soap_ref, imol=0):
     keys1 = {tuple(key) for key in soap.keys}
     keys2 = {tuple(key) for key in soap_ref.keys}
-    keys  = sorted(keys1 & keys2, key=lambda x: x[::-1])
+    keys  = sorted(keys1 & keys2, key=lambda x: x[::-1])  # noqa FURB118
     kernel = {key: [] for key in keys}
 
     for iat, q in enumerate(atom_charges):
@@ -36,7 +36,7 @@ def kernel_nm(atom_charges, soap, soap_ref, imol=0):
             # Normalize with zeta=2
             if l==0:
                 factor = pre_kernel
-            kernel[(l,q)].append(pre_kernel * factor)
+            kernel[l,q].append(pre_kernel * factor)
     kernel = kernels2tmap(atom_charges, kernel)
     return kernel
 
@@ -75,18 +75,18 @@ def kernel_mm(lmax, power_ref):
         nsamp = len(rblock.samples)
         if q not in samples:
             samples[q] = list(rblock.samples)
-        k_MM[(l, q)] = np.zeros((nsamp, nsamp, msize, msize))
+        k_MM[l,q] = np.zeros((nsamp, nsamp, msize, msize))
         for iiref1 in range(nsamp):
             vec1 = rblock.values[iiref1]
             for iiref2 in range(iiref1, nsamp):
                 vec2 = rblock.values[iiref2]
                 dot = vec1 @ vec2.T
-                k_MM[(l, q)][iiref1, iiref2] = dot
+                k_MM[l, q][iiref1, iiref2] = dot
                 if iiref1!=iiref2:
-                    k_MM[(l, q)][iiref2, iiref1] = dot.T
+                    k_MM[l,q][iiref2, iiref1] = dot.T
     for q, lm in lmax.items():
         # Mind the descending order of l
         for l in range(lm, -1, -1):
-            k_MM[(l, q)] *= k_MM[(0, q)]
+            k_MM[l,q] *= k_MM[0,q]
 
     return kmm2tmap(samples, k_MM)
