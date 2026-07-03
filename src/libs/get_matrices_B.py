@@ -63,7 +63,7 @@ def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
                             Bmat[i12a:i12b] += dB[n2,im2,n2,:im2+1]
 
 
-def get_b(basis, ref_elem, nfrac, ntrains, trrange,
+def get_b(basis, ref_elem, ntrains, trrange,
           path_over, path_kern, paths_bmat):
 
     def do_mol(imol):
@@ -72,8 +72,6 @@ def get_b(basis, ref_elem, nfrac, ntrains, trrange,
     totsize = basis.nao_for_mol(ref_elem)
     Bmat = np.zeros(symsize(totsize))
     idx = basis.sparse_indices(ref_elem)
-
-    ntrains = np.pad(ntrains, (0, 1), 'constant', constant_values=0)
 
     if USE_MPI:
         Nproc = MPI.COMM_WORLD.Get_size()
@@ -89,16 +87,16 @@ def get_b(basis, ref_elem, nfrac, ntrains, trrange,
         Nproc = 1
 
     if nproc==0:
-        print_batches(nfrac, ntrains, paths_bmat)
+        print_batches(ntrains, paths_bmat)
     if USE_MPI:
         MPI.COMM_WORLD.barrier()
 
     if Nproc==1:
-        for ifrac in range(nfrac):
+        for ifrac, path_bmat in enumerate(paths_bmat):
             for imol in range(ntrains[ifrac-1], ntrains[ifrac]):
                 print(f'{nproc:4d}: {imol:4d}', flush=True)
                 do_mol(imol)
-            Bmat.tofile(paths_bmat[ifrac])
+            Bmat.tofile(path_bmat)
         if USE_MPI:
             t = MPI.Wtime () - t
             print(f'{t=:4.2f}', flush=True)
@@ -112,7 +110,7 @@ def get_b(basis, ref_elem, nfrac, ntrains, trrange,
         if nproc==0:
             BMAT = np.zeros(bufsize)
 
-        for ifrac in range(nfrac):
+        for ifrac, path_bmat in enumerate(paths_bmat):
             scatter_jobs(Nproc, nproc, MPI.COMM_WORLD, ntrains[ifrac-1], ntrains[ifrac], do_mol)
             MPI.COMM_WORLD.barrier()
 
@@ -127,5 +125,5 @@ def get_b(basis, ref_elem, nfrac, ntrains, trrange,
                 MPI.COMM_WORLD.Reduce(Bmat[i*bufsize:i*bufsize+size], BMAT[:size] if nproc==0 else None, MPI.SUM, 0)
                 if nproc==0:
                     print(f'chunk #{i+1}/{div+1 if rem else div} written', flush=True)
-                    with open(paths_bmat[ifrac], 'a' if i else 'w') as f:
+                    with open(path_bmat, 'a' if i else 'w') as f:
                         BMAT[:size].tofile(f)

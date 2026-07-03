@@ -3,9 +3,9 @@ import metatensor
 from libs.tmap import vector2tmap, tmap2vector
 
 
-def print_batches(nfrac, ntrains, paths):
-    for i in range(nfrac):
-        print(f'batch {i:2d} [{ntrains[i-1]}--{ntrains[i]}):\t {paths[i]}')
+def print_batches(ntrains, paths):
+    for i, path in enumerate(paths):
+        print(f'batch {i:2d} [{ntrains[i-1]}--{ntrains[i]}):\t {path}')
     print(flush=True)
 
 
@@ -20,18 +20,17 @@ def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
             ablock.values[iiref1,:,:] += dA
 
 
-def get_a(basis, ref_elem, nfrac, ntrains, trrange,
+def get_a(basis, ref_elem, ntrains, trrange,
           path_proj, path_kern, paths_avec):
 
-    ntrains = np.pad(ntrains, (0, 1), 'constant', constant_values=0)
-    print_batches(nfrac, ntrains, paths_avec)
+    print_batches(ntrains, paths_avec)
 
     totsize = basis.nao_for_mol(ref_elem)
     Avec = np.zeros(totsize)
     A1 = vector2tmap(ref_elem, basis, Avec)
-    for ifrac in range(nfrac):
+    for ifrac, path_avec in enumerate(paths_avec):
         for imol in range(ntrains[ifrac-1], ntrains[ifrac]):
             print(f'{0:4d}: {imol:4d}')
             do_work_a(trrange[imol], ref_elem, path_proj, path_kern, A1)
         Avec = tmap2vector(ref_elem, basis, A1)
-        np.savetxt(paths_avec[ifrac], Avec)
+        np.savetxt(path_avec, Avec)

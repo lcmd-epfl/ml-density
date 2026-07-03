@@ -92,7 +92,8 @@ def read_config(argv):
         p.baselinedwbase   = conf.paths.get('baselined_w_base')
         p.avfile           = conf.paths.get('averages_file')
 
-        p.trainfilename    = conf.paths.get('trainingselfile')
+        p.train_test_sets = conf.paths.get('trainingselfile')
+
         p.avecfilebase     = conf.paths.get('avec_base')
         p.bmatfilebase     = conf.paths.get('bmat_base')
         p._weightsfilebase  = conf.paths.get('weights_base')

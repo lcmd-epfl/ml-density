@@ -26,7 +26,8 @@ def main():
         ref_elements_idx[np.where(ref_elements==q)] = iq
 
     # training set selection
-    nfrac, ntrains, train_configs = get_training_sets(p.trainfilename, o.fracs)
+    ntrains, train_configs = get_training_sets(p.train_test_sets, o.fracs)
+    nfrac = len(ntrains)
     ntrain = ntrains[-1]
     atomic_numbers_train = atomic_numbers[train_configs]
     atom_counting = get_atomicindx(elements, atomic_numbers_train)

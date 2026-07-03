@@ -22,7 +22,6 @@ def main():
     averages = metatensor.load(p.avfile)
     atomic_numbers = moldata_read(p.xyzfilename)
     basis = Basis(o.basisname, elements=set(averages.keys.column('center_type')))
-    nmol = len(atomic_numbers)
 
     if o.use_charges:
         print(f'charge_file: {p.chargefilename} mode: {o.use_charges}\n')
@@ -31,12 +30,12 @@ def main():
     for frac in o.fracs:
 
         print(f'fraction = {frac}')
-        if not training:
-            ntest, test_configs = get_test_set(p.trainfilename, nmol)
-            predictfile = p.predictions.format(subset='test', train_frac=frac)
-        else:
-            ntest, test_configs = get_training_set(p.trainfilename, frac)
+        if training:
+            ntest, test_configs = get_training_set(p.train_test_sets, frac)
             predictfile = p.predictions.format(subset='training', train_frac=frac)
+        else:
+            ntest, test_configs = get_test_set(p.train_test_sets)
+            predictfile = p.predictions.format(subset='test', train_frac=frac)
         predictions = split(metatensor.load(predictfile))
 
         total_error_N      = 0.0
@@ -88,7 +87,7 @@ def main():
             else:
                 errorn_rel_bl = np.nan
 
-            s1 = f'mol # {itest:{len(str(ntest))}} ({imol:{len(str(nmol))}}):  '
+            s1 = f'mol # {itest:{len(str(ntest))}} ({imol:{len(str(len(atomic_numbers)))}}):  '
             s2 = f'{error_rel_bl:8.3f} %  {error_rel:.2e} %    ( {error:.2e} )   {nel:8.4f} / {nel0:8.4f} ( {N:3d} )     (corr N: {errorn_rel_bl:8.3f} %)'
             print(s1+s2)
 

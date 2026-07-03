@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import ase.io
 from ase.data import chemical_symbols
 from qstack.tools import slice_generator
@@ -16,25 +17,29 @@ def get_elements_list(atomic_numbers, return_counts=False):
 
 
 def get_training_set(filename, fraction=1.0, sort=True):
-    train_selection = np.loadtxt(filename, dtype=int, ndmin=1)
-    n = int(fraction*len(train_selection))
-    train_configs = train_selection[0:n]
+    df = pd.read_csv(filename)
+    train_full = df[df['subset']=='train']['mol_idx'].to_numpy()
+    n = int(fraction*len(train_full))
+    train = train_full[0:n]
     if sort:
-        train_configs.sort()
-    return n, train_configs
+        train.sort()
+    return n, train
 
 
 def get_training_sets(filename, fractions):
-    train_selection = np.loadtxt(filename, dtype=int, ndmin=1)
-    n = (fractions*len(train_selection)).astype(int)
-    train_configs = train_selection[0:n[-1]]
-    return len(n), n, train_configs
+    df = pd.read_csv(filename)
+    train_full = df[df['subset']=='train']['mol_idx'].to_numpy()
+    train_sizes = (fractions*len(train_full)).astype(int)
+    trains = train_full[0:train_sizes[-1]]
+    return train_sizes, trains
 
 
-def get_test_set(filename, nmol):
-    train_selection = np.loadtxt(filename, dtype=int)
-    test_configs = np.setdiff1d(range(nmol), train_selection)
-    return len(test_configs), test_configs
+def get_test_set(filename, sort=True):
+    df = pd.read_csv(filename)
+    test = df[df['subset']=='test']['mol_idx'].to_numpy()
+    if sort:
+        test.sort()
+    return len(test), test
 
 
 class Basis:

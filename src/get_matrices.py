@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import numpy as np
 import pandas as pd
 from libs.config import read_config
 from libs.functions import get_training_sets, Basis
@@ -15,15 +16,16 @@ def main():
     basis = Basis(o.basisname, elements=set(ref_elements))
 
     # training set selection
-    nfrac, ntrains, train_configs = get_training_sets(p.trainfilename, o.fracs)
+    ntrains, train_configs = get_training_sets(p.train_test_sets, o.fracs)
+    ntrains = np.pad(ntrains, (0, 1), 'constant', constant_values=0)
 
     if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
         bmatfiles = [f'{p.bmatfilebase}_M{o.M}_trainfrac{frac}.dat' for frac in o.fracs]
-        get_b(basis, ref_elements, nfrac, ntrains, train_configs,
+        get_b(basis, ref_elements, ntrains, train_configs,
               p.goodoverfilebase, p.kernelconfbase, bmatfiles)
     else:
         avecfiles = [f'{p.avecfilebase}_M{o.M}_trainfrac{frac}.txt' for frac in o.fracs]
-        get_a(basis, ref_elements, nfrac, ntrains, train_configs,
+        get_a(basis, ref_elements, ntrains, train_configs,
               p.baselinedwbase, p.kernelconfbase, avecfiles)
 
 

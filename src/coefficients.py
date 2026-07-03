@@ -16,7 +16,7 @@ def main():
     averages = metatensor.load(p.avfile)
 
     basis = Basis(o.basisname, elements=set(averages.keys.column('center_type')))
-    _, test_configs = get_test_set(p.trainfilename, len(atomic_numbers))
+    _, test_configs = get_test_set(p.train_test_sets)
 
     for frac in o.fracs:
         print('fraction =', frac)

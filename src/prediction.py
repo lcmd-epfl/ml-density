@@ -21,10 +21,10 @@ def main():
     for frac in o.fracs:
         weights = np.load(p.weights.format(train_frac=frac))
         if not training:
-            ntest, test_configs = get_test_set(p.trainfilename, len(atomic_numbers))
+            ntest, test_configs = get_test_set(p.train_test_sets)
             predictfile = p.predictions.format(subset='test', train_frac=frac)
         else:
-            ntest, test_configs = get_training_set(p.trainfilename, frac)
+            ntest, test_configs = get_training_set(p.train_test_sets, frac)
             predictfile = p.predictions.format(subset='training', train_frac=frac)
 
         print(f'Number of testing molecules = {ntest}')
