@@ -18,8 +18,8 @@ def main():
     elements = get_elements_list(atomic_numbers)
     elements_ex = get_elements_list([mol.get_atomic_numbers() for mol in mols_ex])
     if not set(elements_ex).issubset(elements):
-        print(f'Different elements in the molecule and in the training set: {elements_ex} and {elements}')
-        exit(1)
+        msg = f'Different elements in the molecule and in the training set: {elements_ex} and {elements}'
+        raise RuntimeError(msg)
 
     basis = Basis(o.basisname, elements=elements_ex)
     rascal_hypers = make_rascal_hypers(o.soap_rcut, o.soap_ncut, o.soap_lcut, o.soap_sigma)

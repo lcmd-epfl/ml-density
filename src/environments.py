@@ -7,7 +7,7 @@ from tqdm import tqdm
 from ase.data import chemical_symbols
 from qstack.mathutils.fps import do_fps
 from libs.config import read_config
-from libs.functions import moldata_read, get_elements_list
+from libs.functions import moldata_read, get_elements_list, warn_short
 from libs.power_spectra_lib import read_ps_1mol_l0
 
 
@@ -41,7 +41,7 @@ def main():
 
     nuniq = len(np.unique(ref_indices))
     if nuniq != len(ref_indices):
-        print(f'Warning: I have found only {nuniq} unique environments')
+        warn_short(f'Only {nuniq} / {len(ref_indices)} unique environments found', stacklevel=1)
 
 
 if __name__=='__main__':

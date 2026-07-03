@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import pandas as pd
 import ase.io
@@ -55,7 +56,8 @@ class Basis:
             atom = compound.make_atom(chemical_symbols[q], basis=basisname)
             _, l, _ = compound.basis_flatten(atom, return_both=False)
             if not np.all(sorted(l)==l):
-                raise ValueError("Basis functions are not sorted by angular momentum")
+                msg = "Basis functions are not sorted by angular momentum. This can lead to AO mismatch"
+                raise ValueError(msg)
             lmax[q] = l[-1]
             nmax[q] = np.zeros(lmax[q]+1, dtype=int)
             n = []
@@ -130,3 +132,11 @@ class AOIndex:
     def __repr__(self):
         with np.printoptions(legacy="1.25"):
             return f'AOIndex({self.atoms}, {self.basis})'
+
+
+def warn_short(*kargs, stacklevel=1, **kwargs):
+    def short_warning_formatter(message, category, filename, lineno, line=None):  # noqa ARG001
+        return '%s:%s: %s: %s\n' % (filename, lineno, category.__name__, message)
+    warnings.formatwarning, formatwarning = short_warning_formatter, warnings.formatwarning
+    warnings.warn(*kargs, stacklevel=stacklevel+1, **kwargs)
+    warnings.formatwarning = formatwarning

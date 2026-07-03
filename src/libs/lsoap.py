@@ -100,7 +100,8 @@ class EquivariantPowerSpectrum_custom(EquivariantPowerSpectrum):
 def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_species=None, normalize=True, min_norm=MIN_NORM, lmax=None, gradients=None):
 
     if gradients is not None:
-        raise NotImplementedError("Gradients are not implemented yet")
+        msg = "Gradients are not implemented yet"
+        raise NotImplementedError(msg)
 
     if not isinstance(mols, list):
         mols = [mols]

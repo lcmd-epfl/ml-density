@@ -12,8 +12,7 @@ class Config:
         if config_path is None:
             config_path = DEFAULT_PATH
         if not os.path.isfile(config_path):
-            print(f'Cannot open configuration file "{config_path}"')
-            exit(1)
+            raise RuntimeError(f'Cannot open configuration file "{config_path}"')
         link = f' -> {os.readlink(config_path)}' if os.path.islink(config_path) else ''
         print(f'================ {sys.argv[0]} ================')
         print(f'Configuration file: {config_path}'+link)
@@ -38,8 +37,7 @@ class Config:
             return True
         elif x in ['0', 'false']:
             return False
-        print(f'Wrong input for the Bool option: "{x}"')
-        exit(0)
+        raise TypeError(f'Wrong input for the Bool option: "{x}"')
 
 
 def get_config_path(argv):
