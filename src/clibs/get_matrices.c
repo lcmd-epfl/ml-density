@@ -173,8 +173,8 @@ int get_a(
     const unsigned int * const alnum,
     const unsigned int * const annum,
     const unsigned int const elements[nelem],
-    const char * const path_proj,
-    const char * const path_kern,
+    const char ** const path_proj,
+    const char ** const path_kern,
     const char ** const paths_avec
     ){
 
@@ -280,8 +280,8 @@ int get_b(
     const unsigned int const * alnum,
     const unsigned int const * annum,
     const unsigned int const elements  [nelem],
-    const char * const path_over,
-    const char * const path_kern,
+    const char ** const path_over,
+    const char ** const path_kern,
     const char ** const paths_bmat
     ){
 

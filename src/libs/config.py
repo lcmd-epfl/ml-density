@@ -86,11 +86,11 @@ def read_config(argv):
         p._powerrefbase     = conf.paths.get('ps_ref_base')
 
         p._kmmbase          = conf.paths.get('kmm_base')
-        p.kernelconfbase   = conf.paths.get('kernel_conf_base')  # TODO 1
+        p.kernelconfbase   = conf.paths.get('kernel_conf_base')
 
         p._goodcoeffilebase = conf.paths.get('goodcoef_base')
-        p.goodoverfilebase = conf.paths.get('goodover_base')     # TODO 1
-        p.baselinedwbase   = conf.paths.get('baselined_w_base')  # TODO 1
+        p.goodoverfilebase = conf.paths.get('goodover_base')
+        p.baselinedwbase   = conf.paths.get('baselined_w_base')
 
         p.spherical_averages = conf.paths.get('averages_file')
         p.train_test_sets    = conf.paths.get('trainingselfile')

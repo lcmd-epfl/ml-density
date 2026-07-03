@@ -17,6 +17,7 @@ def main():
 
     # load molecules
     atomic_numbers = moldata_read(p.xyzfilename)
+    nmol = len(atomic_numbers)
     elements = get_elements_list(atomic_numbers)
 
     # reference environments
@@ -42,44 +43,40 @@ def main():
     # C arguments
     outputfiles = (ctypes.c_char_p * nfrac)()
     for i, frac in enumerate(o.fracs):
-        if task=="b":
-            outputfiles[i] = (p.bmat.format(train_frac=frac)).encode('ascii')
-        else:
-            outputfiles[i] = (p.avec.format(train_frac=frac)).encode('ascii')
-    qcfilebase = p.goodoverfilebase if task=='b' else p.baselinedwbase
+        outputfiles[i] = (p.bmat if task=='b' else p.avec).format(train_frac=frac).encode('ascii')
+
+    kernelfiles = (ctypes.c_char_p * nmol)()
+    qcfiles     = (ctypes.c_char_p * nmol)()
+    for imol in range(nmol):
+        kernelfiles[imol] = p.kernel_nm.format(imol).encode('ascii')
+        qcfiles[imol] = (p.metric_matrix if task=='b' else p.projection).format(imol).encode('ascii')
 
     array_1d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
     array_2d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
 
-    arguments = ((totsize                           ,      ctypes.c_int,                  ),
-                 (len(elements)                     ,      ctypes.c_int,                  ),
-                 (o.M                               ,      ctypes.c_int,                  ),
-                 (ntrain                            ,      ctypes.c_int,                  ),
-                 (nfrac                             ,      ctypes.c_int,                  ),
-                 (ntrains.astype(np.uint32)         ,      array_1d_int,                  ),
-                 (atom_counting.astype(np.uint32)   ,      array_2d_int,                  ),
-                 (train_configs.astype(np.uint32)   ,      array_1d_int,                  ),
-                 (ref_elements_idx.astype(np.uint32),      array_1d_int,                  ),
-                 (alnum.astype(np.uint32)           ,      array_1d_int,                  ),
-                 (annum.flatten().astype(np.uint32) ,      array_1d_int,                  ),
-                 (elements.astype(np.uint32)        ,      array_1d_int,                  ),
-                 (qcfilebase.encode('ascii')        ,      ctypes.c_char_p,               ),
-                 (p.kernelconfbase.encode('ascii')  ,      ctypes.c_char_p,               ),
-                 (outputfiles                       ,      ctypes.POINTER(ctypes.c_char_p)))
-
-    args     = [i[0] for i in arguments]
-    argtypes = [i[1] for i in arguments]
+    args, argtypes = zip(
+            (totsize                           ,  ctypes.c_int,                  ),
+            (len(elements)                     ,  ctypes.c_int,                  ),
+            (o.M                               ,  ctypes.c_int,                  ),
+            (ntrain                            ,  ctypes.c_int,                  ),
+            (nfrac                             ,  ctypes.c_int,                  ),
+            (ntrains.astype(np.uint32)         ,  array_1d_int,                  ),
+            (atom_counting.astype(np.uint32)   ,  array_2d_int,                  ),
+            (train_configs.astype(np.uint32)   ,  array_1d_int,                  ),
+            (ref_elements_idx.astype(np.uint32),  array_1d_int,                  ),
+            (alnum.astype(np.uint32)           ,  array_1d_int,                  ),
+            (annum.flatten().astype(np.uint32) ,  array_1d_int,                  ),
+            (elements.astype(np.uint32)        ,  array_1d_int,                  ),
+            (qcfiles                           ,  ctypes.POINTER(ctypes.c_char_p)),
+            (kernelfiles                       ,  ctypes.POINTER(ctypes.c_char_p)),
+            (outputfiles                       ,  ctypes.POINTER(ctypes.c_char_p)),
+            strict=True)
 
     get_matrices = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/get_matrices.so")
-    #get_matrices = ctypes.CDLL(os.path.dirname(sys.argv[0])+"/clibs/get_matrices.so", ctypes.RTLD_GLOBAL)
-    if task == 'b':
-        get_matrices.get_b.restype = ctypes.c_int
-        get_matrices.get_b.argtypes = argtypes
-        ret = get_matrices.get_b(*args)
-    else:
-        get_matrices.get_a.restype = ctypes.c_int
-        get_matrices.get_a.argtypes = argtypes
-        ret = get_matrices.get_a(*args)
+    func = get_matrices.get_b if task=='b' else get_matrices.get_a
+    func.restype = ctypes.c_int
+    func.argtypes = argtypes
+    ret = func(*args)
     return ret
 
 
