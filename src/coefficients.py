@@ -15,7 +15,7 @@ def main():
     atomic_numbers = moldata_read(p.xyzfilename)
     averages = metatensor.load(p.spherical_averages)
 
-    basis = Basis(o.basisname, elements=set(averages.keys.column('center_type')))
+    basis = Basis(o.basisname, elements=averages.keys.column('center_type'))
     _, test_configs = get_test_set(p.train_test_sets)
 
     if o.output_coeff_order!='gpr':

@@ -26,7 +26,7 @@ def main(missing_only=False):
     atomic_numbers = moldata_read(p.xyzfilename)
     power_ref = metatensor.load(p.reference_power_spectra)
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
-    basis = Basis(o.basisname, elements=set(ref_elements))
+    basis = Basis(o.basisname, elements=ref_elements)
     nmol = len(atomic_numbers)
 
     if USEMPI:

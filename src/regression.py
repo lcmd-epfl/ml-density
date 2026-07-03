@@ -15,7 +15,7 @@ def main():
     o, p = read_config(sys.argv)
 
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
-    basis = Basis(o.basisname, np.unique(ref_elements))
+    basis = Basis(o.basisname, ref_elements)
     totsize = basis.nao_for_mol(ref_elements)
 
     k_MM = metatensor.load(p.kernel_mm)

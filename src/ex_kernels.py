@@ -15,7 +15,7 @@ def main():
     atomic_numbers_ex = moldata_read(p.xyzexfilename)
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     power_ref = metatensor.load(p.reference_power_spectra)
-    basis = Basis(o.basisname, elements=set(ref_elements))
+    basis = Basis(o.basisname, elements=ref_elements)
 
     for imol, atoms in enumerate(tqdm(atomic_numbers_ex)):
         kernel_for_mol(basis.lmax, ref_elements, atoms, power_ref,

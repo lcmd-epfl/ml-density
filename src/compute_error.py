@@ -21,7 +21,7 @@ def main():
 
     averages = metatensor.load(p.spherical_averages)
     atomic_numbers = moldata_read(p.xyzfilename)
-    basis = Basis(o.basisname, elements=set(averages.keys.column('center_type')))
+    basis = Basis(o.basisname, elements=averages.keys.column('center_type'))
 
     if o.use_charges:
         print(f'charge_file: {p.chargefilename} mode: {o.use_charges}\n')

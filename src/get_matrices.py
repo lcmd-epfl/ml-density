@@ -13,7 +13,7 @@ def main():
     o, p = read_config(sys.argv)
 
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
-    basis = Basis(o.basisname, elements=set(ref_elements))
+    basis = Basis(o.basisname, elements=ref_elements)
 
     # training set selection
     ntrains, train_configs = get_training_sets(p.train_test_sets, o.fracs)

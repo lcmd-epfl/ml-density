@@ -45,11 +45,13 @@ def get_test_set(filename, sort=True):
 class Basis:
     def __init__(self, basisname, elements):
         self.basisname = basisname
-        self.elements = sorted(elements)
+        if isinstance(elements, type(dict().keys())):
+            elements = list(elements)
+        self.elements = np.unique(np.asarray(elements))
         lmax = {}
         nmax = {}
         ao = {}
-        for q in elements:
+        for q in self.elements:
             atom = compound.make_atom(chemical_symbols[q], basis=basisname)
             _, l, _ = compound.basis_flatten(atom, return_both=False)
             if not np.all(sorted(l)==l):

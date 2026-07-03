@@ -11,7 +11,7 @@ def main():
     o, p = read_config(sys.argv)
 
     power_ref = metatensor.load(p.reference_power_spectra)
-    basis = Basis(o.basisname, elements=set(power_ref.keys.column('center_type')))
+    basis = Basis(o.basisname, elements=power_ref.keys.column('center_type'))
 
     k_MM = kernel_mm(basis.lmax, power_ref)
     metatensor.save(p.kernel_mm, k_MM)

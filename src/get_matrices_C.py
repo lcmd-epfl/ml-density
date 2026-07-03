@@ -34,7 +34,7 @@ def main():
     atom_counting = get_atomicindx(elements, atomic_numbers_train)
 
     # basis set info
-    basis = Basis(o.basisname, elements=set(ref_elements))
+    basis = Basis(o.basisname, elements=ref_elements)
     alnum, annum = basis_info(basis)
 
     # problem dimensionality

@@ -16,7 +16,7 @@ def main():
 
     atomic_numbers = moldata_read(p.xyzfilename)
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
-    basis = Basis(o.basisname, elements=np.unique(ref_elements))
+    basis = Basis(o.basisname, elements=ref_elements)
 
     for frac in o.fracs:
         weights = np.load(p.weights.format(train_frac=frac))

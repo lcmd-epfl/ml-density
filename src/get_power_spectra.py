@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import ase.io
 import metatensor
@@ -12,18 +13,17 @@ from libs.multi import multi_process
 USEMPI = True
 
 
-def main():
+def main(missing_only=False):
     o, p = read_config(sys.argv)
 
     def do_mol(imol):
-        #import os
-        #if os.path.exists(p.power_spectrum.format(imol)):
-        #    return
-        #print(imol)
+        ppath = p.power_spectrum.format(imol)
+        if missing_only and os.path.exists(ppath):
+            return
         soap = generate_lambda_soap_wrapper(mols[imol], rascal_hypers, neighbor_species=elements,
                                             normalize=o.ps_normalize, min_norm=o.ps_min_norm,
                                             lmax=basis.lmax)
-        metatensor.save(p.power_spectrum.format(imol), soap)
+        metatensor.save(ppath, soap)
 
     rascal_hypers = make_rascal_hypers(o.soap_rcut, o.soap_ncut, o.soap_lcut, o.soap_sigma)
 

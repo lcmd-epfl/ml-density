@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import numpy as np
 from tqdm import tqdm
@@ -49,10 +50,9 @@ def main():
 def load_coefs(n, coefffilebase):
     coefficients = []
     for imol in range(n):
-        try:
-            coef = np.loadtxt(f'{coefffilebase}{imol}.dat')
-        except FileNotFoundError:
-            coef = np.load(f'{coefffilebase}{imol}.npy')
+        path_dat = f'{coefffilebase}{imol}.dat'
+        path_npy = f'{coefffilebase}{imol}.npy'
+        coef = np.loadtxt(path_dat) if os.path.exists(path_dat) else np.load(path_npy)
         coefficients.append(coef)
     return coefficients
 
