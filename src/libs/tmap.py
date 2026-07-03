@@ -300,3 +300,17 @@ def kmm2tmap(qsamples, kernel):
     tm_labels = metatensor.Labels(vector_label_names.tm, np.array(tm_label_vals))
     tensor = metatensor.TensorMap(keys=tm_labels, blocks=tensor_blocks)
     return tensor
+
+
+def read_ps_1mol_l0(psfilename, atomic_numbers):
+    power_sorted = None
+    power = metatensor.load(psfilename)
+    for q in set(atomic_numbers):
+        idx = np.where(atomic_numbers==q)
+        block = power.block(o3_lambda=0, center_type=q)
+        if power_sorted is None:
+            power_sorted = np.zeros((len(atomic_numbers), block.values.shape[-1]))
+        power_sorted[idx] = np.copy(block.values[:,0,:])
+    del power
+    gc.collect()
+    return power_sorted

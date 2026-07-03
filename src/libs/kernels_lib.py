@@ -3,20 +3,6 @@ import metatensor
 from libs.tmap import kernels2tmap, kmm2tmap
 
 
-def kernel_nm_sparse_indices(lmax, ref_elements, atomic_numbers):
-    llmax = max(lmax.values())
-    kernel_sparse_indices = np.zeros((len(ref_elements), len(atomic_numbers), llmax+1), dtype=int)
-    kernel_size = 0
-    for iref, q in enumerate(ref_elements):
-        nq  = np.count_nonzero(atomic_numbers==q)
-        for l in range(lmax[q]+1):
-            msize = 2*l+1
-            for iat in range(nq):
-                kernel_sparse_indices[iref,iat,l] = kernel_size
-                kernel_size += msize*msize
-    return kernel_size, kernel_sparse_indices
-
-
 def kernel_nm(atom_charges, soap, soap_ref, imol=0):
     keys1 = {tuple(key) for key in soap.keys}
     keys2 = {tuple(key) for key in soap_ref.keys}
@@ -41,29 +27,10 @@ def kernel_nm(atom_charges, soap, soap_ref, imol=0):
     return kernel
 
 
-def kernel_nm_flatten(kernel_size, kernel_sparse_indices,
-                      ref_elements, atomic_numbers, k_NM):
-
-    k_NM_flat = np.zeros(kernel_size)
-    for (l, q) in k_NM.keys:
-        nq = np.count_nonzero(atomic_numbers==q)
-        msize = 2*l+1
-        kblock = k_NM.block(o3_lambda=l, center_type=q)
-        for iiref, iref in enumerate(np.where(ref_elements==q)[0]):
-            for iatq in range(nq):
-                ik = kernel_sparse_indices[iref,iatq,l]
-                k_NM_flat[ik:ik+msize*msize] = kblock.values[iatq,:,:,iiref].T.flatten()
-    return k_NM_flat
-
-
-def kernel_for_mol(lmax, ref_elements, atomic_numbers, power_ref, power_file, kernel_file, save_txt=False):
+def kernel_for_mol(atomic_numbers, power_ref, power_file, kernel_file):
     power = metatensor.load(power_file)
     k_NM = kernel_nm(atomic_numbers, power, power_ref)
     metatensor.save(f'{kernel_file}', k_NM)
-    if save_txt:
-        kernel_size, kernel_sparse_indices = kernel_nm_sparse_indices(lmax, ref_elements, atomic_numbers)
-        k_NM_flat = kernel_nm_flatten(kernel_size, kernel_sparse_indices, ref_elements, atomic_numbers, k_NM)
-        np.savetxt(f'{kernel_file}.dat', k_NM_flat)
 
 
 def kernel_mm(lmax, power_ref):

@@ -8,7 +8,7 @@ from ase.data import chemical_symbols
 from qstack.mathutils.fps import do_fps
 from libs.config import read_config
 from libs.functions import moldata_read, get_elements_list, warn_short
-from libs.power_spectra_lib import read_ps_1mol_l0
+from libs.tmap import read_ps_1mol_l0
 
 
 def main():
