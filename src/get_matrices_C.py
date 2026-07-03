@@ -43,9 +43,9 @@ def main():
     outputfiles = (ctypes.c_char_p * nfrac)()
     for i, frac in enumerate(o.fracs):
         if task=="b":
-            outputfiles[i] = (f'{p.bmatfilebase}_M{o.M}_trainfrac{frac}.dat').encode('ascii')
+            outputfiles[i] = (p.bmat.format(train_frac=frac)).encode('ascii')
         else:
-            outputfiles[i] = (f'{p.avecfilebase}_M{o.M}_trainfrac{frac}.txt').encode('ascii')
+            outputfiles[i] = (p.avec.format(train_frac=frac)).encode('ascii')
     qcfilebase = p.goodoverfilebase if task=='b' else p.baselinedwbase
 
     array_1d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')

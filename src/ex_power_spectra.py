@@ -33,7 +33,7 @@ def main():
         soap = generate_lambda_soap_wrapper(mol, rascal_hypers, neighbor_species=elements,
                                             normalize=o.ps_normalize, min_norm=o.ps_min_norm,
                                             lmax=basis.lmax)
-        metatensor.save(f'{p.powerexbase}_{imol}.mts', soap)
+        metatensor.save(p.extra_power_spectrum.format(imol), soap)
 
 
 if __name__=='__main__':

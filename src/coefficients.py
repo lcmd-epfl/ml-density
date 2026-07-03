@@ -13,7 +13,7 @@ def main():
     o, p = read_config(sys.argv)
 
     atomic_numbers = moldata_read(p.xyzfilename)
-    averages = metatensor.load(p.avfile)
+    averages = metatensor.load(p.spherical_averages)
 
     basis = Basis(o.basisname, elements=set(averages.keys.column('center_type')))
     _, test_configs = get_test_set(p.train_test_sets)

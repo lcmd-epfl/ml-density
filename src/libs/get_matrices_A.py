@@ -10,8 +10,8 @@ def print_batches(ntrains, paths):
 
 
 def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
-    proj = metatensor.load(f'{path_proj}{conf}.mts')
-    k_NM = metatensor.load(f'{path_kern}{conf}.mts')
+    proj = metatensor.load(path_proj.format(conf))
+    k_NM = metatensor.load(path_kern.format(conf))
     for (l1, q1), pblock in proj.items():
         kblock = k_NM.block(o3_lambda=l1, center_type=q1)
         ablock = Avec.block(o3_lambda=l1, center_type=q1)
@@ -20,8 +20,7 @@ def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
             ablock.values[iiref1,:,:] += dA
 
 
-def get_a(basis, ref_elem, ntrains, trrange,
-          path_proj, path_kern, paths_avec):
+def get_a(basis, ref_elem, ntrains, trrange, path_proj, path_kern, paths_avec):
 
     print_batches(ntrains, paths_avec)
 

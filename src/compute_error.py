@@ -19,7 +19,7 @@ def main():
     o, p = read_config(sys.argv)
     training = 'training' in sys.argv[1:]
 
-    averages = metatensor.load(p.avfile)
+    averages = metatensor.load(p.spherical_averages)
     atomic_numbers = moldata_read(p.xyzfilename)
     basis = Basis(o.basisname, elements=set(averages.keys.column('center_type')))
 
@@ -53,7 +53,7 @@ def main():
             elif o.use_charges==2:
                 N  = molcharges[imol]
 
-            S = tmap2matrix(atoms, basis, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'))
+            S = tmap2matrix(atoms, basis, metatensor.load(p.metric_matrix.format(imol)))
 
             mol = make_pyscf_mol(atom=[[q, (0, 0, 0)]  for q in atoms], basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
             qvec = rho_moments(mol, rho=None, moments=(0,), per_atom=False)[0]

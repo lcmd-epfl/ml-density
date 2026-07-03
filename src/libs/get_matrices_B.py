@@ -29,8 +29,8 @@ def mpos(i, j):
 
 def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
 
-    over = metatensor.load(f'{path_over}{conf}.mts')
-    k_NM = metatensor.load(f'{path_kern}{conf}.mts')
+    over = metatensor.load(path_over.format(conf))
+    k_NM = metatensor.load(path_kern.format(conf))
 
     for (l1, l2, q1, q2), oblock in over.items():
         msize1 = 2*l1+1

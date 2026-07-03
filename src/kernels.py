@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import pandas as pd
 import metatensor
@@ -12,15 +13,15 @@ from libs.multi import multi_process
 USEMPI = True
 
 
-def main():
+def main(missing_only=False):
     o, p = read_config(sys.argv)
 
     def do_mol(imol):
-        #import os
-        #if os.path.exists(f'{p.kernelconfbase}{imol}.dat'):
-        #    return
+        kpath = p.kernel_nm.format(imol)
+        if missing_only and os.path.exists(kpath):
+            return
         kernel_for_mol(basis.lmax, ref_elements, atomic_numbers[imol],
-                       power_ref, p.power_spectrum.format(imol), f'{p.kernelconfbase}{imol}.mts')
+                       power_ref, p.power_spectrum.format(imol), kpath)
 
     atomic_numbers = moldata_read(p.xyzfilename)
     power_ref = metatensor.load(p.reference_power_spectra)

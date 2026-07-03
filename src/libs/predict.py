@@ -21,12 +21,12 @@ def compute_prediction(atoms, basis, kernel, weights, averages=None):
 
 def run_prediction(test_configs, atomic_numbers,
                    basis, weights, ref_elements,
-                   kernelbase, averages=None):
+                   path_kern, averages=None):
 
     weights = vector2tmap(ref_elements, basis, weights)
 
     predictions = []
     for imol, atoms in zip(tqdm(test_configs), atomic_numbers, strict=True):
-        kernel = metatensor.load(f'{kernelbase}{imol}.mts')
+        kernel = metatensor.load(path_kern.format(imol))
         predictions.append(compute_prediction(atoms, basis, kernel, weights, averages=averages))
     return predictions

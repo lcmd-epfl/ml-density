@@ -19,8 +19,8 @@ def main():
 
     for imol, atoms in enumerate(tqdm(atomic_numbers_ex)):
         kernel_for_mol(basis.lmax, ref_elements, atoms, power_ref,
-                       f'{p.powerexbase}_{imol}.mts',
-                       f'{p.kernelexbase}{imol}.mts')
+                       p.extra_power_spectrum.format(imol),
+                       p.extra_kernel_nm.format(imol))
 
 
 if __name__=='__main__':

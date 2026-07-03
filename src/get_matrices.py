@@ -20,13 +20,13 @@ def main():
     ntrains = np.pad(ntrains, (0, 1), 'constant', constant_values=0)
 
     if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
-        bmatfiles = [f'{p.bmatfilebase}_M{o.M}_trainfrac{frac}.dat' for frac in o.fracs]
+        bmatfiles = [p.bmat.format(train_frac=frac) for frac in o.fracs]
         get_b(basis, ref_elements, ntrains, train_configs,
-              p.goodoverfilebase, p.kernelconfbase, bmatfiles)
+              p.metric_matrix, p.kernel_nm, bmatfiles)
     else:
-        avecfiles = [f'{p.avecfilebase}_M{o.M}_trainfrac{frac}.txt' for frac in o.fracs]
+        avecfiles = [p.avec.format(train_frac=frac) for frac in o.fracs]
         get_a(basis, ref_elements, ntrains, train_configs,
-              p.baselinedwbase, p.kernelconfbase, avecfiles)
+              p.projection, p.kernel_nm, avecfiles)
 
 
 if __name__=='__main__':

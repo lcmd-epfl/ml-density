@@ -85,25 +85,25 @@ def read_config(argv):
         p._powerrefbase     = conf.paths.get('ps_ref_base')
 
         p._kmmbase          = conf.paths.get('kmm_base')
-        p.kernelconfbase   = conf.paths.get('kernel_conf_base')
+        p.kernelconfbase   = conf.paths.get('kernel_conf_base')  # TODO 1
 
         p._goodcoeffilebase = conf.paths.get('goodcoef_base')
-        p.goodoverfilebase = conf.paths.get('goodover_base')
-        p.baselinedwbase   = conf.paths.get('baselined_w_base')
-        p.avfile           = conf.paths.get('averages_file')
+        p.goodoverfilebase = conf.paths.get('goodover_base')     # TODO 1
+        p.baselinedwbase   = conf.paths.get('baselined_w_base')  # TODO 1
 
-        p.train_test_sets = conf.paths.get('trainingselfile')
+        p.spherical_averages = conf.paths.get('averages_file')
+        p.train_test_sets    = conf.paths.get('trainingselfile')
 
-        p.avecfilebase     = conf.paths.get('avec_base')
-        p.bmatfilebase     = conf.paths.get('bmat_base')
+        p._avecfilebase     = conf.paths.get('avec_base')
+        p._bmatfilebase     = conf.paths.get('bmat_base')
         p._weightsfilebase  = conf.paths.get('weights_base')
         p._predictfilebase  = conf.paths.get('predict_base')
-        p.outfilebase      = conf.paths.get('output_base')
+        p.outfilebase      = conf.paths.get('output_base')  # TODO
 
         p.xyzexfilename    = conf.paths.get('ex_xyzfile')
-        p.powerexbase      = conf.paths.get('ex_ps_base')
-        p.kernelexbase     = conf.paths.get('ex_kernel_base')
-        p.outexfilebase    = conf.paths.get('ex_output_base')
+        p._powerexbase      = conf.paths.get('ex_ps_base')
+        p._kernelexbase     = conf.paths.get('ex_kernel_base')
+        p.outexfilebase    = conf.paths.get('ex_output_base') #TODO
         return p
 
     path = get_config_path(argv)
@@ -112,12 +112,21 @@ def read_config(argv):
     o = set_variable_values()
     p = get_all_paths()
 
+    p.metric_matrix           = f'{p.goodoverfilebase}{{}}.mts'
+    p.projection              = f'{p.baselinedwbase}{{}}.mts'
+
     p.reference_environments  = f'{p._refsselfilebase}_{o.M}.csv'
     p.reference_power_spectra = f'{p._powerrefbase}_{o.M}.mts'
     p.kernel_mm               = f'{p._kmmbase}{o.M}.mts'
+    p.kernel_nm               = f'{p.kernelconfbase}{{}}.mts'
+
+    p.extra_kernel_nm         = f'{p._kernelexbase}{{}}.mts'
+    p.extra_power_spectrum    = f'{p._powerexbase}_{{}}.mts'
 
     p.weights                 = f'{p._weightsfilebase}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.npy'
     p.predictions             = f'{p._predictfilebase}_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
+    p.avec                    = f'{p._avecfilebase}_M{o.M}_trainfrac{{train_frac}}.txt'
+    p.bmat                    = f'{p._bmatfilebase}_M{o.M}_trainfrac{{train_frac}}.dat'
 
     p.power_spectrum          = f'{p._splitpsfilebase}_{{}}.mts'
     p.clean_coefficients      = f'{p._goodcoeffilebase}_{{}}.npy'

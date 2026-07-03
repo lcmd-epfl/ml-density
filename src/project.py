@@ -37,13 +37,13 @@ def main():
         if o.copy_metric:
             over = np.load(f'{p.overfilebase}{imol}.npy')
             over = reorder.reorder_ao(mol, over, dest='gpr', src=o.overlap_order)
-            metatensor.save(f'{p.goodoverfilebase}{imol}.mts', equio.array_to_tensormap(mol, over, src='gpr'))
+            metatensor.save(p.metric_matrix.format(imol), equio.array_to_tensormap(mol, over, src='gpr'))
         else:
-            over = equio.tensormap_to_array(mol, metatensor.load(f'{p.goodoverfilebase}{imol}.mts'), dest='gpr', fast=True)
+            over = equio.tensormap_to_array(mol, metatensor.load(p.metric_matrix.format(imol)), dest='gpr', fast=True)
 
         proj = over @ coef
-        metatensor.save(f'{p.baselinedwbase}{imol}.mts', equio.array_to_tensormap(mol, proj, src='gpr'))
-    metatensor.save(p.avfile, averages2tmap(av_coefs))
+        metatensor.save(p.projection.format(imol), equio.array_to_tensormap(mol, proj, src='gpr'))
+    metatensor.save(p.spherical_averages, averages2tmap(av_coefs))
 
 
 def load_coefs(n, coefffilebase):

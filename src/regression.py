@@ -25,16 +25,11 @@ def main():
     print(f'problem dimensionality = {totsize}')
 
     for frac in o.fracs:
-        avecfile    = f'{p.avecfilebase}_M{o.M}_trainfrac{frac}.txt'
-        bmatfile    = f'{p.bmatfilebase}_M{o.M}_trainfrac{frac}.dat'
-        weightsfile = p.weights.format(train_frac=frac)
-        Avec = np.loadtxt(avecfile)
+        Avec = np.loadtxt(p.avec.format(train_frac=frac))
         mat[:] = 0
-
-        fill_matrix(mat, k_MM, bmatfile, idx, basis.nmax, o.jit, o.reg)
-
+        fill_matrix(mat, k_MM, p.bmat.format(train_frac=frac), idx, basis.nmax, o.jit, o.reg)
         weights = spl.solve(mat, Avec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
-        np.save(weightsfile, weights)
+        np.save(p.weights.format(train_frac=frac), weights)
 
 
 @jit(nopython=True)
