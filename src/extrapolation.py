@@ -23,8 +23,15 @@ def main():
                                  basis, weights, ref_elements,
                                  p.extra_kernel_nm, averages=averages)
 
+    if o.output_coeff_order!='gpr':
+        from qstack import compound, reorder
+        mols = compound.xyz_to_mol_all(p.xyzexfilename, basis=o.basisname, ignore=True)
+
     for imol, (atoms, c) in enumerate(zip(atomic_numbers_ex, predictions, strict=True)):
-        np.savetxt(f'{p.outexfilebase}gpr_{imol}.dat', tmap2vector(atoms, basis, c))
+        rho = tmap2vector(atoms, basis, c)
+        if o.output_coeff_order!='gpr':
+            rho = reorder.reorder_ao(mols[imol], rho, dest=o.output_coeff_order, src='gpr')
+        np.savetxt(p.extra_predicted_coeff.format(order=o.output_coeff_order, imol=imol), rho)
 
 
 if __name__=='__main__':

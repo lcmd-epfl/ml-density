@@ -14,6 +14,9 @@ reorder_ao = 1
 copy_metric = 1
 ps_min_norm = 1e-20
 ps_normalize = true
+coeff_order = pyscf
+overlap_order = pyscf
+output_coeff_order = gpr
 
 [paths]
 xyzfile          = 16.xyz
@@ -35,10 +38,10 @@ baselined_w_base = INNER/BASELINED_PROJECTIONS/projections_conf
 avec_base        = INNER/Avec
 weights_base     = INNER/weights
 predict_base     = INNER/prediction
-output_base      = INNER/predicted/rho_
+output_base      = INNER/predicted/rho
 
 ex_xyzfile      = extra/1.xyz
 ex_ps_base      = extra/PS
 ex_kernel_base  = extra/kernel
 ex_predict_base = extra/prediction
-ex_output_base  = extra/rho_
+ex_output_base  = extra/rho
