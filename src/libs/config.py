@@ -128,7 +128,7 @@ def read_config(argv):
         o.use_charges = None
 
     p.clean_coefficients      = f'{p._goodcoeffilebase}_{{}}.npy'
-    p.metric_matrix           = f'{p.goodoverfilebase}{{}}.mts'
+    p.metric_matrix           = f'{p.goodoverfilebase}_{{}}.mts'
     p.projection              = f'{p.baselinedwbase}{{}}.mts'
 
     p.power_spectrum          = f'{p._splitpsfilebase}_{{}}.mts'
