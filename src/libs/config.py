@@ -15,7 +15,8 @@ class Config:
         if config_path is None:
             config_path = DEFAULT_PATH
         if not os.path.isfile(config_path):
-            raise RuntimeError(f'Cannot open configuration file "{config_path}"')
+            msg = f'Cannot open configuration file "{config_path}"'
+            raise RuntimeError(msg)
         link = f' -> {os.readlink(config_path)}' if os.path.islink(config_path) else ''
         print(f'================ {sys.argv[0]} ================')
         print(f'Configuration file: {config_path}'+link)
@@ -40,42 +41,51 @@ class Config:
             return True
         elif x in ['0', 'false']:
             return False
-        raise TypeError(f'Wrong input for the Bool option: "{x}"')
+        msg = f'Wrong input for a Bool option: "{x}"'
+        raise TypeError(msg)
 
-    def choice(self, dtype, options, strict=True):
+    def choice(self, dtype, options, name=None, strict=True):
         def checker(x):
             x = dtype(x)
             if x not in options:
                 if strict:
-                    raise RuntimeError(f'Wrong input: {x} not in {options}')
+                    msg = f'Wrong input for `{name}`: `{x}` not in {options}'
+                    raise RuntimeError(msg)
                 else:
-                    warn_short(f'{x} not in recommended options {options}')
+                    warn_short(f'`{x}` not in recommended options {options} for `{name}`')
             return x
         return checker
 
 
 def read_config(argv, return_args=None):
     def set_variable_values():
-        o = SimpleNamespace()
-        o.M                  = conf.get_option('m'                   , 100             , int         )
-        o.seed               = conf.get_option('seed'                , 1               , int         )
-        o.train              = conf.get_option('train_size'          , 1000            , int         )
-        o.fracs              = conf.get_option('trainfrac'           , np.array([1.0]) , conf.floats )
-        o.soap_sigma         = conf.get_option('soap_sigma'          , 0.3             , float       )
-        o.soap_rcut          = conf.get_option('soap_rcut'           , 4.0             , float       )
-        o.soap_ncut          = conf.get_option('soap_ncut'           , 8               , int         )
-        o.soap_lcut          = conf.get_option('soap_lcut '          , 6               , int         )
-        o.process_metric     = conf.get_option('process_metric'      , True            , conf.bool   )
-        o.reg                = conf.get_option('regular'             , 1e-6            , float       )
-        o.jit                = conf.get_option('jitter'              , 1e-10           , float       )
-        o.use_charges        = conf.get_option('number_of_electrons' , 'none'          , conf.choice(str, ['none', 'charge', 'N']))
-        o.ps_min_norm        = conf.get_option('ps_min_norm'         , 1e-20           , float       )
-        o.ps_normalize       = conf.get_option('ps_normalize'        , True            , conf.bool   )
-        o.basisname          = conf.get_option('basis'               , 'cc-pvqz-jkfit' , str         )
-        o.coeff_order        = conf.get_option('coeff_order'         , 'pyscf'         , conf.choice(str, ['pyscf', 'gpr'], strict=False)  )
-        o.overlap_order      = conf.get_option('overlap_order'       , 'pyscf'         , conf.choice(str, ['pyscf', 'gpr'], strict=False)  )
-        o.output_coeff_order = conf.get_option('output_coeff_order'  , 'gpr'           , conf.choice(str, ['pyscf', 'gpr'], strict=False)  )
-        return o
+        options = {
+                'M'                  : ('m'                   , 100             , int         ),
+                'seed'               : ('seed'                , 1               , int         ),
+                'train'              : ('train_size'          , 1000            , int         ),
+                'fracs'              : ('trainfrac'           , np.array([1.0]) , conf.floats ),
+                'soap_sigma'         : ('soap_sigma'          , 0.3             , float       ),
+                'soap_rcut'          : ('soap_rcut'           , 4.0             , float       ),
+                'soap_ncut'          : ('soap_ncut'           , 8               , int         ),
+                'soap_lcut'          : ('soap_lcut'           , 6               , int         ),
+                'process_metric'     : ('process_metric'      , True            , conf.bool   ),
+                'reg'                : ('regular'             , 1e-6            , float       ),
+                'jit'                : ('jitter'              , 1e-10           , float       ),
+                'use_charges'        : ('number_of_electrons' , 'none'          , conf.choice(str, ['none', 'charge', 'N'], name='number_of_electrons')),
+                'ps_min_norm'        : ('ps_min_norm'         , 1e-20           , float       ),
+                'ps_normalize'       : ('ps_normalize'        , True            , conf.bool   ),
+                'basisname'          : ('basis'               , 'cc-pvqz-jkfit' , str         ),
+                'coeff_order'        : ('coeff_order'         , 'pyscf'         , conf.choice(str, ['pyscf', 'gpr'], name='coeff_order',        strict=False)),
+                'overlap_order'      : ('overlap_order'       , 'pyscf'         , conf.choice(str, ['pyscf', 'gpr'], name='overlap_order',      strict=False)),
+                'output_coeff_order' : ('output_coeff_order'  , 'gpr'           , conf.choice(str, ['pyscf', 'gpr'], name='output_coeff_order', strict=False)),
+                }
+
+        recognized_options = [val[0] for val in options.values()]
+        present_options = conf.options.keys()
+        if unrecognized_options:=set(present_options).difference(recognized_options):
+            msg = f'Unrecognized_options: {unrecognized_options}'
+            raise RuntimeError(msg)
+        return SimpleNamespace({dest: conf.get_option(*signature) for dest, signature in options.items()})
 
     def get_all_paths():
         p = SimpleNamespace()
