@@ -16,6 +16,7 @@ ps_normalize = true
 coeff_order = pyscf
 overlap_order = pyscf
 output_coeff_order = gpr
+basis = cc-pvqz-jkfit
 
 [paths]
 
@@ -23,7 +24,6 @@ dataset          = dataset.csv
 xyz              = dataset/{mol_name}.xyz
 metrics          = dataset/jmat_{mol_name}.npy
 coeffs           = dataset/coef_{mol_name}.dat
-basis            = cc-pvqz-jkfit
 
 xyzfile          = INNER/dataset.xyz
 ps_split_base    = INNER/PS/PS
@@ -45,5 +45,4 @@ output_base      = INNER/predicted/rho
 ex_xyzfile      = extra/1.xyz
 ex_ps_base      = extra/PS
 ex_kernel_base  = extra/kernel
-ex_predict_base = extra/prediction
 ex_output_base  = extra/rho
