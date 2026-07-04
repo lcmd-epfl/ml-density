@@ -7,6 +7,7 @@ import pandas as pd
 import scipy.linalg as spl
 from numba import jit
 import metatensor
+from libs.tmap import vector2tmap
 from libs.config import read_config
 from libs.functions import Basis
 
@@ -29,7 +30,8 @@ def main():
         mat[:] = 0
         fill_matrix(mat, k_MM, p.bmat.format(train_frac=frac), idx, basis.nmax, o.jit, o.reg)
         weights = spl.solve(mat, Avec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
-        np.save(p.weights.format(train_frac=frac), weights)
+        weights = vector2tmap(ref_elements, basis, weights)
+        metatensor.save(p.weights.format(train_frac=frac), weights)
 
 
 @jit(nopython=True)

@@ -17,11 +17,10 @@ def main():
     averages = metatensor.load(p.spherical_averages)
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     basis = Basis(o.basisname, elements=ref_elements)
-    weights = np.load(p.weights.format(train_frac=o.fracs[-1]))
+    weights = metatensor.load(p.weights.format(train_frac=o.fracs[-1]))
 
     predictions = run_prediction(np.arange(len(atomic_numbers_ex)), atomic_numbers_ex,
-                                 basis, weights, ref_elements,
-                                 p.extra_kernel_nm, averages=averages)
+                                 basis, weights, p.extra_kernel_nm, averages=averages)
 
     if o.output_coeff_order!='gpr':
         from qstack import compound, reorder

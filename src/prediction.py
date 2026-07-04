@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-import numpy as np
 import pandas as pd
 import metatensor
 from qstack.io.metatensor import join
@@ -19,7 +18,7 @@ def main():
     basis = Basis(o.basisname, elements=ref_elements)
 
     for frac in o.fracs:
-        weights = np.load(p.weights.format(train_frac=frac))
+        weights = metatensor.load(p.weights.format(train_frac=frac))
         if not training:
             ntest, test_configs = get_test_set(p.train_test_sets)
             predictfile = p.predictions.format(subset='test', train_frac=frac)
@@ -29,7 +28,7 @@ def main():
 
         print(f'Number of testing molecules = {ntest}')
         predictions = run_prediction(test_configs, atomic_numbers[test_configs],
-                                     basis, weights, ref_elements, p.kernel_nm)
+                                     basis, weights, p.kernel_nm)
         predictions = join(predictions)
         metatensor.save(predictfile, predictions)
 

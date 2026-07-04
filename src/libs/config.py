@@ -123,7 +123,7 @@ def read_config(argv):
 
     p.avec                    = f'{p._avecfilebase}_M{o.M}_trainfrac{{train_frac}}.txt'
     p.bmat                    = f'{p._bmatfilebase}_M{o.M}_trainfrac{{train_frac}}.dat'
-    p.weights                 = f'{p._weightsfilebase}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.npy'
+    p.weights                 = f'{p._weightsfilebase}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
     p.predictions             = f'{p._predictfilebase}_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
     p.predicted_coeff         = f'{p._outfilebase}_tf{{train_frac}}_{{order}}_{{imol}}.dat'
 
