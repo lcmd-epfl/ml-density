@@ -88,43 +88,75 @@ def read_config(argv, return_args=None):
         return SimpleNamespace({dest: conf.get_option(*signature) for dest, signature in options.items()})
 
     def get_all_paths():
-        p = SimpleNamespace()
 
-        p.dataset = conf.paths.get('dataset')
-        p.xyz = conf.paths.get('xyz')
-        p.input_metrics = conf.paths.get('metrics')
-        p.input_coeffs  = conf.paths.get('coeffs')
+        paths = {
+        'dataset'            : ('dataset'         , 'ERROR' ,  'ERROR_FILE', None),
+        'xyz'                : ('xyz'             , 'ERROR' ,  'ERROR_DIR' , None),
+        'input_metrics'      : ('metrics'         , 'ERROR' ,  'ERROR_DIR' , None),
+        'input_coeffs'       : ('coeffs'          , 'ERROR' ,  'ERROR_DIR' , None),
 
-        p.xyzfilename       = conf.paths.get('xyzfile')
-        p._splitpsfilebase  = conf.paths.get('ps_split_base')
-        p._refsselfilebase  = conf.paths.get('refs_sel_base')
-        p._powerrefbase     = conf.paths.get('ps_ref_base')
+        'xyzfilename'        : ('xyzfile'         , None    ,  'MAKE_DIR'  , 'INNER/dataset.xyz'),
+        '_splitpsfilebase'   : ('ps_split_base'   , None    ,  'MAKE_DIR'  , 'INNER/PS/PS'),
+        '_refsselfilebase'   : ('refs_sel_base'   , None    ,  'MAKE_DIR'  , 'INNER/SELECTIONS/refs_selection'),
+        '_powerrefbase'      : ('ps_ref_base'     , None    ,  'MAKE_DIR'  , 'INNER/PS'),
+        '_kmmbase'           : ('kmm_base'        , None    ,  'MAKE_DIR'  , 'INNER/KMM'),
+        '_kernelconfbase'    : ('kernel_conf_base', None    ,  'MAKE_DIR'  , 'INNER/KERNELS/kernel_conf'),
+        '_goodcoeffilebase'  : ('goodcoef_base'   , None    ,  'MAKE_DIR'  , 'INNER/coeff/mol'),
+        '_goodoverfilebase'  : ('goodover_base'   , None    ,  'MAKE_DIR'  , 'INNER/metric/mol'),
+        '_baselinedwbase'    : ('baselined_w_base', None    ,  'MAKE_DIR'  , 'INNER/BASELINED_PROJECTIONS/projections_conf'),
+        'spherical_averages' : ('averages_file'   , None    ,  'MAKE_DIR'  , 'INNER/AVERAGES.mts'),
+        'train_test_sets'    : ('trainingselfile' , None    ,  'MAKE_DIR'  , 'INNER/SELECTIONS/training_selection.csv'),
+        '_avecfilebase'      : ('avec_base'       , None    ,  'MAKE_DIR'  , 'INNER/Avec'),
+        '_bmatfilebase'      : ('bmat_base'       , None    ,  'MAKE_DIR'  , 'INNER/Bmat'),
+        '_weightsfilebase'   : ('weights_base'    , None    ,  'MAKE_DIR'  , 'INNER/weights'),
+        '_predictfilebase'   : ('predict_base'    , None    ,  'MAKE_DIR'  , 'INNER/prediction'),
+        '_outfilebase'       : ('output_base'     , 'WARN'  ,  'MAKE_DIR'  , 'INNER/predicted/rho'),
 
-        p._kmmbase          = conf.paths.get('kmm_base')
-        p.kernelconfbase   = conf.paths.get('kernel_conf_base')
+        'xyzexfilename'      : ('ex_xyzfile'      , 'WARN'  ,  'ERROR_FILE', None),
+        '_powerexbase'       : ('ex_ps_base'      , None    ,  'MAKE_DIR'  , 'INNER/extra/PS'),
+        '_kernelexbase'      : ('ex_kernel_base'  , None    ,  'MAKE_DIR'  , 'INNER/extra/kernel'),
+        '_outexfilebase'     : ('ex_output_base'  , 'WARN'  ,  'MAKE_DIR'  , 'INNER/extra/rho'),
+        }
 
-        p._goodcoeffilebase = conf.paths.get('goodcoef_base')
-        p.goodoverfilebase = conf.paths.get('goodover_base')
-        p.baselinedwbase   = conf.paths.get('baselined_w_base')
+        recognized_paths = [val[0] for val in paths.values()]
+        present_paths = conf.paths.keys()
+        if unrecognized_paths:=set(present_paths).difference(recognized_paths):
+            msg = f'Unrecognized_paths: {unrecognized_paths}'
+            raise RuntimeError(msg)
 
-        p.spherical_averages = conf.paths.get('averages_file')
-        p.train_test_sets    = conf.paths.get('trainingselfile')
+        p = {}
+        for dest, (option, when_missing_config, check_file, default) in paths.items():
+            path = conf.paths.get(option)
+            if path is None:
+                if when_missing_config=='WARN':
+                    warn_short(f'Missing recommended config path `{option}`')
+                elif when_missing_config=='ERROR':
+                    msg = f'Missing required config path `{option}`'
+                    raise RuntimeError(msg)
+                else:
+                    path = default
 
-        p._avecfilebase     = conf.paths.get('avec_base')
-        p._bmatfilebase     = conf.paths.get('bmat_base')
-        p._weightsfilebase  = conf.paths.get('weights_base')
-        p._predictfilebase  = conf.paths.get('predict_base')
-        p._outfilebase      = conf.paths.get('output_base')
+            else:
+                if check_file=='ERROR_FILE':
+                    isfile = os.path.isfile(path)
+                    if not isfile:
+                        msg = f'Missing file "{path}" ("{option}")'
+                        raise RuntimeError(msg)
+                elif check_file in ['ERROR_DIR', 'MAKE_DIR'] :
+                    fdir = os.path.dirname(path)
+                    if not os.path.isdir(fdir):
+                        if check_file=='ERROR_DIR':
+                            msg = f'Missing directory "{fdir}" ("{option}")'
+                            raise RuntimeError(msg)
+                        else:
+                            warn_short(f'Creating directory "{fdir}" ("option")')
+                            os.makedirs(fdir)
+            p[dest] = path
 
-        p.xyzexfilename    = conf.paths.get('ex_xyzfile')
-        p._powerexbase      = conf.paths.get('ex_ps_base')
-        p._kernelexbase     = conf.paths.get('ex_kernel_base')
-        p._outexfilebase    = conf.paths.get('ex_output_base')
-        return p
+        return SimpleNamespace(p)
 
     args = parse_cli_args(argv[1:], return_args)
     conf = Config(config_path=args.config)
-    check_paths(conf)
     o = set_variable_values()
     p = get_all_paths()
 
@@ -132,14 +164,14 @@ def read_config(argv, return_args=None):
         o.use_charges = None
 
     p.clean_coefficients      = f'{p._goodcoeffilebase}_{{}}.npy'
-    p.metric_matrix           = f'{p.goodoverfilebase}_{{}}.mts'
-    p.projection              = f'{p.baselinedwbase}{{}}.mts'
+    p.metric_matrix           = f'{p._goodoverfilebase}_{{}}.mts'
+    p.projection              = f'{p._baselinedwbase}{{}}.mts'
 
     p.power_spectrum          = f'{p._splitpsfilebase}_{{}}.mts'
     p.reference_environments  = f'{p._refsselfilebase}_{o.M}.csv'
     p.reference_power_spectra = f'{p._powerrefbase}_{o.M}.mts'
     p.kernel_mm               = f'{p._kmmbase}{o.M}.mts'
-    p.kernel_nm               = f'{p.kernelconfbase}{{}}.mts'
+    p.kernel_nm               = f'{p._kernelconfbase}{{}}.mts'
 
     p.avec                    = f'{p._avecfilebase}_M{o.M}_trainfrac{{train_frac}}.txt'
     p.bmat                    = f'{p._bmatfilebase}_M{o.M}_trainfrac{{train_frac}}.dat'
@@ -155,60 +187,6 @@ def read_config(argv, return_args=None):
         return o, p
     else:
         return args, o, p
-
-
-def check_paths(conf):
-    paths0 = [
-      'dataset',
-      'ex_xyzfile',
-      'averages_file',
-      ]
-
-    paths1 = [
-      'avec_base',
-      'baselined_w_base',
-      'bmat_base',
-      'ex_kernel_base',
-      'ex_output_base',
-      'goodcoef_base',
-      'goodover_base',
-      'kernel_conf_base',
-      'kmm_base',
-      'output_base',
-      'predict_base',
-      'ps_ref_base',
-      'ps_split_base',
-      'refs_sel_base',
-      'weights_base',
-      'trainingselfile',
-      'ex_ps_base',
-      ]
-
-    for key in paths0:
-        if key in conf.paths:
-            path = conf.paths[key]
-            isfile = os.path.isfile(path)
-            if not isfile:
-                print(f'Cannot find file "{path}" ("{key}")')
-        else:
-            print(f'Cannot find option "{key}"')
-
-    dirs = []
-    for key in paths1:
-        if key in conf.paths:
-            path = conf.paths[key]
-            path = os.path.dirname(path)
-            isdir = os.path.isdir(path)
-            if not isdir:
-                #print(f'Cannot find directory "{path}" ("{key}")')
-                dirs.append(path)
-        else:
-            print(f'Cannot find option "{key}"')
-    print()
-
-    for d in sorted(set(dirs)):
-        print(f'Creating directory {d}')
-        os.makedirs(d)
 
 
 def parse_cli_args(argv, return_args=None):
