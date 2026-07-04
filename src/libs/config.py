@@ -3,6 +3,7 @@ import os
 from types import SimpleNamespace
 import configparser
 import numpy as np
+from libs.functions import warn_short
 
 DEFAULT_PATH = 'config.txt'
 
@@ -39,6 +40,17 @@ class Config:
             return False
         raise TypeError(f'Wrong input for the Bool option: "{x}"')
 
+    def choice(self, dtype, options, strict=True):
+        def checker(x):
+            x = dtype(x)
+            if x not in options:
+                if strict:
+                    raise RuntimeError(f'Wrong input: {x} not in {options}')
+                else:
+                    warn_short(f'{x} not in recommended options {options}')
+            return x
+        return checker
+
 
 def get_config_path(argv):
     path = None
@@ -59,26 +71,27 @@ def read_config(argv):
         o.soap_rcut          = conf.get_option('soap_rcut'           , 4.0             , float       )
         o.soap_ncut          = conf.get_option('soap_ncut'           , 8               , int         )
         o.soap_lcut          = conf.get_option('soap_lcut '          , 6               , int         )
-        o.reorder_ao         = conf.get_option('reorder_ao'          , 0               , int         )
-        o.copy_metric        = conf.get_option('copy_metric'         , 1               , int         )
+        o.process_metric     = conf.get_option('process_metric'      , True            , conf.bool   )
         o.reg                = conf.get_option('regular'             , 1e-6            , float       )
         o.jit                = conf.get_option('jitter'              , 1e-10           , float       )
-        o.use_charges        = conf.get_option('charges'             , 0               , int         )
+        o.use_charges        = conf.get_option('number_of_electrons' , 'none'          , conf.choice(str, ['none', 'charge', 'N']))
         o.ps_min_norm        = conf.get_option('ps_min_norm'         , 1e-20           , float       )
         o.ps_normalize       = conf.get_option('ps_normalize'        , True            , conf.bool   )
-        o.basisname          = conf.get_option('basisname'           , 'cc-pvqz-jkfit' , str         )
-        o.coeff_order        = conf.get_option('coeff_order'         , 'pyscf'         , str         )
-        o.overlap_order      = conf.get_option('overlap_order'       , 'pyscf'         , str         )
-        o.output_coeff_order = conf.get_option('output_coeff_order'  , 'gpr'           , str         )
+        o.basisname          = conf.get_option('basis'               , 'cc-pvqz-jkfit' , str         )
+        o.coeff_order        = conf.get_option('coeff_order'         , 'pyscf'         , conf.choice(str, ['pyscf', 'gpr'], strict=False)  )
+        o.overlap_order      = conf.get_option('overlap_order'       , 'pyscf'         , conf.choice(str, ['pyscf', 'gpr'], strict=False)  )
+        o.output_coeff_order = conf.get_option('output_coeff_order'  , 'gpr'           , conf.choice(str, ['pyscf', 'gpr'], strict=False)  )
         return o
 
     def get_all_paths():
         p = SimpleNamespace()
-        p.xyzfilename      = conf.paths.get('xyzfile')
-        p.chargefilename   = conf.paths.get('chargesfile')
-        p.coefffilebase    = conf.paths.get('coeff_base')
-        p.overfilebase     = conf.paths.get('over_base')
 
+        p.dataset = conf.paths.get('dataset')
+        p.xyz = conf.paths.get('xyz')
+        p.input_metrics = conf.paths.get('metrics')
+        p.input_coeffs  = conf.paths.get('coeffs')
+
+        p.xyzfilename       = conf.paths.get('xyzfile')
         p._splitpsfilebase  = conf.paths.get('ps_split_base')
         p._refsselfilebase  = conf.paths.get('refs_sel_base')
         p._powerrefbase     = conf.paths.get('ps_ref_base')
@@ -111,6 +124,9 @@ def read_config(argv):
     o = set_variable_values()
     p = get_all_paths()
 
+    if o.use_charges=='none':
+        o.use_charges = None
+
     p.clean_coefficients      = f'{p._goodcoeffilebase}_{{}}.npy'
     p.metric_matrix           = f'{p.goodoverfilebase}{{}}.mts'
     p.projection              = f'{p.baselinedwbase}{{}}.mts'
@@ -136,9 +152,8 @@ def read_config(argv):
 
 def check_paths(conf):
     paths0 = [
-      'xyzfile',
+      'dataset',
       'ex_xyzfile',
-      'chargesfile',
       'averages_file',
       ]
 
@@ -146,7 +161,6 @@ def check_paths(conf):
       'avec_base',
       'baselined_w_base',
       'bmat_base',
-      'coeff_base',
       'ex_kernel_base',
       'ex_output_base',
       'goodcoef_base',
@@ -154,7 +168,6 @@ def check_paths(conf):
       'kernel_conf_base',
       'kmm_base',
       'output_base',
-      'over_base',
       'predict_base',
       'ps_ref_base',
       'ps_split_base',

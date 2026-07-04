@@ -12,10 +12,6 @@ def tmap2vector(atom_charges, basis, tensor):
     return equio._tensormap_to_vector(atom_charges, basis.llist, tensor)
 
 
-def tmap2matrix(atom_charges, basis, tensor):
-    return equio._tensormap_to_matrix(atom_charges, basis.llist, tensor, fast=True)
-
-
 def averages2tmap(averages):
     atoms = np.array(sorted(averages.keys()))
     llist = {q:[0]*len(v) for q, v in averages.items()}

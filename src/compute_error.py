@@ -2,13 +2,13 @@
 
 import sys
 import numpy as np
+import pandas as pd
 import metatensor
-from qstack.io.metatensor import split
-from pyscf.gto import M as make_pyscf_mol
+from qstack.io.metatensor import split, tensormap_to_array
 from qstack.fields.moments import r2_c as rho_moments
 from libs.config import read_config
-from libs.functions import moldata_read, get_test_set, get_training_set, Basis
-from libs.tmap import tmap2vector, tmap2matrix, sph2vector
+from libs.functions import moldata_read, get_test_set, get_training_set, Basis, make_dummy_mol
+from libs.tmap import sph2vector
 
 
 def correct_number_of_electrons(c, S, q, N):
@@ -16,17 +16,27 @@ def correct_number_of_electrons(c, S, q, N):
     return c + S1q * (N - c@q)/(q@S1q)
 
 
+def get_number_of_electrons(use_charges, atomic_numbers, df):
+    if use_charges in [None, 'charge']:
+        nuc_charges = np.array([sum(atoms) for atoms in atomic_numbers])
+        if use_charges is None:
+            return nuc_charges
+    inp = df[use_charges].to_numpy()
+    if use_charges=='N':
+        return inp
+    elif use_charges=='charge':
+        return nuc_charges - inp
+
+
 def main():
     o, p = read_config(sys.argv)
     training = 'training' in sys.argv[1:]
 
+    df = pd.read_csv(p.dataset)
     averages = metatensor.load(p.spherical_averages)
     atomic_numbers = moldata_read(p.xyzfilename)
     basis = Basis(o.basisname, elements=averages.keys.column('center_type'))
-
-    if o.use_charges:
-        print(f'charge_file: {p.chargefilename} mode: {o.use_charges}\n')
-        molcharges = np.loadtxt(p.chargefilename, dtype=int)
+    N_all = get_number_of_electrons(o.use_charges, atomic_numbers, df)
 
     for frac in o.fracs:
 
@@ -47,20 +57,13 @@ def main():
         for itest, imol in enumerate(test_configs):
 
             atoms = atomic_numbers[imol]
-            if o.use_charges==0:
-                N  = sum(atoms)
-            elif o.use_charges==1:
-                N  = sum(atoms) - molcharges[imol]
-            elif o.use_charges==2:
-                N  = molcharges[imol]
-
-            S = tmap2matrix(atoms, basis, metatensor.load(p.metric_matrix.format(imol)))
-
-            mol = make_pyscf_mol(atom=[[q, (0, 0, 0)]  for q in atoms], basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
+            N = N_all[imol]
+            mol = make_dummy_mol(atoms=atoms, basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
             qvec = rho_moments(mol, rho=None, moments=(0,), per_atom=False)[0]
 
+            S    = tensormap_to_array(mol, metatensor.load(p.metric_matrix.format(imol)), dest='gpr', fast=True)
             c0   = np.load(p.clean_coefficients.format(imol))
-            c_bl = tmap2vector(atoms, basis, predictions[itest])
+            c_bl = tensormap_to_array(mol, predictions[itest], dest='gpr', fast=True)
             c_av = sph2vector(atoms, basis, averages)
 
             c0_bl = c0 - c_av
@@ -89,10 +92,10 @@ def main():
                 errorn_rel_bl = np.nan
 
             s1 = f'mol # {itest:{len(str(ntest))}} ({imol:{len(str(len(atomic_numbers)))}}):  '
-            s2 = f'{error_rel_bl:8.3f} %  {error_rel:.2e} %    ( {error:.2e} )   {nel:8.4f} / {nel0:8.4f} ( {N:3d} )     (corr N: {errorn_rel_bl:8.3f} %)'
+            s2 = f'{error_rel_bl:8.3f} %  {error_rel:.2e} %    ( {error:.2e} )   {nel:8.4f} / {nel0:8.4f} ( {N:3d} )     (corr N: {errorn_rel_bl:8.3f} %)    {p.xyz.format(mol_name=df['id'][imol])}'
             print(s1+s2)
 
-        print(f'\n{frac=}\tMAE = {total_error_rel_bl/ntest:.2e} %  {total_error_rel/ntest:.2e} %    ( {total_error_abs/ntest:.2e} )', end='')
+        print(f'\nfrac={frac}\tMAE = {total_error_rel_bl/ntest:.2e} %  {total_error_rel/ntest:.2e} %    ( {total_error_abs/ntest:.2e} )', end='')
 
         if o.use_charges:
             print(f'  ΔN: {total_error_N/ntest:.2e}')

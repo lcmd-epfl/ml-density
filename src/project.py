@@ -1,42 +1,49 @@
 #!/usr/bin/env python3
 
-import os
 import sys
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
+import ase.io
 import metatensor
-from qstack import compound, reorder
+from qstack import reorder
 from qstack.io import metatensor as equio
 from libs.config import read_config
-from libs.functions import moldata_read, get_elements_list, Basis
+from libs.functions import get_elements_list, Basis, make_dummy_mol
 from libs.tmap import averages2tmap
 
 
 def main():
     o, p = read_config(sys.argv)
 
-    print(f'{o.copy_metric=}')
+    print(f'{o.process_metric=}')
 
-    mols = compound.xyz_to_mol_all(p.xyzfilename, basis=o.basisname, ignore=True)
-    atomic_numbers = moldata_read(p.xyzfilename)
+    # load molecules and dump into a cache file
+    df = pd.read_csv(p.dataset)
+    mol_names = df['id'].to_list()
+    asemols = [ase.io.read(p.xyz.format(mol_name=mol_name)) for mol_name in mol_names]
+    ase.io.write(p.xyzfilename, asemols)
+    atomic_numbers = [asemol.numbers for asemol in asemols]
+
     nenv = dict(zip(*get_elements_list(atomic_numbers, return_counts=True), strict=True))
 
     basis = Basis(o.basisname, elements=nenv.keys())
     ao_indices = [basis.index(atoms) for atoms in atomic_numbers]
 
-    coefficients = load_coefs(len(atomic_numbers), p.coefffilebase)
+    coefficients = load_coefs(mol_names, p.input_coeffs)
 
     av_coefs = get_averages(nenv, basis, coefficients, ao_indices)
 
-    for imol, (coef, mol, ao_index) in tqdm([*enumerate(zip(coefficients, mols, ao_indices, strict=True))]):
+    for imol, (mol_name, coef, atoms, ao_index) in tqdm([*enumerate(zip(mol_names, coefficients, atomic_numbers, ao_indices, strict=True))]):
 
+        mol = make_dummy_mol(atoms, basis=o.basisname, ignore=True)
         coef = reorder.reorder_ao(mol, coef, dest='gpr', src=o.coeff_order)
         np.save(p.clean_coefficients.format(imol), coef)
 
         coef = remove_averages(ao_index, coef, av_coefs)
 
-        if o.copy_metric:
-            over = np.load(f'{p.overfilebase}{imol}.npy')
+        if o.process_metric:
+            over = np.load(p.input_metrics.format(mol_name=mol_name))
             over = reorder.reorder_ao(mol, over, dest='gpr', src=o.overlap_order)
             metatensor.save(p.metric_matrix.format(imol), equio.array_to_tensormap(mol, over, src='gpr'))
         else:
@@ -47,12 +54,11 @@ def main():
     metatensor.save(p.spherical_averages, averages2tmap(av_coefs))
 
 
-def load_coefs(n, coefffilebase):
+def load_coefs(mol_names, fname_template):
     coefficients = []
-    for imol in range(n):
-        path_dat = f'{coefffilebase}{imol}.dat'
-        path_npy = f'{coefffilebase}{imol}.npy'
-        coef = np.loadtxt(path_dat) if os.path.exists(path_dat) else np.load(path_npy)
+    for mol_name in mol_names:
+        fname = fname_template.format(mol_name=mol_name)
+        coef = np.load(fname) if fname.endswith('.npy') else np.loadtxt(fname)
         coefficients.append(coef)
     return coefficients
 

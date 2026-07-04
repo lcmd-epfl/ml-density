@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import ase.io
 from ase.data import chemical_symbols
+from pyscf import gto
 from qstack.tools import slice_generator
 from qstack import compound
 
@@ -141,3 +142,23 @@ def warn_short(*kargs, stacklevel=1, **kwargs):
     warnings.formatwarning, formatwarning = short_warning_formatter, warnings.formatwarning
     warnings.warn(*kargs, stacklevel=stacklevel+1, **kwargs)
     warnings.formatwarning = formatwarning
+
+
+def make_pyscf_mol(numbers, positions, basis, spin=None, charge=None, ignore=False):
+    mol = gto.Mole()
+    mol.atom = [*zip(numbers, positions, strict=True)]
+    mol.basis = basis
+    if ignore:
+        mol.spin = 0
+        mol.charge = -(sum(numbers)%2)
+    else:
+        if spin is not None:
+            mol.spin = spin
+        if charge is not None:
+            mol.charge = charge
+    mol.build()
+    return mol
+
+
+def make_dummy_mol(atoms, basis, **kwargs):
+    return make_pyscf_mol(numbers=atoms, positions=np.zeros((len(atoms), 3)), basis=basis, **kwargs)

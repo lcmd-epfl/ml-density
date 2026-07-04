@@ -4,9 +4,10 @@ import sys
 import numpy as np
 import metatensor
 from qstack.io.metatensor import split
+from qstack import reorder
 from tqdm import tqdm
 from libs.config import read_config
-from libs.functions import moldata_read, get_test_set, Basis
+from libs.functions import moldata_read, get_test_set, Basis, make_dummy_mol
 from libs.tmap import tmap2vector, tmap_add
 
 
@@ -20,8 +21,7 @@ def main():
     _, test_configs = get_test_set(p.train_test_sets)
 
     if o.output_coeff_order!='gpr':
-        from qstack import compound, reorder
-        mols = compound.xyz_to_mol_all(p.xyzfilename, basis=o.basisname, ignore=True)
+        mols = [make_dummy_mol(atoms, basis=o.basisname, ignore=True) for atoms in atomic_numbers]
 
     for frac in o.fracs:
         print('fraction =', frac)
