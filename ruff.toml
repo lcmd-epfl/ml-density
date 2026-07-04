@@ -38,6 +38,7 @@ preview = true
 extend-select = ["DOC"]
 extend-ignore = [
   "E265", # no-space-after-block-comment TODO
+  "FURB118", # reimplemented-operator
 # pathlib
   "FURB101", "FURB103",
 # whitespaces

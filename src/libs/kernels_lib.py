@@ -6,7 +6,7 @@ from libs.tmap import kernels2tmap, kmm2tmap
 def kernel_nm(atom_charges, soap, soap_ref, imol=0):
     keys1 = {tuple(key) for key in soap.keys}
     keys2 = {tuple(key) for key in soap_ref.keys}
-    keys  = sorted(keys1 & keys2, key=lambda x: x[::-1])  # noqa FURB118
+    keys  = sorted(keys1 & keys2, key=lambda x: x[::-1])
     kernel = {key: [] for key in keys}
 
     for iat, q in enumerate(atom_charges):

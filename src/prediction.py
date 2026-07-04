@@ -4,10 +4,10 @@ import sys
 import numpy as np
 import pandas as pd
 import metatensor
+from qstack.io.metatensor import join
 from libs.config import read_config
 from libs.functions import moldata_read, get_test_set, get_training_set, Basis
 from libs.predict import run_prediction
-from libs.tmap import join
 
 
 def main():

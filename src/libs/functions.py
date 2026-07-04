@@ -46,13 +46,13 @@ def get_test_set(filename, sort=True):
 class Basis:
     def __init__(self, basisname, elements):
         self.basisname = basisname
-        if isinstance(elements, type(dict().keys())):
+        if isinstance(elements, type({}.keys())):
             elements = list(elements)
         self.elements = np.unique(np.asarray(elements))
         lmax = {}
         nmax = {}
         ao = {}
-        for q in self.elements:
+        for q in self.elements.tolist():
             atom = compound.make_atom(chemical_symbols[q], basis=basisname)
             _, l, _ = compound.basis_flatten(atom, return_both=False)
             if not np.all(sorted(l)==l):
@@ -74,6 +74,7 @@ class Basis:
 
         self.msize = np.array([2*l+1 for l in range(max(lmax.values())+1)])
         self.nao_atom = {q: nmax[q] @ self.msize[:l+1] for q, l in lmax.items()}
+        self.llist = {q: np.hstack([[l] * n for l, n in enumerate(nmax_q)]).tolist() for q, nmax_q in nmax.items()}
 
     def __repr__(self):
         with np.printoptions(legacy="1.25"):

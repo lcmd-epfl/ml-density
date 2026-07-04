@@ -3,10 +3,11 @@
 import sys
 import numpy as np
 import metatensor
+from qstack.io.metatensor import split
 from tqdm import tqdm
 from libs.config import read_config
 from libs.functions import moldata_read, get_test_set, Basis
-from libs.tmap import split, tmap2vector, tmap_add
+from libs.tmap import tmap2vector, tmap_add
 
 
 def main():

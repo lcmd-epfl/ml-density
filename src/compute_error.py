@@ -3,11 +3,12 @@
 import sys
 import numpy as np
 import metatensor
+from qstack.io.metatensor import split
 from pyscf.gto import M as make_pyscf_mol
 from qstack.fields.moments import r2_c as rho_moments
 from libs.config import read_config
 from libs.functions import moldata_read, get_test_set, get_training_set, Basis
-from libs.tmap import split, tmap2vector, tmap2matrix, sph2vector
+from libs.tmap import tmap2vector, tmap2matrix, sph2vector
 
 
 def correct_number_of_electrons(c, S, q, N):
