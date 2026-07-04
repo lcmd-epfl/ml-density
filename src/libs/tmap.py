@@ -1,51 +1,26 @@
-from types import SimpleNamespace
 import gc
 import numpy as np
 import metatensor
 from qstack.io import metatensor as equio
 
 
-class override_qstack_methods:
-    def __enter__(self):
-        equio.numbers, self.numbers = lambda x: x.numbers, equio.numbers
-        equio._get_llist, self._get_llist = lambda x: x.basis.llist, equio._get_llist
-
-    def __exit__(self, _type, _value, _traceback):
-        equio.numbers, equio._get_llist = self.numbers, self._get_llist
-
-
-def make_ersatz_mol(atom_charges, basis):
-    return SimpleNamespace(
-               numbers=atom_charges,
-               basis=basis,
-               nao=sum(basis.nao_atom[q] for q in atom_charges),
-           )
-
-
 def vector2tmap(atom_charges, basis, c):
-    with override_qstack_methods():
-        return equio._vector_to_tensormap(make_ersatz_mol(atom_charges, basis), c)
+    return equio._vector_to_tensormap(atom_charges, basis.llist, c)
 
 
 def tmap2vector(atom_charges, basis, tensor):
-    with override_qstack_methods():
-        return equio._tensormap_to_vector(make_ersatz_mol(atom_charges, basis), tensor)
+    return equio._tensormap_to_vector(atom_charges, basis.llist, tensor)
 
 
 def tmap2matrix(atom_charges, basis, tensor):
-    with override_qstack_methods():
-        return equio._tensormap_to_matrix(make_ersatz_mol(atom_charges, basis), tensor, fast=True)
+    return equio._tensormap_to_matrix(atom_charges, basis.llist, tensor, fast=True)
 
 
 def averages2tmap(averages):
-    numbers = np.array(sorted(averages.keys()))
-    basis = SimpleNamespace(
-                llist    = {q:[0]*len(v) for q, v in averages.items()},
-                nao_atom = {q:len(v) for q, v in averages.items()},
-            )
-    c = np.hstack([averages[q] for q in numbers])
-    with override_qstack_methods():
-        return equio._vector_to_tensormap(make_ersatz_mol(numbers, basis), c)
+    atoms = np.array(sorted(averages.keys()))
+    llist = {q:[0]*len(v) for q, v in averages.items()}
+    c = np.hstack([averages[q] for q in atoms])
+    return equio._vector_to_tensormap(atoms, llist, c)
 
 
 def kernels2tmap(atom_charges, kernel):

@@ -43,7 +43,7 @@ conda install mpi4py=4.0
 pip install ase==3.26 wigners==0.3
 pip install metatensor-core==0.1.17
 pip install featomic==0.6.3
-pip install git+https://github.com/lcmd-epfl/Q-stack.git@master
+pip install git+https://github.com/lcmd-epfl/Q-stack.git@d5ac511
 ```
 
 ### Build
