@@ -9,15 +9,13 @@ from libs.functions import moldata_read
 from libs.kernels_lib import kernel_for_mol
 from libs.multi import multi_process
 
-USEMPI = True
 
-
-def main(missing_only=False):
-    _, p = read_config(sys.argv)
+def main():
+    args, _, p = read_config(sys.argv, return_args=['missing_only', 'mpi'])
 
     def do_mol(imol):
         kpath = p.kernel_nm.format(imol)
-        if missing_only and os.path.exists(kpath):
+        if args.missing_only and os.path.exists(kpath):
             return
         kernel_for_mol(atomic_numbers[imol], power_ref, p.power_spectrum.format(imol), kpath)
 
@@ -25,7 +23,7 @@ def main(missing_only=False):
     power_ref = metatensor.load(p.reference_power_spectra)
     nmol = len(atomic_numbers)
 
-    if USEMPI:
+    if args.mpi:
         multi_process(nmol, do_mol)
     else:
         for imol in trange(nmol):

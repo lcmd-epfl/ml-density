@@ -10,8 +10,7 @@ from libs.predict import run_prediction
 
 
 def main():
-    o, p = read_config(sys.argv)
-    training = 'training' in sys.argv[1:]
+    args, o, p = read_config(sys.argv, return_args=['training'])
 
     atomic_numbers = moldata_read(p.xyzfilename)
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
@@ -19,12 +18,12 @@ def main():
 
     for frac in o.fracs:
         weights = metatensor.load(p.weights.format(train_frac=frac))
-        if not training:
-            ntest, test_configs = get_test_set(p.train_test_sets)
-            predictfile = p.predictions.format(subset='test', train_frac=frac)
-        else:
+        if args.training:
             ntest, test_configs = get_training_set(p.train_test_sets, frac)
             predictfile = p.predictions.format(subset='training', train_frac=frac)
+        else:
+            ntest, test_configs = get_test_set(p.train_test_sets)
+            predictfile = p.predictions.format(subset='test', train_frac=frac)
 
         print(f'Number of testing molecules = {ntest}')
         predictions = run_prediction(test_configs, atomic_numbers[test_configs],

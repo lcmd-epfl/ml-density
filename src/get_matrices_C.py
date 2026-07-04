@@ -11,9 +11,7 @@ from libs.functions import moldata_read, get_elements_list, get_training_sets, B
 
 
 def main():
-    o, p = read_config(sys.argv)
-
-    task = 'b' if (len(sys.argv)>1 and sys.argv[1][0].lower()=='b') else 'a'
+    args, o, p = read_config(sys.argv, return_args=['get_b_matrix'])
 
     # load molecules
     atomic_numbers = moldata_read(p.xyzfilename)
@@ -43,18 +41,18 @@ def main():
     # C arguments
     outputfiles = (ctypes.c_char_p * nfrac)()
     for i, frac in enumerate(o.fracs):
-        outputfiles[i] = (p.bmat if task=='b' else p.avec).format(train_frac=frac).encode('ascii')
+        outputfiles[i] = (p.bmat if args.get_b_matrix else p.avec).format(train_frac=frac).encode('ascii')
 
     kernelfiles = (ctypes.c_char_p * nmol)()
     qcfiles     = (ctypes.c_char_p * nmol)()
     for imol in range(nmol):
         kernelfiles[imol] = p.kernel_nm.format(imol).encode('ascii')
-        qcfiles[imol] = (p.metric_matrix if task=='b' else p.projection).format(imol).encode('ascii')
+        qcfiles[imol] = (p.metric_matrix if args.get_b_matrix else p.projection).format(imol).encode('ascii')
 
     array_1d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
     array_2d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
 
-    args, argtypes = zip(
+    arguments, argtypes = zip(
             (totsize                           ,  ctypes.c_int,                  ),
             (len(elements)                     ,  ctypes.c_int,                  ),
             (o.M                               ,  ctypes.c_int,                  ),
@@ -73,10 +71,10 @@ def main():
             strict=True)
 
     get_matrices = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/get_matrices.so")
-    func = get_matrices.get_b if task=='b' else get_matrices.get_a
+    func = get_matrices.get_b if args.get_b_matrix else get_matrices.get_a
     func.restype = ctypes.c_int
     func.argtypes = argtypes
-    ret = func(*args)
+    ret = func(*arguments)
     return ret
 
 

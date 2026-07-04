@@ -1,11 +1,13 @@
 import sys
 import os
+import argparse
 from types import SimpleNamespace
 import configparser
 import numpy as np
 from libs.functions import warn_short
 
 DEFAULT_PATH = 'config.txt'
+DEFAULT_MPI = True
 
 
 class Config:
@@ -52,15 +54,7 @@ class Config:
         return checker
 
 
-def get_config_path(argv):
-    path = None
-    paths = ([x for x in argv[1:] if x.startswith('--config=')])
-    if paths:
-        path = paths[-1][len('--config='):]
-    return path
-
-
-def read_config(argv):
+def read_config(argv, return_args=None):
     def set_variable_values():
         o = SimpleNamespace()
         o.M                  = conf.get_option('m'                   , 100             , int         )
@@ -118,8 +112,8 @@ def read_config(argv):
         p._outexfilebase    = conf.paths.get('ex_output_base')
         return p
 
-    path = get_config_path(argv)
-    conf = Config(config_path=path)
+    args = parse_cli_args(argv[1:], return_args)
+    conf = Config(config_path=args.config)
     check_paths(conf)
     o = set_variable_values()
     p = get_all_paths()
@@ -147,7 +141,10 @@ def read_config(argv):
     p.extra_power_spectrum    = f'{p._powerexbase}_{{}}.mts'
     p.extra_predicted_coeff   = f'{p._outexfilebase}_{{order}}_{{imol}}.dat'
 
-    return o, p
+    if return_args is None:
+        return o, p
+    else:
+        return args, o, p
 
 
 def check_paths(conf):
@@ -202,3 +199,25 @@ def check_paths(conf):
     for d in sorted(set(dirs)):
         print(f'Creating directory {d}')
         os.makedirs(d)
+
+
+def parse_cli_args(argv, return_args=None):
+    if return_args is None:
+        return_args = []
+
+    def add_argument(parser, *kargs, **kwargs):
+        if kwargs.get('dest') in return_args:
+            parser.add_argument(*kargs, **kwargs)
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--config", type=str, default=DEFAULT_PATH, help='path to the configuration file')
+    add_argument(parser, "--training", dest='training', action='store_true', help='run prediction / compute error on the training set instead of the test set')
+    add_argument(parser, "-b", "--b", dest="get_b_matrix", action='store_true', help='if True, get_matrices computes the "B matrix"; if False, the "A vector"')
+    add_argument(parser, "--missing-only", dest="missing_only", action='store_true', help='dangerous: not recompute existing power spectra / kernels')
+
+    mpi = parser.add_mutually_exclusive_group()
+    mpi.add_argument("--mpi-dummy-argument", dest="mpi", default=DEFAULT_MPI, action='store_true', help=argparse.SUPPRESS)
+    add_argument(mpi, "--mpi", dest="mpi", default=DEFAULT_MPI, action='store_true', help='set MPI usage flag')
+    add_argument(mpi, "--no-mpi", dest="mpi", default=DEFAULT_MPI, action='store_false', help='set MPI usage flag')
+    args = parser.parse_args(argv)
+    return args

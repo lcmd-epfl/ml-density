@@ -29,8 +29,7 @@ def get_number_of_electrons(use_charges, atomic_numbers, df):
 
 
 def main():
-    o, p = read_config(sys.argv)
-    training = 'training' in sys.argv[1:]
+    args, o, p = read_config(sys.argv, return_args=['training'])
 
     df = pd.read_csv(p.dataset)
     averages = metatensor.load(p.spherical_averages)
@@ -41,7 +40,7 @@ def main():
     for frac in o.fracs:
 
         print(f'fraction = {frac}')
-        if training:
+        if args.training:
             ntest, test_configs = get_training_set(p.train_test_sets, frac)
             predictfile = p.predictions.format(subset='training', train_frac=frac)
         else:

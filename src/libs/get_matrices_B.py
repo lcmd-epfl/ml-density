@@ -2,9 +2,6 @@ import numpy as np
 import metatensor
 from libs.get_matrices_A import print_batches
 from libs.multi import print_nodes, scatter_jobs
-USE_MPI = 1
-if USE_MPI:
-    from mpi4py import MPI
 
 
 def print_mem(totsize, ntrain):
@@ -64,7 +61,7 @@ def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
 
 
 def get_b(basis, ref_elem, ntrains, trrange,
-          path_over, path_kern, paths_bmat):
+          path_over, path_kern, paths_bmat, use_mpi):
 
     def do_mol(imol):
         do_work_b(idx, basis.nmax, trrange[imol], ref_elem, path_over, path_kern, Bmat)
@@ -73,7 +70,8 @@ def get_b(basis, ref_elem, ntrains, trrange,
     Bmat = np.zeros(symsize(totsize))
     idx = basis.sparse_indices(ref_elem)
 
-    if USE_MPI:
+    if use_mpi:
+        from mpi4py import MPI
         Nproc = MPI.COMM_WORLD.Get_size()
         nproc = MPI.COMM_WORLD.Get_rank()
         print_nodes(Nproc, nproc, MPI.COMM_WORLD)
@@ -88,7 +86,7 @@ def get_b(basis, ref_elem, ntrains, trrange,
 
     if nproc==0:
         print_batches(ntrains, paths_bmat)
-    if USE_MPI:
+    if use_mpi:
         MPI.COMM_WORLD.barrier()
 
     if Nproc==1:
@@ -97,7 +95,7 @@ def get_b(basis, ref_elem, ntrains, trrange,
                 print(f'{nproc:4d}: {imol:4d}', flush=True)
                 do_mol(imol)
             Bmat.tofile(path_bmat)
-        if USE_MPI:
+        if use_mpi:
             t = MPI.Wtime () - t
             print(f'{t=:4.2f}', flush=True)
 

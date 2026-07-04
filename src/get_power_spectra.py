@@ -10,15 +10,13 @@ from libs.lsoap import generate_lambda_soap_wrapper, make_rascal_hypers
 from libs.functions import get_elements_list, Basis
 from libs.multi import multi_process
 
-USEMPI = True
 
-
-def main(missing_only=False):
-    o, p = read_config(sys.argv)
+def main():
+    args, o, p = read_config(sys.argv, return_args=['missing_only', 'mpi'])
 
     def do_mol(imol):
         ppath = p.power_spectrum.format(imol)
-        if missing_only and os.path.exists(ppath):
+        if args.missing_only and os.path.exists(ppath):
             return
         soap = generate_lambda_soap_wrapper(mols[imol], rascal_hypers, neighbor_species=elements,
                                             normalize=o.ps_normalize, min_norm=o.ps_min_norm,
@@ -37,7 +35,7 @@ def main(missing_only=False):
     print(f'{o.ps_min_norm=} {o.ps_normalize=}')
 
     nmol = len(mols)
-    if USEMPI:
+    if args.mpi:
         multi_process(nmol, do_mol)
     else:
         for imol in trange(nmol):

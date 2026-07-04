@@ -8,7 +8,7 @@ $path/power_spectra_ref.py
 $path/rmatrix.py
 $path/kernels.py
 $path/get_matrices.py
-$path/get_matrices.py b
+$path/get_matrices.py -b
 $path/regression.py
 $path/prediction.py
 $path/compute_error.py > error.txt
