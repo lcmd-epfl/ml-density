@@ -1,30 +1,50 @@
 [options]
-M = 32
+
+[options.training]
+reference_environments = 32
 seed = 1
 train_size = 8
-trainfrac = 1.0
+train_fractions = 1.0
 regular = 1e-6
 jitter = 1e-8
-number_of_electrons = charge
+
+[options.soap]
 soap_sigma = 0.3
 soap_rcut  = 4.0
 soap_ncut  = 7
 soap_lcut  = 6
-process_metric = true
 ps_min_norm = 1e-20
 ps_normalize = true
+
+[options.rho]
+basis = cc-pvqz-jkfit
+number_of_electrons = charge
 coeff_order = pyscf
 overlap_order = pyscf
 output_coeff_order = gpr
-basis = cc-pvqz-jkfit
+process_metric = true
 
 [paths]
 
+[paths.input]
 dataset          = dataset.csv
 xyz              = dataset/{mol_name}.xyz
 metrics          = dataset/jmat_{mol_name}.npy
 coeffs           = dataset/coef_{mol_name}.dat
 
+[paths.output]
+weights_base     = INNER/weights
+predict_base     = INNER/prediction
+output_base      = INNER/predicted/rho
+
+[paths.extrapolation]
+xyzfile      = extra/1.xyz
+ps_base      = extra/PS
+kernel_base  = extra/kernel
+output_base  = extra/rho
+
+# this section is optional and can be safely removed
+[paths.internal]
 xyzfile          = INNER/dataset.xyz
 ps_split_base    = INNER/PS/PS
 ps_ref_base      = INNER/PS
@@ -38,11 +58,3 @@ goodcoef_base    = INNER/coeff/mol
 averages_file    = INNER/AVERAGES.mts
 baselined_w_base = INNER/BASELINED_PROJECTIONS/projections_conf
 avec_base        = INNER/Avec
-weights_base     = INNER/weights
-predict_base     = INNER/prediction
-output_base      = INNER/predicted/rho
-
-ex_xyzfile      = extra/1.xyz
-ex_ps_base      = extra/PS
-ex_kernel_base  = extra/kernel
-ex_output_base  = extra/rho

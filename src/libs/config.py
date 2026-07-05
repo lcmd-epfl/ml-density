@@ -2,6 +2,8 @@ import sys
 import os
 import argparse
 from types import SimpleNamespace
+from collections import ChainMap
+from itertools import starmap
 import configparser
 import numpy as np
 from libs.functions import warn_short
@@ -72,7 +74,7 @@ class Config:
         return {dest: self.get_option(group, key, default, dtype) for dest, (key, default, dtype) in options.items()}
 
     def get_path_group(self, group, paths):
-        self.check_for_unrecognized_options('paths', paths)
+        self.check_for_unrecognized_options(group, paths)
         p = {}
         for dest, (option, when_missing_config, check_file, default) in paths.items():
             if (path := self.configuration[group].get(option)) is None:
@@ -106,57 +108,69 @@ def read_config(argv, return_args=None):
 
     def set_variable_values():
         options = {
-                'M'                  : ('m'                   , 100             , int         ),
-                'seed'               : ('seed'                , 1               , int         ),
-                'train'              : ('train_size'          , 1000            , int         ),
-                'fracs'              : ('trainfrac'           , np.array([1.0]) , conf.Floats() ),
-                'soap_sigma'         : ('soap_sigma'          , 0.3             , float       ),
-                'soap_rcut'          : ('soap_rcut'           , 4.0             , float       ),
-                'soap_ncut'          : ('soap_ncut'           , 8               , int         ),
-                'soap_lcut'          : ('soap_lcut'           , 6               , int         ),
-                'process_metric'     : ('process_metric'      , True            , conf.Bool() ),
-                'reg'                : ('regular'             , 1e-6            , float       ),
-                'jit'                : ('jitter'              , 1e-10           , float       ),
-                'use_charges'        : ('number_of_electrons' , 'none'          , conf.Choice(str, ['none', 'charge', 'N'], name='number_of_electrons')),
-                'ps_min_norm'        : ('ps_min_norm'         , 1e-20           , float       ),
-                'ps_normalize'       : ('ps_normalize'        , True            , conf.Bool() ),
-                'basisname'          : ('basis'               , 'cc-pvqz-jkfit' , str         ),
-                'coeff_order'        : ('coeff_order'         , 'pyscf'         , conf.Choice(str, ['pyscf', 'gpr'], name='coeff_order',        strict=False)),
-                'overlap_order'      : ('overlap_order'       , 'pyscf'         , conf.Choice(str, ['pyscf', 'gpr'], name='overlap_order',      strict=False)),
-                'output_coeff_order' : ('output_coeff_order'  , 'gpr'           , conf.Choice(str, ['pyscf', 'gpr'], name='output_coeff_order', strict=False)),
+                'options.training': {
+                    'M'                  : ('reference_environments' , 100          , int         ),
+                    'seed'               : ('seed'                , 1               , int         ),
+                    'train'              : ('train_size'          , 1000            , int         ),
+                    'fracs'              : ('train_fractions'     , np.array([1.0]) , conf.Floats() ),
+                    'reg'                : ('regular'             , 1e-6            , float       ),
+                    'jit'                : ('jitter'              , 1e-10           , float       ),
+                    },
+                'options.soap': {
+                    'soap_sigma'         : ('soap_sigma'          , 0.3             , float       ),
+                    'soap_rcut'          : ('soap_rcut'           , 4.0             , float       ),
+                    'soap_ncut'          : ('soap_ncut'           , 8               , int         ),
+                    'soap_lcut'          : ('soap_lcut'           , 6               , int         ),
+                    'ps_min_norm'        : ('ps_min_norm'         , 1e-20           , float       ),
+                    'ps_normalize'       : ('ps_normalize'        , True            , conf.Bool() ),
+                    },
+                'options.rho': {
+                    'process_metric'     : ('process_metric'      , True            , conf.Bool() ),
+                    'use_charges'        : ('number_of_electrons' , 'none'          , conf.Choice(str, ['none', 'charge', 'N'], name='number_of_electrons')),
+                    'basisname'          : ('basis'               , 'cc-pvqz-jkfit' , str         ),
+                    'coeff_order'        : ('coeff_order'         , 'pyscf'         , conf.Choice(str, ['pyscf', 'gpr'], name='coeff_order',        strict=False)),
+                    'overlap_order'      : ('overlap_order'       , 'pyscf'         , conf.Choice(str, ['pyscf', 'gpr'], name='overlap_order',      strict=False)),
+                    'output_coeff_order' : ('output_coeff_order'  , 'gpr'           , conf.Choice(str, ['pyscf', 'gpr'], name='output_coeff_order', strict=False)),
+                    },
                 }
-        return conf.get_option_group('options', options)
+        return dict(ChainMap(*[*starmap(conf.get_option_group, options.items())]))
 
     def get_all_paths():
         paths = {
-                'dataset'            : ('dataset'         , 'ERROR' ,  'ERROR_FILE', None),
-                'xyz'                : ('xyz'             , 'ERROR' ,  'ERROR_DIR' , None),
-                'input_metrics'      : ('metrics'         , 'ERROR' ,  'ERROR_DIR' , None),
-                'input_coeffs'       : ('coeffs'          , 'ERROR' ,  'ERROR_DIR' , None),
-
-                'xyzfilename'        : ('xyzfile'         , None    ,  'MAKE_DIR'  , 'INNER/dataset.xyz'),
-                '_splitpsfilebase'   : ('ps_split_base'   , None    ,  'MAKE_DIR'  , 'INNER/PS/PS'),
-                '_refsselfilebase'   : ('refs_sel_base'   , None    ,  'MAKE_DIR'  , 'INNER/SELECTIONS/refs_selection'),
-                '_powerrefbase'      : ('ps_ref_base'     , None    ,  'MAKE_DIR'  , 'INNER/PS'),
-                '_kmmbase'           : ('kmm_base'        , None    ,  'MAKE_DIR'  , 'INNER/KMM'),
-                '_kernelconfbase'    : ('kernel_conf_base', None    ,  'MAKE_DIR'  , 'INNER/KERNELS/kernel_conf'),
-                '_goodcoeffilebase'  : ('goodcoef_base'   , None    ,  'MAKE_DIR'  , 'INNER/coeff/mol'),
-                '_goodoverfilebase'  : ('goodover_base'   , None    ,  'MAKE_DIR'  , 'INNER/metric/mol'),
-                '_baselinedwbase'    : ('baselined_w_base', None    ,  'MAKE_DIR'  , 'INNER/BASELINED_PROJECTIONS/projections_conf'),
-                'spherical_averages' : ('averages_file'   , None    ,  'MAKE_DIR'  , 'INNER/AVERAGES.mts'),
-                'train_test_sets'    : ('trainingselfile' , None    ,  'MAKE_DIR'  , 'INNER/SELECTIONS/training_selection.csv'),
-                '_avecfilebase'      : ('avec_base'       , None    ,  'MAKE_DIR'  , 'INNER/Avec'),
-                '_bmatfilebase'      : ('bmat_base'       , None    ,  'MAKE_DIR'  , 'INNER/Bmat'),
-                '_weightsfilebase'   : ('weights_base'    , None    ,  'MAKE_DIR'  , 'INNER/weights'),
-                '_predictfilebase'   : ('predict_base'    , None    ,  'MAKE_DIR'  , 'INNER/prediction'),
-                '_outfilebase'       : ('output_base'     , 'WARN'  ,  'MAKE_DIR'  , 'INNER/predicted/rho'),
-
-                'xyzexfilename'      : ('ex_xyzfile'      , 'WARN'  ,  'ERROR_FILE', None),
-                '_powerexbase'       : ('ex_ps_base'      , None    ,  'MAKE_DIR'  , 'INNER/extra/PS'),
-                '_kernelexbase'      : ('ex_kernel_base'  , None    ,  'MAKE_DIR'  , 'INNER/extra/kernel'),
-                '_outexfilebase'     : ('ex_output_base'  , 'WARN'  ,  'MAKE_DIR'  , 'INNER/extra/rho'),
+                'paths.input': {
+                    'dataset'            : ('dataset'         , 'ERROR' ,  'ERROR_FILE', None),
+                    'xyz'                : ('xyz'             , 'ERROR' ,  'ERROR_DIR' , None),
+                    'input_metrics'      : ('metrics'         , 'ERROR' ,  'ERROR_DIR' , None),
+                    'input_coeffs'       : ('coeffs'          , 'ERROR' ,  'ERROR_DIR' , None),
+                    },
+                'paths.internal': {
+                    'xyzfilename'        : ('xyzfile'         , None    ,  'MAKE_DIR'  , 'INNER/dataset.xyz'),
+                    '_splitpsfilebase'   : ('ps_split_base'   , None    ,  'MAKE_DIR'  , 'INNER/PS/PS'),
+                    '_refsselfilebase'   : ('refs_sel_base'   , None    ,  'MAKE_DIR'  , 'INNER/SELECTIONS/refs_selection'),
+                    '_powerrefbase'      : ('ps_ref_base'     , None    ,  'MAKE_DIR'  , 'INNER/PS'),
+                    '_kmmbase'           : ('kmm_base'        , None    ,  'MAKE_DIR'  , 'INNER/KMM'),
+                    '_kernelconfbase'    : ('kernel_conf_base', None    ,  'MAKE_DIR'  , 'INNER/KERNELS/kernel_conf'),
+                    '_goodcoeffilebase'  : ('goodcoef_base'   , None    ,  'MAKE_DIR'  , 'INNER/coeff/mol'),
+                    '_goodoverfilebase'  : ('goodover_base'   , None    ,  'MAKE_DIR'  , 'INNER/metric/mol'),
+                    '_baselinedwbase'    : ('baselined_w_base', None    ,  'MAKE_DIR'  , 'INNER/BASELINED_PROJECTIONS/projections_conf'),
+                    'spherical_averages' : ('averages_file'   , None    ,  'MAKE_DIR'  , 'INNER/AVERAGES.mts'),
+                    'train_test_sets'    : ('trainingselfile' , None    ,  'MAKE_DIR'  , 'INNER/SELECTIONS/training_selection.csv'),
+                    '_avecfilebase'      : ('avec_base'       , None    ,  'MAKE_DIR'  , 'INNER/Avec'),
+                    '_bmatfilebase'      : ('bmat_base'       , None    ,  'MAKE_DIR'  , 'INNER/Bmat'),
+                    },
+                'paths.output': {
+                    '_weightsfilebase'   : ('weights_base'    , None    ,  'MAKE_DIR'  , 'INNER/weights'),
+                    '_predictfilebase'   : ('predict_base'    , None    ,  'MAKE_DIR'  , 'INNER/prediction'),
+                    '_outfilebase'       : ('output_base'     , 'WARN'  ,  'MAKE_DIR'  , 'INNER/predicted/rho'),
+                    },
+                'paths.extrapolation': {
+                    'xyzexfilename'      : ('xyzfile'         , 'WARN'  ,  'ERROR_FILE', None),
+                    '_powerexbase'       : ('ps_base'         , None    ,  'MAKE_DIR'  , 'INNER/extra/PS'),
+                    '_kernelexbase'      : ('kernel_base'     , None    ,  'MAKE_DIR'  , 'INNER/extra/kernel'),
+                    '_outexfilebase'     : ('output_base'     , 'WARN'  ,  'MAKE_DIR'  , 'INNER/extra/rho'),
+                    },
                 }
-        return conf.get_path_group('paths', paths)
+        return dict(ChainMap(*[*starmap(conf.get_path_group, paths.items())]))
 
     def postprocess_options(o):
         if o['use_charges']=='none':
