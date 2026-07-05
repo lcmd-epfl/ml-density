@@ -1,6 +1,7 @@
 import warnings
 import numpy as np
 import pandas as pd
+import ase
 import ase.io
 from ase.data import chemical_symbols
 from pyscf import gto
@@ -14,68 +15,46 @@ def moldata_read(xyzfilename):
     return np.array(atomic_numbers, dtype=object)
 
 
-def get_elements_list(atomic_numbers, return_counts=False):
-    return np.unique(np.concatenate(atomic_numbers), return_counts=return_counts)
+def get_elements(mols, return_counts=False):
+    if len(mols) and isinstance(mols[0], ase.Atoms):
+        mols = [mol.numbers for mol in mols]
+    return np.unique(np.concatenate(mols), return_counts=return_counts)
 
 
-def get_training_set(filename, fraction=1.0, sort=True):
-    df = pd.read_csv(filename)
-    train_full = df[df['subset']=='train']['mol_idx'].to_numpy()
-    n = int(fraction*len(train_full))
-    train = train_full[0:n]
-    if sort:
-        train.sort()
-    return n, train
+class Subset:
+    def __init__(self, filename):
+        self.df = pd.read_csv(filename)
+        self.train = self.df[self.df['subset']=='train']['mol_idx'].to_numpy()
+        self.test  = self.df[self.df['subset']=='test']['mol_idx'].to_numpy()
 
+    def get_training(self, fraction, sort=True):
+        train = self.train[0:int(fraction*len(self.train))]
+        return sorted(train) if sort else train
 
-def get_training_sets(filename, fractions):
-    df = pd.read_csv(filename)
-    train_full = df[df['subset']=='train']['mol_idx'].to_numpy()
-    train_sizes = (fractions*len(train_full)).astype(int)
-    trains = train_full[0:train_sizes[-1]]
-    return train_sizes, trains
+    def get_test(self, sort=True):
+        return sorted(self.test) if sort else self.test
 
-
-def get_test_set(filename, sort=True):
-    df = pd.read_csv(filename)
-    test = df[df['subset']=='test']['mol_idx'].to_numpy()
-    if sort:
-        test.sort()
-    return len(test), test
+    def get_training_all(self, fractions):
+        sizes = (fractions*len(self.train)).astype(int)
+        train = self.train[0:sizes[-1]]
+        return sizes, train
 
 
 class Basis:
+
     def __init__(self, basisname, elements):
         self.basisname = basisname
         if isinstance(elements, type({}.keys())):
             elements = list(elements)
         self.elements = np.unique(np.asarray(elements))
-        lmax = {}
-        nmax = {}
-        ao = {}
-        for q in self.elements.tolist():
-            atom = compound.make_atom(chemical_symbols[q], basis=basisname)
-            _, l, _ = compound.basis_flatten(atom, return_both=False)
-            if not np.all(sorted(l)==l):
-                msg = "Basis functions are not sorted by angular momentum. This can lead to AO mismatch"
-                raise ValueError(msg)
-            lmax[q] = l[-1]
-            nmax[q] = np.zeros(lmax[q]+1, dtype=int)
-            n = []
-            m = []
-            for li, nao_l in zip(*np.unique(l, return_counts=True), strict=True):
-                msize = 2*li+1
-                nmax[q][li] = nao_l//msize
-                n.append( np.repeat(np.arange(nmax[q][li]), msize))
-                m.append( np.tile(np.arange(msize)-li, nmax[q][li]))  # cannot use m from basis_flatten because of pyscf ordering
-            ao[q] = np.vstack((np.ones_like(l)*q, l, np.hstack(n), np.hstack(m))).T
-        self.ao = ao
-        self.lmax = lmax
-        self.nmax = nmax
 
-        self.msize = np.array([2*l+1 for l in range(max(lmax.values())+1)])
-        self.nao_atom = {q: nmax[q] @ self.msize[:l+1] for q, l in lmax.items()}
-        self.llist = {q: np.hstack([[l] * n for l, n in enumerate(nmax_q)]).tolist() for q, nmax_q in nmax.items()}
+        self.lmax, self.nmax, self.ao = {}, {}, {}
+        for q in self.elements.tolist():
+            self.lmax[q], self.nmax[q], self.ao[q] = self.get_atom_info(q)
+
+        self.msize = np.array([2*l+1 for l in range(max(self.lmax.values())+1)])
+        self.nao_atom = {q: self.nmax[q] @ self.msize[:l+1] for q, l in self.lmax.items()}
+        self.llist = {q: np.hstack([[l] * n for l, n in enumerate(nmax_q)]).tolist() for q, nmax_q in self.nmax.items()}
 
     def __repr__(self):
         with np.printoptions(legacy="1.25"):
@@ -88,6 +67,24 @@ class Basis:
             ao[i,0] = iat
             ao[i,1:] = self.ao[q]
         return ao
+
+    def get_atom_info(self, q):
+        atom = compound.make_atom(chemical_symbols[q], basis=self.basisname)
+        _, l, _ = compound.basis_flatten(atom, return_both=False)
+        if not np.all(sorted(l)==l):
+            msg = f"Basis functions for {q} are not sorted by angular momentum. This can lead to AO mismatch"
+            raise ValueError(msg)
+        lmax = l[-1]
+        nmax = np.zeros(lmax+1, dtype=int)
+        n = []
+        m = []
+        for li, nao_l in zip(*np.unique(l, return_counts=True), strict=True):
+            msize = 2*li+1
+            nmax[li] = nao_l//msize
+            n.append( np.repeat(np.arange(nmax[li]), msize))
+            m.append( np.tile(np.arange(msize)-li, nmax[li]))  # cannot use m from basis_flatten because of pyscf ordering
+        ao = np.vstack((np.ones_like(l)*q, l, np.hstack(n), np.hstack(m))).T
+        return lmax, nmax, ao
 
     def sparse_indices(self, atoms):
         idx = np.zeros((len(atoms), max(self.lmax.values())+1), dtype=int)
@@ -114,17 +111,8 @@ class AOIndex:
         self.nat = len(self.atoms)
 
     def find(self, iat=None, q=None, l=None, n=None, m=None):
-        conditions = []
-        if iat is not None:
-            conditions.append(self.ao[:,0]==iat)
-        if q is not None:
-            conditions.append(self.ao[:,1]==q)
-        if l is not None:
-            conditions.append(self.ao[:,2]==l)
-        if n is not None:
-            conditions.append(self.ao[:,3]==n)
-        if m is not None:
-            conditions.append(self.ao[:,4]==m)
+        column_order = [iat, q, l, n, m]
+        conditions = [self.ao[:,i]==query for i, query in enumerate(column_order) if query is not None]
 
         if len(conditions)==0:
             return np.arange(len(self.ao))

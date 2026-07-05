@@ -6,7 +6,7 @@ import metatensor
 from tqdm import tqdm
 from libs.config import read_config
 from libs.lsoap import generate_lambda_soap_wrapper, make_rascal_hypers
-from libs.functions import get_elements_list, moldata_read, Basis
+from libs.functions import get_elements, moldata_read, Basis
 
 
 def main():
@@ -15,8 +15,8 @@ def main():
     mols_ex = ase.io.read(p.xyzexfilename, ":")
     atomic_numbers = moldata_read(p.xyzfilename)
 
-    elements = get_elements_list(atomic_numbers)
-    elements_ex = get_elements_list([mol.get_atomic_numbers() for mol in mols_ex])
+    elements = get_elements(atomic_numbers)
+    elements_ex = get_elements(mols_ex)
     if not set(elements_ex).issubset(elements):
         msg = f'Different elements in the molecule and in the training set: {elements_ex} and {elements}'
         raise RuntimeError(msg)

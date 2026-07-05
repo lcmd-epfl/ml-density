@@ -4,7 +4,7 @@ import sys
 import numpy as np
 import pandas as pd
 from libs.config import read_config
-from libs.functions import get_training_sets, Basis
+from libs.functions import Basis, Subset
 from libs.get_matrices_A import get_a
 from libs.get_matrices_B import get_b
 
@@ -16,7 +16,7 @@ def main():
     basis = Basis(o.basisname, elements=ref_elements)
 
     # training set selection
-    ntrains, train_configs = get_training_sets(p.train_test_sets, o.fracs)
+    ntrains, train_configs = Subset(p.train_test_sets).get_training_all(o.fracs)
     ntrains = np.pad(ntrains, (0, 1), 'constant', constant_values=0)
 
     if args.get_b_matrix:

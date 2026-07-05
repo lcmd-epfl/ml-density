@@ -7,7 +7,7 @@ import metatensor
 from qstack.io.metatensor import split, tensormap_to_array
 from qstack.fields.moments import r2_c as rho_moments
 from libs.config import read_config
-from libs.functions import moldata_read, get_test_set, get_training_set, Basis, make_dummy_mol
+from libs.functions import moldata_read, Basis, make_dummy_mol, Subset
 from libs.tmap import sph2vector
 
 
@@ -41,11 +41,12 @@ def main():
 
         print(f'fraction = {frac}')
         if args.training:
-            ntest, test_configs = get_training_set(p.train_test_sets, frac)
+            test_configs = Subset(p.train_test_sets).get_training(frac)
             predictfile = p.predictions.format(subset='training', train_frac=frac)
         else:
-            ntest, test_configs = get_test_set(p.train_test_sets)
+            test_configs = Subset(p.train_test_sets).get_test()
             predictfile = p.predictions.format(subset='test', train_frac=frac)
+        ntest = len(test_configs)
         predictions = split(metatensor.load(predictfile))
 
         total_error_N      = 0.0

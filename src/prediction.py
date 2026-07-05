@@ -5,7 +5,7 @@ import pandas as pd
 import metatensor
 from qstack.io.metatensor import join
 from libs.config import read_config
-from libs.functions import moldata_read, get_test_set, get_training_set, Basis
+from libs.functions import moldata_read, Basis, Subset
 from libs.predict import run_prediction
 
 
@@ -19,13 +19,13 @@ def main():
     for frac in o.fracs:
         weights = metatensor.load(p.weights.format(train_frac=frac))
         if args.training:
-            ntest, test_configs = get_training_set(p.train_test_sets, frac)
+            test_configs = Subset(p.train_test_sets).get_training(frac)
             predictfile = p.predictions.format(subset='training', train_frac=frac)
         else:
-            ntest, test_configs = get_test_set(p.train_test_sets)
+            test_configs = Subset(p.train_test_sets).get_test()
             predictfile = p.predictions.format(subset='test', train_frac=frac)
 
-        print(f'Number of testing molecules = {ntest}')
+        print(f'Number of testing molecules = {len(test_configs)}')
         predictions = run_prediction(test_configs, atomic_numbers[test_configs],
                                      basis, weights, p.kernel_nm)
         predictions = join(predictions)

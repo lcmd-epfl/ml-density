@@ -7,7 +7,7 @@ from tqdm import tqdm
 from ase.data import chemical_symbols
 from qstack.mathutils.fps import do_fps
 from libs.config import read_config
-from libs.functions import moldata_read, get_elements_list, warn_short
+from libs.functions import moldata_read, get_elements, warn_short
 from libs.tmap import read_ps_1mol_l0
 
 
@@ -15,7 +15,7 @@ def main():
     o, p = read_config(sys.argv)
 
     atomic_numbers = moldata_read(p.xyzfilename)
-    elements = get_elements_list(atomic_numbers)
+    elements = get_elements(atomic_numbers)
 
     power_env, idx_mol, idx_atm = [], [], []
     for imol, atoms in enumerate(tqdm(atomic_numbers)):

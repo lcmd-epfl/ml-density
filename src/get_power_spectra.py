@@ -7,7 +7,7 @@ import metatensor
 from tqdm import trange
 from libs.config import read_config
 from libs.lsoap import generate_lambda_soap_wrapper, make_rascal_hypers
-from libs.functions import get_elements_list, Basis
+from libs.functions import get_elements, Basis
 from libs.multi import multi_process
 
 
@@ -26,7 +26,7 @@ def main():
     rascal_hypers = make_rascal_hypers(o.soap_rcut, o.soap_ncut, o.soap_lcut, o.soap_sigma)
 
     mols = ase.io.read(p.xyzfilename, ":")
-    elements = get_elements_list([mol.get_atomic_numbers() for mol in mols])
+    elements = get_elements(mols)
     basis = Basis(o.basisname, elements)
 
     print(f'{rascal_hypers=}')

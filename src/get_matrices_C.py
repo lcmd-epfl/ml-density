@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from qstack.mathutils.array import vstack_padding
 from libs.config import read_config
-from libs.functions import moldata_read, get_elements_list, get_training_sets, Basis
+from libs.functions import moldata_read, get_elements, Basis, Subset
 
 
 def main():
@@ -16,7 +16,7 @@ def main():
     # load molecules
     atomic_numbers = moldata_read(p.xyzfilename)
     nmol = len(atomic_numbers)
-    elements = get_elements_list(atomic_numbers)
+    elements = get_elements(atomic_numbers)
 
     # reference environments
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
@@ -25,7 +25,7 @@ def main():
         ref_elements_idx[np.where(ref_elements==q)] = iq
 
     # training set selection
-    ntrains, train_configs = get_training_sets(p.train_test_sets, o.fracs)
+    ntrains, train_configs = Subset(p.train_test_sets).get_training_all(o.fracs)
     nfrac = len(ntrains)
     ntrain = ntrains[-1]
     atomic_numbers_train = atomic_numbers[train_configs]

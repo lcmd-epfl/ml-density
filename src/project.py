@@ -9,23 +9,17 @@ import metatensor
 from qstack import reorder
 from qstack.io import metatensor as equio
 from libs.config import read_config
-from libs.functions import get_elements_list, Basis, make_dummy_mol
+from libs.functions import get_elements, Basis, make_dummy_mol
 from libs.tmap import averages2tmap
 
 
 def main():
     o, p = read_config(sys.argv)
-
     print(f'{o.process_metric=}')
 
-    # load molecules and dump into a cache file
-    df = pd.read_csv(p.dataset)
-    mol_names = df['id'].to_list()
-    asemols = [ase.io.read(p.xyz.format(mol_name=mol_name)) for mol_name in mol_names]
-    ase.io.write(p.xyzfilename, asemols)
-    atomic_numbers = [asemol.numbers for asemol in asemols]
+    mol_names, atomic_numbers = prepare_molecules(p)
 
-    nenv = dict(zip(*get_elements_list(atomic_numbers, return_counts=True), strict=True))
+    nenv = dict(zip(*get_elements(atomic_numbers, return_counts=True), strict=True))
 
     basis = Basis(o.basisname, elements=nenv.keys())
     ao_indices = [basis.index(atoms) for atoms in atomic_numbers]
@@ -37,9 +31,9 @@ def main():
     for imol, (mol_name, coef, atoms, ao_index) in tqdm([*enumerate(zip(mol_names, coefficients, atomic_numbers, ao_indices, strict=True))]):
 
         mol = make_dummy_mol(atoms, basis=o.basisname, ignore=True)
+
         coef = reorder.reorder_ao(mol, coef, dest='gpr', src=o.coeff_order)
         np.save(p.clean_coefficients.format(imol), coef)
-
         coef = remove_averages(ao_index, coef, av_coefs)
 
         if o.process_metric:
@@ -54,15 +48,17 @@ def main():
     metatensor.save(p.spherical_averages, averages2tmap(av_coefs))
 
 
+def prepare_molecules(p):
+    df = pd.read_csv(p.dataset)
+    mol_names = df['id'].to_list()
+    asemols = [ase.io.read(p.xyz.format(mol_name=mol_name)) for mol_name in mol_names]
+    ase.io.write(p.xyzfilename, asemols)
+    atomic_numbers = [asemol.numbers for asemol in asemols]
+    return mol_names, atomic_numbers
+
+
 def load_coefs(mol_names, fname_template):
     return [np.load(fname_template.format(mol_name=mol_name)) if (fname := fname_template.format(mol_name=mol_name)).endswith('.npy') else np.loadtxt(fname) for mol_name in mol_names]
-
-
-def remove_averages(ao_index, coef, av_coefs):
-    coef_new = np.copy(coef)
-    for iat, q in enumerate(ao_index.atoms):
-        coef_new[ao_index.find(iat=iat, l=0)] -= av_coefs[q]
-    return coef_new
 
 
 def get_averages(nenv, basis, coefficients, ao_indices):
@@ -75,6 +71,13 @@ def get_averages(nenv, basis, coefficients, ao_indices):
     for q in av_coefs:
         av_coefs[q] /= nenv[q]
     return av_coefs
+
+
+def remove_averages(ao_index, coef, av_coefs):
+    coef_new = np.copy(coef)
+    for iat, q in enumerate(ao_index.atoms):
+        coef_new[ao_index.find(iat=iat, l=0)] -= av_coefs[q]
+    return coef_new
 
 
 if __name__=='__main__':
