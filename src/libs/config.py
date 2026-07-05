@@ -52,8 +52,7 @@ class Config:
             self.strict = strict
 
         def __call__(self, x):
-            x = self.dtype(x)
-            if x not in self.options:
+            if (x := self.dtype(x)) not in self.options:
                 if self.strict:
                     msg = f'Wrong input for `{self.name}`: `{x}` not in {self.options}'
                     raise RuntimeError(msg)
@@ -64,7 +63,7 @@ class Config:
     def check_for_unrecognized_options(self, group, options):
         recognized = [val[0] for val in options.values()]
         present = self.configuration[group].keys()
-        if unrecognized:=set(present).difference(recognized):
+        if unrecognized := set(present).difference(recognized):
             msg = f'Unrecognized entries in [{group}]: {unrecognized}'
             raise RuntimeError(msg)
 
@@ -76,8 +75,7 @@ class Config:
         self.check_for_unrecognized_options('paths', paths)
         p = {}
         for dest, (option, when_missing_config, check_file, default) in paths.items():
-            path = self.configuration[group].get(option)
-            if path is None:
+            if (path := self.configuration[group].get(option)) is None:
                 if when_missing_config=='WARN':
                     warn_short(f'Missing recommended config path `{option}`')
                 elif when_missing_config=='ERROR':
@@ -88,8 +86,7 @@ class Config:
 
             else:
                 if check_file=='ERROR_FILE':
-                    isfile = os.path.isfile(path)
-                    if not isfile:
+                    if not os.path.isfile(path):
                         msg = f'Missing file "{path}" ("{option}")'
                         raise RuntimeError(msg)
                 elif check_file in ['ERROR_DIR', 'MAKE_DIR'] :

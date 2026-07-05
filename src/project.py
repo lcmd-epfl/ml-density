@@ -55,12 +55,7 @@ def main():
 
 
 def load_coefs(mol_names, fname_template):
-    coefficients = []
-    for mol_name in mol_names:
-        fname = fname_template.format(mol_name=mol_name)
-        coef = np.load(fname) if fname.endswith('.npy') else np.loadtxt(fname)
-        coefficients.append(coef)
-    return coefficients
+    return [np.load(fname_template.format(mol_name=mol_name)) if (fname := fname_template.format(mol_name=mol_name)).endswith('.npy') else np.loadtxt(fname) for mol_name in mol_names]
 
 
 def remove_averages(ao_index, coef, av_coefs):

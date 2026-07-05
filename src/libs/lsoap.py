@@ -8,8 +8,7 @@ MIN_NORM = 1e-10
 
 
 def ps_normalize_inplace(vals, min_norm=MIN_NORM):
-    norm = np.sqrt(np.linalg.norm(vals @ vals.T))
-    if norm > min_norm:
+    if (norm := np.sqrt(np.linalg.norm(vals @ vals.T))) > min_norm:
         vals /= norm
     else:
         vals[...] = 0.0

@@ -39,9 +39,8 @@ def main():
         n2 = np.count_nonzero(np.concatenate(atomic_numbers)==q)
         print(f'# {chemical_symbols[q]}: {n1} / {n2} ({100.0*n1/n2:.1f}%)')
 
-    nuniq = len(np.unique(ref_indices))
-    if nuniq != len(ref_indices):
-        warn_short(f'Only {nuniq} / {len(ref_indices)} unique environments found', stacklevel=1)
+    if (nuniq := len(np.unique(ref_indices))) != (nref := len(ref_indices)):
+        warn_short(f'Only {nuniq} / {nref} unique environments found', stacklevel=1)
 
 
 if __name__=='__main__':

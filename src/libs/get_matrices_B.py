@@ -67,7 +67,7 @@ def get_b(basis, ref_elem, ntrains, trrange,
         do_work_b(idx, basis.nmax, trrange[imol], ref_elem, path_over, path_kern, Bmat)
 
     totsize = basis.nao_for_mol(ref_elem)
-    Bmat = np.zeros(symsize(totsize))
+    Bmat = np.zeros(matsize := symsize(totsize))
     idx = basis.sparse_indices(ref_elem)
 
     if use_mpi:
@@ -101,10 +101,10 @@ def get_b(basis, ref_elem, ntrains, trrange,
 
     else:
         bufsize = (1<<30)//np.array(0.0).itemsize  # number of doubles to take 1 GiB
-        if bufsize > symsize(totsize):
-            bufsize = symsize(totsize)
-        div = symsize(totsize)//bufsize
-        rem = symsize(totsize)%bufsize
+        if bufsize > matsize:
+            bufsize = matsize
+        div = matsize//bufsize
+        rem = matsize%bufsize
         if nproc==0:
             BMAT = np.zeros(bufsize)
 
@@ -117,8 +117,7 @@ def get_b(basis, ref_elem, ntrains, trrange,
                 print(f'batch{ifrac}: t={tt-t:4.2f}', flush=True)
                 t = tt
             for i in range(div+1):
-                size = bufsize if i<div else rem
-                if size==0:
+                if (size := bufsize if i<div else rem)==0:
                     break
                 MPI.COMM_WORLD.Reduce(Bmat[i*bufsize:i*bufsize+size], BMAT[:size] if nproc==0 else None, MPI.SUM, 0)
                 if nproc==0:
