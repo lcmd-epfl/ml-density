@@ -77,8 +77,7 @@ def main():
     func = get_matrices.get_b if args.get_b_matrix else get_matrices.get_a
     func.restype = ctypes.c_int
     func.argtypes = argtypes
-    ret = func(*arguments)
-    return ret
+    return func(*arguments)
 
 
 def basis_info(basis):

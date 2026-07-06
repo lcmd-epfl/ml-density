@@ -32,8 +32,7 @@ def kernels2tmap(atom_charges, kernel):
         components = [metatensor.Labels([name], comp_label_vals) for name in equio.matrix_label_names.block_comp]
         tensor_blocks.append(metatensor.TensorBlock(values=values, samples=samples, components=components, properties=properties))
     tm_labels = metatensor.Labels(equio.vector_label_names.tm, np.array(tm_label_vals))
-    tensor = metatensor.TensorMap(keys=tm_labels, blocks=tensor_blocks)
-    return tensor
+    return metatensor.TensorMap(keys=tm_labels, blocks=tensor_blocks)
 
 
 def merge_ref_ps(lmax, idx, ps_path_template):
@@ -74,8 +73,7 @@ def merge_ref_ps(lmax, idx, ps_path_template):
                                              properties=block_prop_labels[key])
 
     tm_labels = metatensor.Labels(tensor_keys_names, np.array(keys))
-    tensor = metatensor.TensorMap(keys=tm_labels, blocks=[blocks[key] for key in keys])
-    return tensor
+    return metatensor.TensorMap(keys=tm_labels, blocks=[blocks[key] for key in keys])
 
 
 def sph2vector(atoms, basis, tensor):
@@ -108,8 +106,7 @@ def kmm2tmap(qsamples, kernel):
         components = [metatensor.Labels([name], comp_label_vals) for name in equio.matrix_label_names.block_comp]
         tensor_blocks.append(metatensor.TensorBlock(values=values, samples=samples, components=components, properties=properties))
     tm_labels = metatensor.Labels(equio.vector_label_names.tm, np.array(tm_label_vals))
-    tensor = metatensor.TensorMap(keys=tm_labels, blocks=tensor_blocks)
-    return tensor
+    return metatensor.TensorMap(keys=tm_labels, blocks=tensor_blocks)
 
 
 def read_ps_1mol_l0(psfilename, atomic_numbers):

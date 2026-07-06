@@ -28,10 +28,7 @@ class Config:
         self.configuration = dict(parser.items())
 
     def get_option(self, group, key, default, dtype):
-        if key in self.configuration[group]:
-            return dtype(self.configuration[group][key])
-        else:
-            return default
+        return dtype(self.configuration[group].get(key, default))
 
     class Floats:
         def __call__(self, x):
@@ -40,15 +37,15 @@ class Config:
     class Bool:
         def __call__(self, x):
             x = x.lower()
-            if x in ['1', 'true', 'on', 'yes']:
+            if x in {'1', 'true', 'on', 'yes'}:
                 return True
-            elif x in ['0', 'false', 'off', 'no']:
+            if x in {'0', 'false', 'off', 'no'}:
                 return False
             msg = f'Wrong input for a Bool option: "{x}"'
             raise TypeError(msg)
 
     class Choice:
-        def __init__(self, dtype, options, name, strict=True):
+        def __init__(self, dtype, options, name, *, strict=True):
             self.dtype = dtype
             self.options = options
             self.name = name
@@ -59,8 +56,7 @@ class Config:
                 if self.strict:
                     msg = f'Wrong input for `{self.name}`: `{x}` not in {self.options}'
                     raise RuntimeError(msg)
-                else:
-                    logger.warning(f'`{x}` not in the recommended options {self.options} for `{self.name}`')
+                logger.warning(f'`{x}` not in the recommended options {self.options} for `{self.name}`')
             return x
 
     def check_for_unrecognized_options(self, group, options):
@@ -87,20 +83,18 @@ class Config:
                 else:
                     path = default
 
-            else:
-                if check_file=='ERROR_FILE':
-                    if not os.path.isfile(path):
-                        msg = f'Missing file "{path}" ("{option}")'
+            elif check_file=='ERROR_FILE':
+                if not os.path.isfile(path):
+                    msg = f'Missing file "{path}" ("{option}")'
+                    raise RuntimeError(msg)
+            elif check_file in {'ERROR_DIR', 'MAKE_DIR'}:
+                fdir = os.path.dirname(path)
+                if not os.path.isdir(fdir):
+                    if check_file=='ERROR_DIR':
+                        msg = f'Missing directory "{fdir}" ("{option}")'
                         raise RuntimeError(msg)
-                elif check_file in ['ERROR_DIR', 'MAKE_DIR'] :
-                    fdir = os.path.dirname(path)
-                    if not os.path.isdir(fdir):
-                        if check_file=='ERROR_DIR':
-                            msg = f'Missing directory "{fdir}" ("{option}")'
-                            raise RuntimeError(msg)
-                        else:
-                            logger.debug(f'Creating directory "{fdir}" ("option")')
-                            os.makedirs(fdir)
+                    logger.debug(f'Creating directory "{fdir}" ("option")')
+                    os.makedirs(fdir)
             p[dest] = path
         return p
 
@@ -226,15 +220,11 @@ def parse_cli_args(return_args=None):
     mpi.add_argument("--mpi-dummy-argument", dest="mpi", default=DEFAULT_MPI, action='store_true', help=argparse.SUPPRESS)
     add_argument(mpi, "--mpi", dest="mpi", default=DEFAULT_MPI, action='store_true', help='set MPI usage flag')
     add_argument(mpi, "--no-mpi", dest="mpi", default=DEFAULT_MPI, action='store_false', help='set MPI usage flag')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def get_settings(return_args=None):
     args = parse_cli_args(return_args)
     logger.setLevel(args.log)
     o, p = read_config(args.config)
-    if return_args is None:
-        return o, p
-    else:
-        return args, o, p
+    return (args, o, p) if return_args else (o, p)

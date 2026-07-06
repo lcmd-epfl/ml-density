@@ -14,7 +14,6 @@ def print_mem(totsize, ntrain):
     logger.info(f"""Problem dimensionality = {totsize}\n\
 Number of training molecules = {ntrain}\n\
 output: {size:16d} bytes ({size*b2mib:10.2f} MiB, {size*b2gib:6.2f} GiB)\n""", extra={'flush': True})
-    return
 
 
 def symsize(M):
@@ -22,8 +21,17 @@ def symsize(M):
 
 
 def mpos(i, j):
-    # A[i+j*(j+1)/2], i <= j, 0 <= j < N
-    return i + (((j)*((j)+1))//2)
+    '''
+    Sparse indexing for a lower triangle matrix.
+
+    Args:
+        i (int): i index, i<=j
+        j (int): j index, 0<=j<N (matrix size)
+
+    Returns:
+        int: index corresponding to [i,j] and [j,i] value.
+    '''
+    return i + ((j*(j+1))//2)
 
 
 def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
@@ -44,7 +52,12 @@ def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
             for iiref2, iref2 in enumerate(np.where(ref_elem==q2)[0]):
                 if iref1>iref2:
                     continue
-                # dB = np.einsum('AMJ,AaMmNn,amj->NnJj', kblock1.values[...,iiref1], oval, kblock2.values[...,iiref2])
+                '''
+                Non-optimized:
+                ```
+                dB = np.einsum('AMJ,AaMmNn,amj->NnJj', kblock1.values[...,iiref1], oval, kblock2.values[...,iiref2])
+                ```
+                '''
                 t1 = np.einsum('AMJ,AaMmNn->amJNn', kblock1.values[...,iiref1], oval)
                 dB = np.einsum('amJNn,amj->njNJ', t1, kblock2.values[...,iiref2])
 
@@ -73,7 +86,7 @@ def get_b(basis, ref_elem, ntrains, trrange,
     idx = basis.sparse_indices(ref_elem)
 
     if use_mpi:
-        from mpi4py import MPI
+        from mpi4py import MPI  # noqa: PLC0415
         Nproc = MPI.COMM_WORLD.Get_size()
         nproc = MPI.COMM_WORLD.Get_rank()
         print_nodes(Nproc, nproc, MPI.COMM_WORLD)
@@ -102,11 +115,8 @@ def get_b(basis, ref_elem, ntrains, trrange,
             logger.info(f'{t=:4.2f}', extra={'flush': True})
 
     else:
-        bufsize = (1<<30)//np.array(0.0).itemsize  # number of doubles to take 1 GiB
-        if bufsize > matsize:
-            bufsize = matsize
-        div = matsize//bufsize
-        rem = matsize%bufsize
+        bufsize = min(matsize, ((1<<30)//np.array(0.0).itemsize))  # number of doubles to take 1 GiB
+        div, rem = matsize//bufsize, matsize%bufsize
         if nproc==0:
             BMAT = np.zeros(bufsize)
 

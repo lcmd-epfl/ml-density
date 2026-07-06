@@ -19,15 +19,14 @@ def correct_number_of_electrons(c, S, q, N):
 
 
 def get_number_of_electrons(use_charges, atomic_numbers, df):
-    if use_charges in [None, 'charge']:
+    if use_charges in {None, 'charge'}:
         nuc_charges = np.array([sum(atoms) for atoms in atomic_numbers])
         if use_charges is None:
             return nuc_charges
     inp = df[use_charges].to_numpy()
     if use_charges=='N':
         return inp
-    elif use_charges=='charge':
-        return nuc_charges - inp
+    return nuc_charges - inp  # use_charges=='charge'
 
 
 def main():
@@ -51,10 +50,7 @@ def main():
         ntest = len(test_configs)
         predictions = split(metatensor.load(predictfile))
 
-        total_error_N      = 0.0
-        total_error_abs    = 0.0
-        total_error_rel    = 0.0
-        total_error_rel_bl = 0.0
+        total_N, total_abs, total_rel, total_rel_bl = 0.0, 0.0, 0.0, 0.0
 
         print()
         for itest, imol in enumerate(test_configs):
@@ -70,27 +66,22 @@ def main():
             c_av = sph2vector(atoms, basis, averages)
 
             c0_bl = c0 - c_av
-            nel0  = qvec @ c0
-
             c   = c_bl + c_av
-            dc  = c0 - c
-            nel = qvec @ c
+            dc  = c - c0
 
-            error    = dc    @ S @ dc
             norm     = c0    @ S @ c0
             norm_bl  = c0_bl @ S @ c0_bl
-            error_rel_bl = error/norm_bl * 100.0
-            error_rel    = error/norm * 100.0
-            total_error_abs    += error
-            total_error_rel    += error_rel
-            total_error_rel_bl += error_rel_bl
 
+            total_abs    += (error        := dc @ S @ dc)
+            total_rel    += (error_rel    := error/norm * 100.0)
+            total_rel_bl += (error_rel_bl := error/norm_bl * 100.0)
+
+            nel0 = qvec @ c0
+            nel  = qvec @ c
             if o.use_charges:
-                cn     = correct_number_of_electrons(c, S, qvec, N)
-                dcn    = cn - c0
-                errorn = dcn @ S @ dcn
-                errorn_rel_bl = errorn / norm_bl * 100.0
-                total_error_N += abs(nel - N)
+                total_N += abs(nel - N)
+                dcn = correct_number_of_electrons(c, S, qvec, N) - c0
+                errorn_rel_bl = (dcn @ S @ dcn) / norm_bl * 100.0
             else:
                 errorn_rel_bl = np.nan
 
@@ -98,10 +89,10 @@ def main():
             s2 = f'{error_rel_bl:8.3f} %  {error_rel:.2e} %    ( {error:.2e} )   {nel:8.4f} / {nel0:8.4f} ( {N:3d} )     (corr N: {errorn_rel_bl:8.3f} %)    {p.xyz.format(mol_name=df['id'][imol])}'
             print(s1+s2)
 
-        print(f'\nfrac={frac}\tMAE = {total_error_rel_bl/ntest:.2e} %  {total_error_rel/ntest:.2e} %    ( {total_error_abs/ntest:.2e} )', end='')
+        print(f'\nfrac={frac}\tMAE = {total_rel_bl/ntest:.2e} %  {total_rel/ntest:.2e} %    ( {total_abs/ntest:.2e} )', end='')
 
         if o.use_charges:
-            print(f'  ΔN: {total_error_N/ntest:.2e}')
+            print(f'  ΔN: {total_N/ntest:.2e}')
 
 
 if __name__=='__main__':

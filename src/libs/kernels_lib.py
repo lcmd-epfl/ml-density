@@ -23,8 +23,7 @@ def kernel_nm(atom_charges, soap, soap_ref, imol=0):
             if l==0:
                 factor = pre_kernel
             kernel[l,q].append(pre_kernel * factor)
-    kernel = kernels2tmap(atom_charges, kernel)
-    return kernel
+    return kernels2tmap(atom_charges, kernel)
 
 
 def kernel_for_mol(atomic_numbers, power_ref, power_file, kernel_file):

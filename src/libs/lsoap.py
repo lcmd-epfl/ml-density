@@ -16,8 +16,10 @@ def ps_normalize_inplace(vals, min_norm=MIN_NORM):
 
 
 def ps_normalize_gradient_inplace(idx, grad, values, norm, min_norm=MIN_NORM):
-    # grad   :  natoms-in-mol * 3 * (2*l+1) * nfeatures
-    # values : (2*l+1) * nfeatures
+    '''
+    grad   :  natoms-in-mol * 3 * (2*l+1) * nfeatures
+    values : (2*l+1) * nfeatures
+    '''
     if norm > min_norm:
         if values.shape[0]==1:
             t1 = np.einsum('kxmi,mi->kx', grad[idx], values)
@@ -35,7 +37,7 @@ def ps_normalize_gradient_inplace(idx, grad, values, norm, min_norm=MIN_NORM):
 
 
 def normalize_tensormap(soap, min_norm=MIN_NORM):
-    for _key, block in soap.items():  # noqa PERF102
+    for _key, block in soap.items():  # noqa: PERF102
         for samp in block.samples:
             isamp = block.samples.position(samp)
             norm = ps_normalize_inplace(block.values[isamp,:,:], min_norm=min_norm)
@@ -96,7 +98,7 @@ class EquivariantPowerSpectrum_custom(EquivariantPowerSpectrum):
         return keys_to_keep
 
 
-def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_species=None, normalize=True, min_norm=MIN_NORM, lmax=None, gradients=None):
+def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, *, neighbor_species=None, normalize=True, min_norm=MIN_NORM, lmax=None, gradients=None):
 
     if gradients is not None:
         msg = "Gradients are not implemented yet"
@@ -107,14 +109,21 @@ def generate_lambda_soap_wrapper(mols: list, rascal_hypers: dict, neighbor_speci
 
     spex_calculator = SphericalExpansion(**rascal_hypers)
 
-    # filter redundant keys to make PS smaller
-    # but break compatibility with previous results because lead to different kernels with even L>0
-    # calculator = EquivariantPowerSpectrum(spex_calculator, neighbor_types=neighbor_species)
+    '''
+    New default featomic filter: Filter redundant keys to make PS smaller
+    but break compatibility with previous results because this leads to different kernels with even L>0:
+    ```
+    calculator = EquivariantPowerSpectrum(spex_calculator, neighbor_types=neighbor_species)
+    ```
 
-    # legacy: do no filter redundant keys
-    # calculator = EquivariantPowerSpectrum_custom(spex_calculator, neighbor_types=neighbor_species, filter_redundant_keys=False)
+    Legacy (like in the old code from Joe): Do no filter redundant keys at all
+    ```
+    calculator = EquivariantPowerSpectrum_custom(spex_calculator, neighbor_types=neighbor_species, filter_redundant_keys=False)
+    ```
 
-    # new: filter only odd redundant keys so the PS are smaller but still compatible with previous results for even L
+    Current implemenetation:
+    Filter only odd redundant keys so the PS are smaller but still compatible with previous results for even L.
+    '''
     calculator = EquivariantPowerSpectrum_custom(spex_calculator, neighbor_types=neighbor_species, filter_redundant_keys='odd')
 
     if lmax is None:

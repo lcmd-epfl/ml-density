@@ -14,7 +14,7 @@ def moldata_read(xyzfilename):
     return np.array(atomic_numbers, dtype=object)
 
 
-def get_elements(mols, return_counts=False):
+def get_elements(mols, *, return_counts=False):
     if len(mols) and isinstance(mols[0], ase.Atoms):
         mols = [mol.numbers for mol in mols]
     return np.unique(np.concatenate(mols), return_counts=return_counts)
@@ -26,11 +26,11 @@ class Subset:
         self.train = self.df[self.df['subset']=='train']['mol_idx'].to_numpy()
         self.test  = self.df[self.df['subset']=='test']['mol_idx'].to_numpy()
 
-    def get_training(self, fraction, sort=True):
+    def get_training(self, fraction, *, sort=True):
         train = self.train[0:int(fraction*len(self.train))]
         return sorted(train) if sort else train
 
-    def get_test(self, sort=True):
+    def get_test(self, *, sort=True):
         return sorted(self.test) if sort else self.test
 
     def get_training_all(self, fractions):
@@ -109,21 +109,17 @@ class AOIndex:
         self.nao = len(self.ao)
         self.nat = len(self.atoms)
 
-    def find(self, iat=None, q=None, l=None, n=None, m=None):
+    def find(self, *, iat=None, q=None, l=None, n=None, m=None):
         column_order = [iat, q, l, n, m]
         conditions = [self.ao[:,i]==query for i, query in enumerate(column_order) if query is not None]
-
-        if len(conditions)==0:
-            return np.arange(len(self.ao))
-        else:
-            return np.where(np.prod(conditions, axis=0))[0]
+        return np.where(np.prod(conditions, axis=0))[0] if conditions else np.arange(len(self.ao))
 
     def __repr__(self):
         with np.printoptions(legacy="1.25"):
             return f'AOIndex({self.atoms}, {self.basis})'
 
 
-def make_pyscf_mol(numbers, positions, basis, spin=None, charge=None, ignore=False):
+def make_pyscf_mol(numbers, positions, basis, *, spin=None, charge=None, ignore=False):
     mol = gto.Mole()
     mol.atom = [*zip(numbers, positions, strict=True)]
     mol.basis = basis

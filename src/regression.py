@@ -46,7 +46,6 @@ def unravel_tril(mat, data, jitter):
             mat[j,i] = data[k]
             k += 1
         mat[j,j] += jitter
-    return
 
 
 def fill_matrix(mat, k_MM, bmatfile, idx, nmax, jitter, reg):
