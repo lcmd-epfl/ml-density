@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import ase.io
 import metatensor
 from tqdm import trange
-from libs.config import read_config
+from libs.config import get_settings
 from libs.lsoap import generate_lambda_soap_wrapper, make_rascal_hypers
 from libs.functions import get_elements, Basis
 from libs.multi import multi_process
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def main():
-    args, o, p = read_config(sys.argv, return_args=['missing_only', 'mpi'])
+    args, o, p = get_settings(return_args=['missing_only', 'mpi'])
 
     def do_mol(imol):
         ppath = p.power_spectrum.format(imol)
@@ -29,10 +31,10 @@ def main():
     elements = get_elements(mols)
     basis = Basis(o.basisname, elements)
 
-    print(f'{rascal_hypers=}')
-    print(f'{elements=}')
-    print(f'{basis.lmax=}')
-    print(f'{o.ps_min_norm=} {o.ps_normalize=}')
+    logger.debug(f'rascal_hypers={rascal_hypers}')
+    logger.debug(f'elements={elements}')
+    logger.debug(f'basis.lmax={basis.lmax}')
+    logger.debug(f'ps_min_norm={o.ps_min_norm} ps_normalize={o.ps_normalize}')
 
     nmol = len(mols)
     if args.mpi:

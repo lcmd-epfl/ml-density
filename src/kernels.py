@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import metatensor
 from tqdm import trange
-from libs.config import read_config
+from libs.config import get_settings
 from libs.functions import moldata_read
 from libs.kernels_lib import kernel_for_mol
 from libs.multi import multi_process
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def main():
-    args, _, p = read_config(sys.argv, return_args=['missing_only', 'mpi'])
+    args, _, p = get_settings(return_args=['missing_only', 'mpi'])
 
     def do_mol(imol):
         kpath = p.kernel_nm.format(imol)

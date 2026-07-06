@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
-import sys
 import numpy as np
 import pandas as pd
 import metatensor
 from qstack.io.metatensor import split, tensormap_to_array
 from qstack.fields.moments import r2_c as rho_moments
-from libs.config import read_config
+from libs.config import get_settings
 from libs.functions import moldata_read, Basis, make_dummy_mol, Subset
 from libs.tmap import sph2vector
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def correct_number_of_electrons(c, S, q, N):
@@ -29,7 +31,7 @@ def get_number_of_electrons(use_charges, atomic_numbers, df):
 
 
 def main():
-    args, o, p = read_config(sys.argv, return_args=['training'])
+    args, o, p = get_settings(return_args=['training'])
 
     df = pd.read_csv(p.dataset)
     averages = metatensor.load(p.spherical_averages)
@@ -39,7 +41,7 @@ def main():
 
     for frac in o.fracs:
 
-        print(f'fraction = {frac}')
+        logger.info(f'fraction = {frac}')
         if args.training:
             test_configs = Subset(p.train_test_sets).get_training(frac)
             predictfile = p.predictions.format(subset='training', train_frac=frac)
@@ -54,6 +56,7 @@ def main():
         total_error_rel    = 0.0
         total_error_rel_bl = 0.0
 
+        print()
         for itest, imol in enumerate(test_configs):
 
             atoms = atomic_numbers[imol]
@@ -99,8 +102,6 @@ def main():
 
         if o.use_charges:
             print(f'  ΔN: {total_error_N/ntest:.2e}')
-        else:
-            print()
 
 
 if __name__=='__main__':

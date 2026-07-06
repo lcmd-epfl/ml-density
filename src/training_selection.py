@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
-import sys
 import numpy as np
 import pandas as pd
 import ase.io
-from libs.config import read_config
+from libs.config import get_settings
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def main():
-    o, p = read_config(sys.argv)
+    o, p = get_settings()
     np.random.seed(o.seed)
     nmol = len(ase.io.read(p.xyzfilename, ':'))
 

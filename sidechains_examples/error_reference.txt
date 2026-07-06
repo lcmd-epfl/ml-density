@@ -1,7 +1,6 @@
-================ ../src/compute_error.py ================
-Configuration file: config.txt
+2026-07-06 21:20:05 compute_error.py [config.py:25] INFO: Configuration file: config.txt
+2026-07-06 21:20:05 compute_error.py [compute_error.py:44] INFO: fraction = 1.0
 
-fraction = 1.0
 mol # 0 ( 0):     9.150 %  6.98e-03 %    ( 1.06e-01 )    79.9043 /  79.9988 (  80 )     (corr N:    9.065 %)    dataset/dimer0001.xyz
 mol # 1 ( 5):   762.373 %  3.10e-01 %    ( 5.17e+00 )    86.9642 /  83.9995 (  84 )     (corr N:  619.242 %)    dataset/dimer0008.xyz
 mol # 2 ( 8):     0.138 %  1.49e-04 %    ( 5.85e-04 )    35.9846 /  35.9995 (  36 )     (corr N:    0.132 %)    dataset/dimer0011.xyz

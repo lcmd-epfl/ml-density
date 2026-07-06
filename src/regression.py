@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import sys
 import gc
 import numpy as np
 import pandas as pd
@@ -8,12 +7,15 @@ import scipy.linalg as spl
 from numba import jit
 import metatensor
 from libs.tmap import vector2tmap
-from libs.config import read_config
+from libs.config import get_settings
 from libs.functions import Basis
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def main():
-    o, p = read_config(sys.argv)
+    o, p = get_settings()
 
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     basis = Basis(o.basisname, ref_elements)
@@ -23,7 +25,7 @@ def main():
     mat  = np.ndarray((totsize,totsize))
     idx = basis.sparse_indices(ref_elements)
 
-    print(f'problem dimensionality = {totsize}')
+    logger.debug(f'problem dimensionality = {totsize}')
 
     for frac in o.fracs:
         Avec = np.loadtxt(p.avec.format(train_frac=frac))

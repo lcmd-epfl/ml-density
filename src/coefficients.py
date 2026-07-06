@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 
-import sys
 import numpy as np
 import metatensor
 from qstack.io.metatensor import split
 from qstack import reorder
 from tqdm import tqdm
-from libs.config import read_config
+from libs.config import get_settings
 from libs.functions import moldata_read, get_test_set, Basis, make_dummy_mol
 from libs.tmap import tmap2vector, tmap_add
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def main():
-    o, p = read_config(sys.argv)
+    o, p = get_settings()
 
     atomic_numbers = moldata_read(p.xyzfilename)
     averages = metatensor.load(p.spherical_averages)
@@ -24,7 +26,7 @@ def main():
         mols = [make_dummy_mol(atoms, basis=o.basisname, ignore=True) for atoms in atomic_numbers]
 
     for frac in o.fracs:
-        print('fraction =', frac)
+        logger.info(f'fraction = {frac}')
         predictfile = p.predictions.format(subset='test', train_frac=frac)
         predictions = split(metatensor.load(predictfile))
         for imol, c in zip(tqdm(test_configs), predictions, strict=True):

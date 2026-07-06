@@ -16,8 +16,8 @@ def ps_normalize_inplace(vals, min_norm=MIN_NORM):
 
 
 def ps_normalize_gradient_inplace(idx, grad, values, norm, min_norm=MIN_NORM):
-    # print(grad[idx,:,:].shape)  # natoms-in-mol * 3 * (2*l+1) * nfeatures
-    # print(values.shape)         # (2*l+1) * nfeatures
+    # grad   :  natoms-in-mol * 3 * (2*l+1) * nfeatures
+    # values : (2*l+1) * nfeatures
     if norm > min_norm:
         if values.shape[0]==1:
             t1 = np.einsum('kxmi,mi->kx', grad[idx], values)

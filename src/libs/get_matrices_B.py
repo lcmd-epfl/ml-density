@@ -1,17 +1,19 @@
+import logging
 import numpy as np
 import metatensor
 from libs.get_matrices_A import print_batches
 from libs.multi import print_nodes, scatter_jobs
+
+logger = logging.getLogger('__main__')
 
 
 def print_mem(totsize, ntrain):
     b2mib = 1.0/(1<<20)
     b2gib = 1.0/(1<<30)
     size = symsize(totsize)*np.array(0.0).itemsize
-    print(f"""\
-        Problem dimensionality = {totsize}\n\
-        Number of training molecules = {ntrain}\n\
-        output: {size:16d} bytes ({size*b2mib:10.2f} MiB, {size*b2gib:6.2f} GiB)\n""", flush=True)
+    logger.info(f"""Problem dimensionality = {totsize}\n\
+Number of training molecules = {ntrain}\n\
+output: {size:16d} bytes ({size*b2mib:10.2f} MiB, {size*b2gib:6.2f} GiB)\n""", extra={'flush': True})
     return
 
 
@@ -92,12 +94,12 @@ def get_b(basis, ref_elem, ntrains, trrange,
     if Nproc==1:
         for ifrac, path_bmat in enumerate(paths_bmat):
             for imol in range(ntrains[ifrac-1], ntrains[ifrac]):
-                print(f'{nproc:4d}: {imol:4d}', flush=True)
+                logger.info(f'{nproc:4d}: {imol:4d}', extra={'flush': True})
                 do_mol(imol)
             Bmat.tofile(path_bmat)
         if use_mpi:
             t = MPI.Wtime () - t
-            print(f'{t=:4.2f}', flush=True)
+            logger.info(f'{t=:4.2f}', extra={'flush': True})
 
     else:
         bufsize = (1<<30)//np.array(0.0).itemsize  # number of doubles to take 1 GiB
@@ -114,13 +116,13 @@ def get_b(basis, ref_elem, ntrains, trrange,
 
             if nproc==0:
                 tt = MPI.Wtime()
-                print(f'batch{ifrac}: t={tt-t:4.2f}', flush=True)
+                logger.info(f'batch{ifrac}: t={tt-t:4.2f}', extra={'flush': True})
                 t = tt
             for i in range(div+1):
                 if (size := bufsize if i<div else rem)==0:
                     break
                 MPI.COMM_WORLD.Reduce(Bmat[i*bufsize:i*bufsize+size], BMAT[:size] if nproc==0 else None, MPI.SUM, 0)
                 if nproc==0:
-                    print(f'chunk #{i+1}/{div+1 if rem else div} written', flush=True)
+                    logger.info(f'chunk #{i+1}/{div+1 if rem else div} written', extra={'flush': True})
                     with open(path_bmat, 'a' if i else 'w') as f:
                         BMAT[:size].tofile(f)

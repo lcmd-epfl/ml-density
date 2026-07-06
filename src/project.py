@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import sys
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -8,14 +7,17 @@ import ase.io
 import metatensor
 from qstack import reorder
 from qstack.io import metatensor as equio
-from libs.config import read_config
+from libs.config import get_settings
 from libs.functions import get_elements, Basis, make_dummy_mol
 from libs.tmap import averages2tmap
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def main():
-    o, p = read_config(sys.argv)
-    print(f'{o.process_metric=}')
+    o, p = get_settings()
+    logger.info(f'{o.process_metric=}')
 
     mol_names, atomic_numbers = prepare_molecules(p)
 

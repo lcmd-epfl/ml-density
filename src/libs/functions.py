@@ -1,4 +1,3 @@
-import warnings
 import numpy as np
 import pandas as pd
 import ase
@@ -122,14 +121,6 @@ class AOIndex:
     def __repr__(self):
         with np.printoptions(legacy="1.25"):
             return f'AOIndex({self.atoms}, {self.basis})'
-
-
-def warn_short(*kargs, stacklevel=1, **kwargs):
-    def short_warning_formatter(message, category, filename, lineno, line=None):  # noqa ARG001
-        return '%s:%s: %s: %s\n' % (filename, lineno, category.__name__, message)
-    warnings.formatwarning, formatwarning = short_warning_formatter, warnings.formatwarning
-    warnings.warn(*kargs, stacklevel=stacklevel+1, **kwargs)
-    warnings.formatwarning = formatwarning
 
 
 def make_pyscf_mol(numbers, positions, basis, spin=None, charge=None, ignore=False):

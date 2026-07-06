@@ -1,12 +1,14 @@
+import logging
 import numpy as np
 import metatensor
 from libs.tmap import vector2tmap, tmap2vector
 
+logger = logging.getLogger('__main__')
+
 
 def print_batches(ntrains, paths):
-    for i, path in enumerate(paths):
-        print(f'batch {i:2d} [{ntrains[i-1]}--{ntrains[i]}):\t {path}')
-    print(flush=True)
+    msg = '\n'.join([f'batch {i:2d} [{ntrains[i-1]}--{ntrains[i]}):\t {path}' for i, path in enumerate(paths)])
+    logger.info(msg, extra={'flush': True})
 
 
 def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
@@ -29,7 +31,7 @@ def get_a(basis, ref_elem, ntrains, trrange, path_proj, path_kern, paths_avec):
     A1 = vector2tmap(ref_elem, basis, Avec)
     for ifrac, path_avec in enumerate(paths_avec):
         for imol in range(ntrains[ifrac-1], ntrains[ifrac]):
-            print(f'{0:4d}: {imol:4d}')
+            logger.info(f'{0:4d}: {imol:4d}', extra={'flush': True})
             do_work_a(trrange[imol], ref_elem, path_proj, path_kern, A1)
         Avec = tmap2vector(ref_elem, basis, A1)
         np.savetxt(path_avec, Avec)

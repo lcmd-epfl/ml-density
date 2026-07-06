@@ -6,12 +6,15 @@ import ctypes
 import numpy as np
 import pandas as pd
 from qstack.mathutils.array import vstack_padding
-from libs.config import read_config
+from libs.config import get_settings
 from libs.functions import moldata_read, get_elements, Basis, Subset
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def main():
-    args, o, p = read_config(sys.argv, return_args=['get_b_matrix'])
+    args, o, p = get_settings(return_args=['get_b_matrix'])
 
     # load molecules
     atomic_numbers = moldata_read(p.xyzfilename)

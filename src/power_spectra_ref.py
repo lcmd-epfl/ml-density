@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 
-import sys
 import numpy as np
 import pandas as pd
 import metatensor
-from libs.config import read_config
+from libs.config import get_settings
 from libs.functions import Basis
 from libs.tmap import merge_ref_ps
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def main():
-    o, p = read_config(sys.argv)
+    o, p = get_settings()
 
     refs = pd.read_csv(p.reference_environments)
     ref_mol_at = np.vstack((refs['q'], refs['mol'], refs['atom_in_mol'])).T

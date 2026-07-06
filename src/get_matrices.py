@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 
-import sys
 import numpy as np
 import pandas as pd
-from libs.config import read_config
+from libs.config import get_settings
 from libs.functions import Basis, Subset
 from libs.get_matrices_A import get_a
 from libs.get_matrices_B import get_b
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def main():
-    args, o, p = read_config(sys.argv, return_args=['get_b_matrix', 'mpi'])
+    args, o, p = get_settings(return_args=['get_b_matrix', 'mpi'])
 
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     basis = Basis(o.basisname, elements=ref_elements)

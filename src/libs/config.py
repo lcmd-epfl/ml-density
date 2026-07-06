@@ -1,27 +1,28 @@
-import sys
 import os
 import argparse
 from types import SimpleNamespace
 from collections import ChainMap
 from itertools import starmap
 import configparser
+import logging
 import numpy as np
-from libs.functions import warn_short
 
-DEFAULT_PATH = 'config.txt'
+DEFAULT_CONFIG = 'config.txt'
 DEFAULT_MPI = True
+DEFAULT_LOGLEVEL = logging.DEBUG
+
+logger = logging.getLogger('__main__')
 
 
 class Config:
-    def __init__(self, config_path=DEFAULT_PATH):
+    def __init__(self, config_path=DEFAULT_CONFIG):
         if config_path is None:
-            config_path = DEFAULT_PATH
+            config_path = DEFAULT_CONFIG
         if not os.path.isfile(config_path):
             msg = f'Cannot open configuration file "{config_path}"'
             raise RuntimeError(msg)
         link = f' -> {os.readlink(config_path)}' if os.path.islink(config_path) else ''
-        print(f'================ {sys.argv[0]} ================')
-        print(f'Configuration file: {config_path}{link}')
+        logger.info(f'Configuration file: {config_path}{link}')
         parser = configparser.RawConfigParser()
         parser.read(config_path)
         self.configuration = dict(parser.items())
@@ -59,7 +60,7 @@ class Config:
                     msg = f'Wrong input for `{self.name}`: `{x}` not in {self.options}'
                     raise RuntimeError(msg)
                 else:
-                    warn_short(f'`{x}` not in the recommended options {self.options} for `{self.name}`')
+                    logger.warning(f'`{x}` not in the recommended options {self.options} for `{self.name}`')
             return x
 
     def check_for_unrecognized_options(self, group, options):
@@ -79,7 +80,7 @@ class Config:
         for dest, (option, when_missing_config, check_file, default) in paths.items():
             if (path := self.configuration[group].get(option)) is None:
                 if when_missing_config=='WARN':
-                    warn_short(f'Missing recommended config path `{option}`')
+                    logger.warning(f'Missing recommended config path `{option}`')
                 elif when_missing_config=='ERROR':
                     msg = f'Missing required config path `{option}`'
                     raise RuntimeError(msg)
@@ -98,13 +99,13 @@ class Config:
                             msg = f'Missing directory "{fdir}" ("{option}")'
                             raise RuntimeError(msg)
                         else:
-                            warn_short(f'Creating directory "{fdir}" ("option")')
+                            logger.debug(f'Creating directory "{fdir}" ("option")')
                             os.makedirs(fdir)
             p[dest] = path
         return p
 
 
-def read_config(argv, return_args=None):
+def read_config(config_path=DEFAULT_CONFIG):
 
     def set_variable_values():
         options = {
@@ -200,19 +201,13 @@ def read_config(argv, return_args=None):
         paths.extra_predicted_coeff   = f'{p['_outexfilebase']}_{{order}}_{{imol}}.dat'
         return paths
 
-    args = parse_cli_args(argv[1:], return_args)
-    conf = Config(config_path=args.config)
-
+    conf = Config(config_path=config_path)
     o = postprocess_options(set_variable_values())
     p = postprocess_paths(get_all_paths(), o)
-
-    if return_args is None:
-        return o, p
-    else:
-        return args, o, p
+    return o, p
 
 
-def parse_cli_args(argv, return_args=None):
+def parse_cli_args(return_args=None):
     if return_args is None:
         return_args = []
 
@@ -221,7 +216,8 @@ def parse_cli_args(argv, return_args=None):
             parser.add_argument(*kargs, **kwargs)
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--config", type=str, default=DEFAULT_PATH, help='path to the configuration file')
+    parser.add_argument("--config", type=str, default=DEFAULT_CONFIG, help='path to the configuration file')
+    parser.add_argument("--log", type=str, default=logging._levelToName[DEFAULT_LOGLEVEL], choices=logging._nameToLevel.keys(), help='logging level')
     add_argument(parser, "--training", dest='training', action='store_true', help='run prediction / compute error on the training set instead of the test set')
     add_argument(parser, "-b", "--b", dest="get_b_matrix", action='store_true', help='if True, get_matrices computes the "B matrix"; if False, the "A vector"')
     add_argument(parser, "--missing-only", dest="missing_only", action='store_true', help='dangerous: not recompute existing power spectra / kernels')
@@ -230,5 +226,15 @@ def parse_cli_args(argv, return_args=None):
     mpi.add_argument("--mpi-dummy-argument", dest="mpi", default=DEFAULT_MPI, action='store_true', help=argparse.SUPPRESS)
     add_argument(mpi, "--mpi", dest="mpi", default=DEFAULT_MPI, action='store_true', help='set MPI usage flag')
     add_argument(mpi, "--no-mpi", dest="mpi", default=DEFAULT_MPI, action='store_false', help='set MPI usage flag')
-    args = parser.parse_args(argv)
+    args = parser.parse_args()
     return args
+
+
+def get_settings(return_args=None):
+    args = parse_cli_args(return_args)
+    logger.setLevel(args.log)
+    o, p = read_config(args.config)
+    if return_args is None:
+        return o, p
+    else:
+        return args, o, p

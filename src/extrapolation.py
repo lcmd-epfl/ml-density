@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 
-import sys
 import numpy as np
 import pandas as pd
 import metatensor
 from qstack import reorder
-from libs.config import read_config
+from libs.config import get_settings
 from libs.functions import moldata_read, Basis, make_dummy_mol
 from libs.predict import run_prediction
 from libs.tmap import tmap2vector
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
 def main():
-    o, p = read_config(sys.argv)
+    o, p = get_settings()
 
     atomic_numbers = moldata_read(p.xyzexfilename)
     averages = metatensor.load(p.spherical_averages)
