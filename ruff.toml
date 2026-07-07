@@ -57,5 +57,5 @@ ignore = [
 
 [lint.per-file-ignores]
 "src/get_matrices_C.py" = ["COM819"]  # prohibited-trailing-comma
-"src/libs/tmap.py"      = ["E251"]    # unexpected-spaces-around-keyword-parameter-equals
+"src/libs/tmap.py"      = ["E251", "PLC2701"]  # unexpected-spaces-around-keyword-parameter-equals, import-private-name
 "src/libs/lsoap.py"     = ["PLC0415", "PLC2701"]  # import-outside-top-level, import-private-name

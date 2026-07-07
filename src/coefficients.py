@@ -32,7 +32,7 @@ def main():  # noqa: D103
         predictions = split(metatensor.load(predictfile))
         for imol, c in zip(tqdm(test_configs), predictions, strict=True):
             tmap_add(c, averages)
-            rho = tmap2vector(atomic_numbers[imol], basis, c)
+            rho = tmap2vector(atomic_numbers[imol], basis.llist, c)
             if o.output_coeff_order!='gpr':
                 rho = reorder.reorder_ao(mols[imol], rho, dest=o.output_coeff_order, src='gpr')
             np.savetxt(p.predicted_coeff.format(train_frac=frac, order=o.output_coeff_order, imol=imol), rho)

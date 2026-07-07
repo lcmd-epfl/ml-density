@@ -56,10 +56,10 @@ def get_a(basis, ref_elem, ntrains, trrange, path_proj, path_kern, paths_avec):
 
     totsize = basis.nao_for_mol(ref_elem)
     Avec = np.zeros(totsize)
-    A1 = vector2tmap(ref_elem, basis, Avec)
+    A1 = vector2tmap(ref_elem, basis.llist, Avec)
     for ifrac, path_avec in enumerate(paths_avec):
         for imol in range(ntrains[ifrac-1], ntrains[ifrac]):
             logger.info(f'{0:4d}: {imol:4d}', extra={'flush': True})
             do_work_a(trrange[imol], ref_elem, path_proj, path_kern, A1)
-        Avec = tmap2vector(ref_elem, basis, A1)
+        Avec = tmap2vector(ref_elem, basis.llist, A1)
         np.savetxt(path_avec, Avec)

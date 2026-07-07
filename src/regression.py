@@ -33,7 +33,7 @@ def main():  # noqa: D103
         mat[:] = 0
         fill_matrix(mat, k_MM, p.bmat.format(train_frac=frac), idx, basis.nmax, o.jit, o.reg)
         weights = spl.solve(mat, Avec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
-        weights = vector2tmap(ref_elements, basis, weights)
+        weights = vector2tmap(ref_elements, basis.llist, weights)
         metatensor.save(p.weights.format(train_frac=frac), weights)
 
 

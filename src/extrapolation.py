@@ -30,7 +30,7 @@ def main():  # noqa: D103
         mols = [make_dummy_mol(atoms, basis=o.basisname, ignore=True) for atoms in atomic_numbers]
 
     for imol, (atoms, c) in enumerate(zip(atomic_numbers, predictions, strict=True)):
-        rho = tmap2vector(atoms, basis, c)
+        rho = tmap2vector(atoms, basis.llist, c)
         if o.output_coeff_order!='gpr':
             rho = reorder.reorder_ao(mols[imol], rho, dest=o.output_coeff_order, src='gpr')
         np.savetxt(p.extra_predicted_coeff.format(order=o.output_coeff_order, imol=imol), rho)

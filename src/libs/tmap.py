@@ -4,34 +4,8 @@ import gc
 import numpy as np
 import metatensor
 from qstack.io import metatensor as equio
-
-
-def vector2tmap(atom_charges, basis, c):
-    """Convert a flattened AO vector into a TensorMap representation.
-
-    Args:
-        atom_charges (np.ndarray): Atomic numbers describing AO block layout.
-        basis (Basis): Basis helper containing l-list metadata.
-        c (np.ndarray): Flattened AO vector.
-
-    Returns:
-        metatensor.TensorMap: TensorMap with blocks grouped by (l, center_type).
-    """
-    return equio._vector_to_tensormap(atom_charges, basis.llist, c)
-
-
-def tmap2vector(atom_charges, basis, tensor):
-    """Convert a TensorMap coefficient representation into a flattened AO vector.
-
-    Args:
-        atom_charges (np.ndarray): Atomic numbers describing AO block layout.
-        basis (Basis): Basis helper containing l-list metadata.
-        tensor (metatensor.TensorMap): TensorMap with AO coefficients.
-
-    Returns:
-        np.ndarray: Flattened AO vector.
-    """
-    return equio._tensormap_to_vector(atom_charges, basis.llist, tensor)
+from qstack.io.metatensor import _vector_to_tensormap as vector2tmap
+from qstack.io.metatensor import _tensormap_to_vector as tmap2vector  # noqa: F401
 
 
 def averages2tmap(averages):
@@ -46,7 +20,7 @@ def averages2tmap(averages):
     atoms = np.array(sorted(averages.keys()))
     llist = {q:[0]*len(v) for q, v in averages.items()}
     c = np.hstack([averages[q] for q in atoms])
-    return equio._vector_to_tensormap(atoms, llist, c)
+    return vector2tmap(atoms, llist, c)
 
 
 def kernels2tmap(atom_charges, kernel):
