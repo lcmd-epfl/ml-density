@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""Select reference environments from the dataset.
+
+Note:
+    This selects reference environments from the full dataset
+    (both train and test). While our tests showed it is not important,
+    in some cases such data leak can lead to wrong results.
+"""
 
 import numpy as np
 import pandas as pd
@@ -13,7 +20,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     o, p = get_settings()
 
     atomic_numbers = moldata_read(p.xyzfilename)

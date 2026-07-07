@@ -1,3 +1,5 @@
+"""Convert data to TensorMap and back."""
+
 import gc
 import numpy as np
 import metatensor
@@ -5,14 +7,42 @@ from qstack.io import metatensor as equio
 
 
 def vector2tmap(atom_charges, basis, c):
+    """Convert a flattened AO vector into a TensorMap representation.
+
+    Args:
+        atom_charges (np.ndarray): Atomic numbers describing AO block layout.
+        basis (Basis): Basis helper containing l-list metadata.
+        c (np.ndarray): Flattened AO vector.
+
+    Returns:
+        metatensor.TensorMap: TensorMap with blocks grouped by (l, center_type).
+    """
     return equio._vector_to_tensormap(atom_charges, basis.llist, c)
 
 
 def tmap2vector(atom_charges, basis, tensor):
+    """Convert a TensorMap coefficient representation into a flattened AO vector.
+
+    Args:
+        atom_charges (np.ndarray): Atomic numbers describing AO block layout.
+        basis (Basis): Basis helper containing l-list metadata.
+        tensor (metatensor.TensorMap): TensorMap with AO coefficients.
+
+    Returns:
+        np.ndarray: Flattened AO vector.
+    """
     return equio._tensormap_to_vector(atom_charges, basis.llist, tensor)
 
 
 def averages2tmap(averages):
+    """Convert per-element spherical averages to TensorMap format.
+
+    Args:
+        averages (dict[int, np.ndarray]): Per-element l=0 average coefficient vectors.
+
+    Returns:
+        metatensor.TensorMap: TensorMap storing per-element spherical averages.
+    """
     atoms = np.array(sorted(averages.keys()))
     llist = {q:[0]*len(v) for q, v in averages.items()}
     c = np.hstack([averages[q] for q in atoms])
@@ -20,6 +50,15 @@ def averages2tmap(averages):
 
 
 def kernels2tmap(atom_charges, kernel):
+    """Convert kernel dictionary blocks to TensorMap format.
+
+    Args:
+        atom_charges (np.ndarray): Atomic numbers of the query molecule.
+        kernel (dict[tuple[int, int], np.4darray[float]]): Kernel blocks keyed by (l, center_type).
+
+    Returns:
+        metatensor.TensorMap: Kernel TensorMap with metatensor-compliant labels.
+    """
     tm_label_vals = sorted(kernel.keys(), key=lambda x: x[::-1])
     tensor_blocks = []
     for (l, q) in tm_label_vals:
@@ -36,7 +75,16 @@ def kernels2tmap(atom_charges, kernel):
 
 
 def merge_ref_ps(lmax, idx, ps_path_template):
+    """Merge per-molecule reference power spectra into one TensorMap.
 
+    Args:
+        lmax (dict[int, int]): Maximum angular channel for each center type.
+        idx (np.ndarray): Reference rows as (q, mol_id, atom_id).
+        ps_path_template (str): Template path to per-molecule power-spectrum files.
+
+    Returns:
+        metatensor.TensorMap: Merged reference power-spectrum TensorMap.
+    """
     keys = [(l, q) for q in sorted(lmax.keys()) for l in range(lmax[q]+1)]
 
     tm_labels = None
@@ -77,14 +125,37 @@ def merge_ref_ps(lmax, idx, ps_path_template):
 
 
 def sph2vector(atoms, basis, tensor):
+    """Convert TensorMap spherical coefficients to flattened AO vector form.
+
+    Args:
+        atoms (np.ndarray | list[int]): Atomic numbers of the molecule.
+        basis (.functions.Basis): Basis used for AO indexing.
+        tensor (metatensor.TensorMap): TensorMap with l=0 spherical coefficients.
+
+    Returns:
+        np.ndarray: Flattened AO vector with per-atom padding applied.
+    """
     return np.hstack([
             np.pad(np.squeeze(tensor.block(o3_lambda=0, center_type=q).values), (0, basis.nao_atom[q]-basis.nmax[q][0]))
            for q in atoms])
 
 
 def tmap_add(x, dx):
+    """Add matching TensorMap blocks from dx into x in place.
 
+    Args:
+        x (metatensor.TensorMap): Accumulator TensorMap updated in place.
+        dx (metatensor.TensorMap): TensorMap containing increments.
+    """
     def keys2set(keys):
+        """Convert key labels into a hashable tuple set.
+
+        Args:
+            keys (metatensor.Labels): TensorMap key labels.
+
+        Returns:
+            set[tuple]: Set of tuple-encoded keys.
+        """
         return {tuple(i) for i in keys}
 
     for (l, q) in keys2set(x.keys).intersection(keys2set(dx.keys)):
@@ -94,6 +165,15 @@ def tmap_add(x, dx):
 
 
 def kmm2tmap(qsamples, kernel):
+    """Convert reference-reference kernel arrays to TensorMap format.
+
+    Args:
+        qsamples (dict[int, list[tuple]]): Reference sample labels grouped by center type.
+        kernel (dict[tuple[int, int], np.ndarray]): Kernel arrays keyed by (l, center_type).
+
+    Returns:
+        metatensor.TensorMap: Reference-reference kernel TensorMap.
+    """
     tm_label_vals = sorted(kernel.keys(), key=lambda x: x[::-1])
     tensor_blocks = []
     for (l, q) in tm_label_vals:
@@ -110,6 +190,15 @@ def kmm2tmap(qsamples, kernel):
 
 
 def read_ps_1mol_l0(psfilename, atomic_numbers):
+    """Load l=0 power-spectrum features and reorder rows by atom index.
+
+    Args:
+        psfilename (str): Path to one-molecule power-spectrum file.
+        atomic_numbers (np.ndarray): Atomic numbers of the molecule.
+
+    Returns:
+        np.ndarray: Array of l=0 features ordered by atom index.
+    """
     power_sorted = None
     power = metatensor.load(psfilename)
     for q in set(atomic_numbers):

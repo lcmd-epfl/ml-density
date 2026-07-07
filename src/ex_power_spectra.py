@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Compute power spectra for out-of-sample molecules."""
 
 import ase.io
 import metatensor
@@ -11,7 +12,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     o, p = get_settings()
 
     mols_ex = ase.io.read(p.xyzexfilename, ":")

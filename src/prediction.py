@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Run model prediction for train/test subsets."""
 
 import pandas as pd
 import metatensor
@@ -11,7 +12,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     args, o, p = get_settings(return_args=['training'])
 
     atomic_numbers = moldata_read(p.xyzfilename)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Run prediction for out-of-sample molecules and export coefficients."""
 
 import numpy as np
 import pandas as pd
@@ -13,7 +14,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     o, p = get_settings()
 
     atomic_numbers = moldata_read(p.xyzexfilename)

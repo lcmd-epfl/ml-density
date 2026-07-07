@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Compute kernel for out-of-sample molecules."""
 
 import metatensor
 from tqdm import tqdm
@@ -10,7 +11,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     _, p = get_settings()
 
     atomic_numbers_ex = moldata_read(p.xyzexfilename)

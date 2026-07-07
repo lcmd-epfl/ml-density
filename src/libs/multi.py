@@ -1,3 +1,5 @@
+"""MPI wrappers."""
+
 import sys
 import logging
 from tqdm import trange
@@ -7,6 +9,13 @@ logger = logging.getLogger('__main__')
 
 
 def print_nodes(Nproc, nproc, comm):
+    """Collect and log the processor name for each MPI rank.
+
+    Args:
+        Nproc (int): Total number of MPI processes.
+        nproc (int): Current MPI rank.
+        comm (mpi4py.MPI.Comm): Active MPI communicator.
+    """
     sys.stdout.flush()
     msg = f'proc {nproc:3d} : {MPI.Get_processor_name()}'
     if nproc == 0:
@@ -18,6 +27,16 @@ def print_nodes(Nproc, nproc, comm):
 
 
 def scatter_jobs(Nproc, nproc, comm, bra, ket, do_mol):
+    """Distribute molecule indices to worker ranks and execute callbacks.
+
+    Args:
+        Nproc (int): Total number of MPI processes.
+        nproc (int): Current MPI rank.
+        comm (mpi4py.MPI.Comm): Active MPI communicator.
+        bra (int): Inclusive start index.
+        ket (int): Exclusive end index.
+        do_mol (Callable[[int], None]): Worker callback run on each assigned molecule index.
+    """
     if nproc == 0:
         for imol in range(bra, ket+Nproc-1):
             (npr, im) = comm.recv(source=MPI.ANY_SOURCE)
@@ -35,6 +54,12 @@ def scatter_jobs(Nproc, nproc, comm, bra, ket, do_mol):
 
 
 def multi_process(nmol, do_mol):
+    """Execute per-molecule work either serially or with MPI job scattering.
+
+    Args:
+        nmol (int): Number of molecules to process.
+        do_mol (Callable[[int], None]): Callback that processes one molecule index.
+    """
     comm = MPI.COMM_WORLD
     Nproc = comm.Get_size()
     nproc = comm.Get_rank()

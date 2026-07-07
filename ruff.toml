@@ -15,6 +15,9 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
+[lint.pydocstyle]
+convention = "google"
+
 [lint]
 
 preview = true
@@ -28,15 +31,15 @@ select = [
   "EM", "RET", "PLR", "BLE", "PLC", "FBT",
   #"Q",
   "FIX", "TD",
-  #"D",
+  "D",
   "DOC",
   "ERA",
 ]
 ignore = [
-  "UP031",    # format TODO
-  "NPY002",   # random
-  "E741",     # ambiguous variable name
-  "E501",     # line length
+  "D105",     # undocumented-magic-method
+  "NPY002",   # numpy-legacy-random
+  "E741",     # ambiguous-variable-name
+  "E501",     # line-too-long
   'PLR0912', # too-many-branches
   'PLR0913', # too-many-arguments
   'PLR0914', # too-many-locals
@@ -55,4 +58,4 @@ ignore = [
 [lint.per-file-ignores]
 "src/get_matrices_C.py" = ["COM819"]  # prohibited-trailing-comma
 "src/libs/tmap.py"      = ["E251"]    # unexpected-spaces-around-keyword-parameter-equals
-"src/libs/lsoap.py"     = ["PLC0415", "PLC2701"]
+"src/libs/lsoap.py"     = ["PLC0415", "PLC2701"]  # import-outside-top-level, import-private-name

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Compute the reference-reference kernel matrix."""
 
 import metatensor
 from libs.functions import Basis
@@ -9,7 +10,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     o, p = get_settings()
 
     power_ref = metatensor.load(p.reference_power_spectra)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Assemble regression "B matrix" and "A vector" (C backend)."""
 
 import sys
 import os
@@ -13,7 +14,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     args, o, p = get_settings(return_args=['get_b_matrix'])
 
     # load molecules
@@ -81,17 +82,30 @@ def main():
 
 
 def basis_info(basis):
-    # basis.elements is ordered
+    """Build compact basis descriptors required by the C backend.
+
+    Args:
+        basis (.functions.Basis): Basis set information.
+
+    Returns:
+        tuple[np.ndarray[int], np.ndarray[int]: Arrays containing l counts and 0-padded n-channel counts
+            for each element in the ascending order.
+    """
     alnum = np.array([basis.lmax[q]+1 for q in basis.elements])
     annum = vstack_padding([basis.nmax[q] for q in basis.elements]).T
     return alnum, annum
 
 
 def get_atomicindx(elements, atomic_numbers):
-    '''
+    """Count atoms of each element for each molecule.
+
+    Args:
+        elements (np.ndarray[int]): Ordered unique atomic numbers.
+        atomic_numbers (np.ndarray[int]): Per-molecule atom number arrays.
+
     Returns:
-      atom_counting[imol, iq]   number of atoms of element #iq in mol #imol
-    '''
+        np.ndarray[int]: Matrix where atom_counting[imol, iq] is the count of element iq in molecule imol.
+    """
     atom_counting = np.zeros((len(atomic_numbers), len(elements)), dtype=int)
     for imol, atoms in enumerate(atomic_numbers):
         for iq, q in enumerate(elements):

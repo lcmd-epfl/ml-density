@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Create train/test splits for molecule indices."""
 
 import numpy as np
 import pandas as pd
@@ -9,7 +10,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     o, p = get_settings()
     np.random.seed(o.seed)
     nmol = len(ase.io.read(p.xyzfilename, ':'))

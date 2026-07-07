@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Compute λ-SOAP power spectra for the dataset molecules."""
 
 import os
 import ase.io
@@ -13,7 +14,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     args, o, p = get_settings(return_args=['missing_only', 'mpi'])
 
     def do_mol(imol):

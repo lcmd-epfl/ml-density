@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Solve the regression system and save model weights."""
 
 import gc
 import numpy as np
@@ -14,7 +15,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     o, p = get_settings()
 
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
@@ -38,7 +39,15 @@ def main():
 
 @jit(nopython=True)
 def unravel_tril(mat, data, jitter):
-    # shouldn't use np.tril_indices() because it creates a huge indices array
+    """Fill a lower-triangular matrix from its vector form and add a constant to the diagonal.
+
+    One should not use `np.tril_indices()` because it creates a huge indices array.
+
+    Args:
+        mat (np.ndarray): Updated in place.
+        data (np.ndarray): Packed lower-triangular coefficients.
+        jitter (float): Diagonal jitter added for numerical stability.
+    """
     n = mat.shape[0]
     k = 0
     for j in range(n):
@@ -49,6 +58,17 @@ def unravel_tril(mat, data, jitter):
 
 
 def fill_matrix(mat, k_MM, bmatfile, idx, nmax, jitter, reg):
+    """Assemble the regression matrix from the B matrix and add regularization.
+
+    Args:
+        mat (np.ndarray): Vector representation of the lower triangle of a symmetric matrix.
+        k_MM (metatensor.TensorMap): Reference-reference kernel.
+        bmatfile (str): Path to packed B-matrix binary file.
+        idx (np.ndarray): Sparse AO start indices per reference and l.
+        nmax (dict[int, np.ndarray]): Radial basis sizes indexed by element and l.
+        jitter (float): Diagonal jitter added after unpacking B.
+        reg (float): Regularization coefficient scaling kernel blocks.
+    """
     data = np.fromfile(bmatfile)
     unravel_tril(mat, data, jitter)
     del data

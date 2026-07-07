@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Compute per-molecule kernels against reference environments."""
 
 import os
 import metatensor
@@ -12,7 +13,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     args, _, p = get_settings(return_args=['missing_only', 'mpi'])
 
     def do_mol(imol):

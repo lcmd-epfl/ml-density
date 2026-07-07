@@ -1,3 +1,5 @@
+"""Compute the "B matrix" (kernel * metric matrix * kernel)."""
+
 import logging
 import numpy as np
 import metatensor
@@ -8,6 +10,12 @@ logger = logging.getLogger('__main__')
 
 
 def print_mem(totsize, ntrain):
+    """Log estimated memory usage to store the result.
+
+    Args:
+        totsize (int): Problem dimensionality (number of AO coefficients).
+        ntrain (int): Number of training molecules.
+    """
     b2mib = 1.0/(1<<20)
     b2gib = 1.0/(1<<30)
     size = symsize(totsize)*np.array(0.0).itemsize
@@ -17,25 +25,47 @@ output: {size:16d} bytes ({size*b2mib:10.2f} MiB, {size*b2gib:6.2f} GiB)\n""", e
 
 
 def symsize(M):
+    """Compute the size of an 1D array representing a symmetric matrix.
+
+    Args:
+        M (int): Matrix dimension.
+
+    Returns:
+        int: Size M*(M+1)/2.
+    """
     return (M*(M+1))//2
 
 
 def mpos(i, j):
-    '''
-    Sparse indexing for a lower triangle matrix.
+    """Map a symmetric matrix index to an index in a corresponding 1D array.
+
+    A symmetric matrix is represented as a flattened lower-triangular matrix.
 
     Args:
-        i (int): i index, i<=j
-        j (int): j index, 0<=j<N (matrix size)
+        i (int): i index, i<=j.
+        j (int): j index, 0<=j<M (matrix size).
 
     Returns:
-        int: index corresponding to [i,j] and [j,i] value.
-    '''
+        int: Index corresponding to [i,j] and [j,i] value.
+
+    Note:
+        There is no check that `i<=j`.
+    """
     return i + ((j*(j+1))//2)
 
 
 def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
+    """Accumulate the B matrix contribution for one training molecule.
 
+    Args:
+        idx (np.ndarray): Sparse AO start indices per reference environment and angular momentum l.
+        nmax (dict[int, np.ndarray[int]]): Radial basis sizes indexed by element and l.
+        conf (int): Molecule index.
+        ref_elem (np.ndarray): Reference-environment atomic numbers.
+        path_over (str): Template path to overlap TensorMaps.
+        path_kern (str): Template path to kernel TensorMaps.
+        Bmat (np.ndarray): Matrix accumulator.
+    """
     over = metatensor.load(path_over.format(conf))
     k_NM = metatensor.load(path_kern.format(conf))
 
@@ -77,8 +107,24 @@ def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
 
 def get_b(basis, ref_elem, ntrains, trrange,
           path_over, path_kern, paths_bmat, use_mpi):
+    """Build and save packed B matrices for all requested training fractions.
 
+    Args:
+        basis (.functions.Basis): Basis used for AO indexing.
+        ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
+        ntrains (np.ndarray[int]): Cumulative training-set boundaries per fraction. The last extra one is 0.
+        trrange (np.ndarray[int]): Training molecule indices.
+        path_over (str): Template path to overlap TensorMaps.
+        path_kern (str): Template path to kernel TensorMaps.
+        paths_bmat (list[str]): Output packed-B path for each fraction.
+        use_mpi (bool): Whether to use MPI.
+    """
     def do_mol(imol):
+        """Process one molecule index and accumulate its B contribution.
+
+        Args:
+            imol (int): Index in trrange identifying the molecule.
+        """
         do_work_b(idx, basis.nmax, trrange[imol], ref_elem, path_over, path_kern, Bmat)
 
     totsize = basis.nao_for_mol(ref_elem)

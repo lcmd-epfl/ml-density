@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Assemble regression "B matrix" and "A vector" (Python implementation)."""
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     args, o, p = get_settings(return_args=['get_b_matrix', 'mpi'])
 
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()

@@ -8,8 +8,17 @@ from libs.config import DEFAULT_LOGLEVEL
 
 
 class MultilineMixin:
-    '''https://docs.python.org/3/howto/logging-cookbook.html#how-to-uniformly-handle-newlines-in-logging-output'''
+    """Mixin splitting multi-line log messages into single-line records.
+
+    Taken from
+    https://docs.python.org/3/howto/logging-cookbook.html#how-to-uniformly-handle-newlines-in-logging-output
+    """
     def emit(self, record):
+        """Emit a log record, splitting multi-line messages into separate records.
+
+        Args:
+            record (logging.LogRecord): Log record emitted by the handler.
+        """
         s = record.getMessage()
         if '\n' not in s:
             super().emit(record)
@@ -23,33 +32,47 @@ class MultilineMixin:
 
 
 class StreamHandler(MultilineMixin, logging.StreamHandler):
-    pass
+    """Stream handler with multi-line aware emit behavior."""
 
 
 class StreamFlushingHandler(MultilineMixin, logging.StreamHandler):
+    """Stream handler that flushes immediately after each emitted record."""
     def emit(self, record):
+        """Emit a record and flush the stream immediately.
+
+        Args:
+            record (logging.LogRecord): Log record emitted by the handler.
+        """
         super().emit(record)
         self.flush()
 
 
 def setup_logger(name, caller, level=DEFAULT_LOGLEVEL):
-    """Configure logger.
+    """Configure project logging with normal and flushing stream handlers.
 
     Args:
         name (str): Logger name (typically __name__).
         caller (str): Path to the calling script.
-        level: Logging level (default: INFO).  Note: will be overwritten
-               by the CLI arguments parser (see libs/config.py).
+        level (int): Logging level (default: INFO). Note: this is usually overwritten
+            by CLI arguments parsing (see libs/config.py).
 
     Returns:
-        Configured logger instance.
+        logging.Logger: Configured logger instance.
     """
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.handlers.clear()
 
     def only_flush(record):
-        return getattr(record, 'flush', None)
+        """Select records that request immediate flushing.
+
+        Args:
+            record (logging.LogRecord): Record to inspect.
+
+        Returns:
+            bool: The `flush` attribute of the record if it exists, otherwise False.
+        """
+        return getattr(record, 'flush', False)
 
     formatter = logging.Formatter(
             f'%(asctime)s {os.path.basename(caller)} [%(filename)s:%(lineno)d] %(levelname)s: %(message)s',

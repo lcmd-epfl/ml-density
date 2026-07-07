@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Compute prediction errors and electron number diagnostics."""
 
 import numpy as np
 import pandas as pd
@@ -14,11 +15,32 @@ logger = setup_logger(__name__, __file__)
 
 
 def correct_number_of_electrons(c, S, q, N):
+    """Project coefficients onto the subspace with the constrained electron number.
+
+    Args:
+        c (np.ndarray[float]): Input coefficient vector.
+        S (np.ndarray[float]): Metric matrix.
+        q (np.ndarray[float]): Number of electrons in each AO.
+        N (float): Target number of electrons.
+
+    Returns:
+        np.ndarray: Corrected coefficient vector with q @ c equal to N.
+    """
     S1q = np.linalg.solve(S, q)
     return c + S1q * (N - c@q)/(q@S1q)
 
 
 def get_number_of_electrons(use_charges, atomic_numbers, df):
+    """Compute the target number of electrons for each molecule.
+
+    Args:
+        use_charges (str | None): Mode controlling which dataset column is used (None, "charge", or "N").
+        atomic_numbers (list[np.ndarray]): Atomic numbers for each molecule.
+        df (pd.DataFrame): Dataset containing charge/electron-count columns.
+
+    Returns:
+        np.ndarray: Per-molecule electron counts used for evaluation.
+    """
     if use_charges in {None, 'charge'}:
         nuc_charges = np.array([sum(atoms) for atoms in atomic_numbers])
         if use_charges is None:
@@ -29,7 +51,7 @@ def get_number_of_electrons(use_charges, atomic_numbers, df):
     return nuc_charges - inp  # use_charges=='charge'
 
 
-def main():
+def main():  # noqa: D103
     args, o, p = get_settings(return_args=['training'])
 
     df = pd.read_csv(p.dataset)

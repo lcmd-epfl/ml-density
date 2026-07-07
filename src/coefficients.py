@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Export predicted electron-density coefficients to output files."""
 
 import numpy as np
 import metatensor
@@ -13,7 +14,7 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def main():
+def main():  # noqa: D103
     o, p = get_settings()
 
     atomic_numbers = moldata_read(p.xyzfilename)
