@@ -7,7 +7,7 @@ from qstack.io.metatensor import split
 from qstack import reorder
 from tqdm import tqdm
 from libs.config import get_settings
-from libs.functions import moldata_read, get_test_set, Basis, make_dummy_mol
+from libs.functions import moldata_read, Basis, Subset, make_dummy_mol
 from libs.tmap import tmap2vector, tmap_add
 from libs.logger_setup import setup_logger
 
@@ -21,7 +21,7 @@ def main():  # noqa: D103
     averages = metatensor.load(p.spherical_averages)
 
     basis = Basis(o.basisname, elements=averages.keys.column('center_type'))
-    _, test_configs = get_test_set(p.train_test_sets)
+    test_configs = Subset(p.train_test_sets).get_test()
 
     if o.output_coeff_order!='gpr':
         mols = [make_dummy_mol(atoms, basis=o.basisname, ignore=True) for atoms in atomic_numbers]
