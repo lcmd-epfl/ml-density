@@ -8,15 +8,22 @@ from libs.tmap import vector2tmap, tmap2vector
 logger = logging.getLogger('__main__')
 
 
-def print_batches(ntrains, paths):
+def print_batches(fracs, ntrains, path_template):
     """Log matrix-output batch boundaries and target files.
 
+    The Avec/Bmat are computed via sum over training set molecules.
+    If there are two training set fraction used, e.g. 0.5 and 1.0,
+    sum over the first 50% training molecules is computed first and saved (first batch).
+    Then a sum over the last 50% training molecules is added (second batch).
+
     Args:
-        ntrains (np.ndarray[int]): Cumulative training-set boundaries per batch.
-                                   The additional last one (`ntrains[len(paths)]`) is 0.
-        paths (list[str]): Output file path for each batch.
+        fracs (np.ndarray[float]): Training set fractions.
+        ntrains (list[tuple[int], tuple[int]]): Training set boundaries per batch.
+        path_template (str): Template path for output file.
     """
-    msg = '\n'.join([f'batch {i:2d} [{ntrains[i-1]}--{ntrains[i]}):\t {path}' for i, path in enumerate(paths)])
+    def _make_msg(i, frac, ntrain):
+        return f'batch {i:2d} [{ntrain[0]}--{ntrain[1]}):\t {path_template.format(train_frac=frac)}'
+    msg = '\n'.join(_make_msg(i, *batch) for i, batch in enumerate(zip(fracs, ntrains, strict=True)))
     logger.info(msg, extra={'flush': True})
 
 
@@ -26,8 +33,8 @@ def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
     Args:
         conf (int): Molecule configuration index.
         ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
-        path_proj (str): Template path to projection TensorMaps.
-        path_kern (str): Template path to kernel TensorMaps.
+        path_proj (str): Template path to projections.
+        path_kern (str): Template path to kernels.
         Avec (metatensor.TensorMap): Accumulator TensorMap for A coefficients.
     """
     proj = metatensor.load(path_proj.format(conf))
@@ -40,26 +47,25 @@ def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
             ablock.values[iiref1,:,:] += dA
 
 
-def get_a(basis, ref_elem, ntrains, trrange, path_proj, path_kern, paths_avec):
+def get_a(basis, ref_elem, fracs, ntrains, training_idx, paths):
     """Build and save A vectors for all requested training fractions.
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
         ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
-        ntrains (np.ndarray[int]): Cumulative training-set boundaries per fraction.
-        trrange (np.ndarray[int]): Training molecule indices.
-        path_proj (str): Template path to projection TensorMaps.
-        path_kern (str): Template path to kernel TensorMaps.
-        paths_avec (list[str]): Output A-vector path for each fraction.
+        fracs (np.ndarray[float]): Training set fractions.
+        ntrains (list[tuple[int], tuple[int]]): Training set boundaries
+                per fraction batch corresponding to the new molecules wrt the previous batch.
+        training_idx (np.ndarray[int]): Training molecules indices.
+        paths (SimpleNamespace): Configured paths and path templates..
     """
-    print_batches(ntrains, paths_avec)
+    print_batches(fracs, ntrains, paths.avec)
 
     totsize = basis.nao_for_mol(ref_elem)
-    Avec = np.zeros(totsize)
-    A1 = vector2tmap(ref_elem, basis.llist, Avec)
-    for ifrac, path_avec in enumerate(paths_avec):
-        for imol in range(ntrains[ifrac-1], ntrains[ifrac]):
+    A1 = vector2tmap(ref_elem, basis.llist, np.zeros(totsize))
+    for frac, ntrain in zip(fracs, ntrains, strict=True):
+        for imol in range(ntrain[0], ntrain[1]):
             logger.info(f'{0:4d}: {imol:4d}', extra={'flush': True})
-            do_work_a(trrange[imol], ref_elem, path_proj, path_kern, A1)
-        Avec = tmap2vector(ref_elem, basis.llist, A1)
-        np.savetxt(path_avec, Avec)
+            do_work_a(training_idx[imol], ref_elem, paths.projection, paths.kernel_nm, A1)
+        A = tmap2vector(ref_elem, basis.llist, A1)
+        np.savetxt(paths.avec.format(train_frac=frac), A)

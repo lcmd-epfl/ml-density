@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Assemble regression "B matrix" and "A vector" (Python implementation)."""
 
-import numpy as np
+import itertools
 import pandas as pd
 from libs.config import get_settings
 from libs.functions import Basis, Subset
@@ -20,16 +20,12 @@ def main():  # noqa: D103
 
     # training set selection
     ntrains, train_configs = Subset(p.train_test_sets).get_training_all(o.fracs)
-    ntrains = np.pad(ntrains, (0, 1), 'constant', constant_values=0)
+    ntrains = list(itertools.pairwise([0, *ntrains]))
 
     if args.get_b_matrix:
-        bmatfiles = [p.bmat.format(train_frac=frac) for frac in o.fracs]
-        get_b(basis, ref_elements, ntrains, train_configs,
-              p.metric_matrix, p.kernel_nm, bmatfiles, use_mpi=args.mpi)
+        get_b(basis, ref_elements, o.fracs, ntrains, train_configs, p, use_mpi=args.mpi)
     else:
-        avecfiles = [p.avec.format(train_frac=frac) for frac in o.fracs]
-        get_a(basis, ref_elements, ntrains, train_configs,
-              p.projection, p.kernel_nm, avecfiles)
+        get_a(basis, ref_elements, o.fracs, ntrains, train_configs, p)
 
 
 if __name__=='__main__':

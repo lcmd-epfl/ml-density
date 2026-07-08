@@ -6,6 +6,8 @@ import metatensor
 from libs.get_matrices_A import print_batches
 from libs.multi import print_nodes, scatter_jobs
 
+DEFAULT_MAX_CHUNK = 1<<30  # 1 GiB
+
 logger = logging.getLogger('__main__')
 
 
@@ -105,27 +107,26 @@ def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
                             Bmat[i12a:i12b] += dB[n2,im2,n2,:im2+1]
 
 
-def get_b(basis, ref_elem, ntrains, trrange,
-          path_over, path_kern, paths_bmat, use_mpi):
+def get_b(basis, ref_elem, fracs, ntrains, training_idx, paths, use_mpi):
     """Build and save packed B matrices for all requested training fractions.
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
         ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
-        ntrains (np.ndarray[int]): Cumulative training-set boundaries per fraction. The last extra one is 0.
-        trrange (np.ndarray[int]): Training molecule indices.
-        path_over (str): Template path to overlap TensorMaps.
-        path_kern (str): Template path to kernel TensorMaps.
-        paths_bmat (list[str]): Output packed-B path for each fraction.
+        fracs (np.ndarray[float]): Training set fractions.
+        ntrains (list[tuple[int], tuple[int]]): Training set boundaries
+                per fraction batch corresponding to the new molecules wrt the previous batch.
+        training_idx (np.ndarray[int]): Training molecule indices.
+        paths (SimpleNamespace): Configured paths and path templates..
         use_mpi (bool): Whether to use MPI.
     """
     def do_mol(imol):
         """Process one molecule index and accumulate its B contribution.
 
         Args:
-            imol (int): Index in trrange identifying the molecule.
+            imol (int): Index in training_idx identifying the molecule.
         """
-        do_work_b(idx, basis.nmax, trrange[imol], ref_elem, path_over, path_kern, Bmat)
+        do_work_b(idx, basis.nmax, training_idx[imol], ref_elem, paths.metric_matrix, paths.kernel_nm, Bmat)
 
     totsize = basis.nao_for_mol(ref_elem)
     Bmat = np.zeros(matsize := symsize(totsize))
@@ -146,28 +147,29 @@ def get_b(basis, ref_elem, ntrains, trrange,
         Nproc = 1
 
     if nproc==0:
-        print_batches(ntrains, paths_bmat)
+        print_batches(fracs, ntrains, paths.bmat)
     if use_mpi:
         MPI.COMM_WORLD.barrier()
 
     if Nproc==1:
-        for ifrac, path_bmat in enumerate(paths_bmat):
-            for imol in range(ntrains[ifrac-1], ntrains[ifrac]):
+        for frac, ntrain in zip(fracs, ntrains, strict=True):
+            for imol in range(ntrain[0], ntrain[1]):
                 logger.info(f'{nproc:4d}: {imol:4d}', extra={'flush': True})
                 do_mol(imol)
-            Bmat.tofile(path_bmat)
+            Bmat.tofile(paths.bmat.format(train_frac=frac))
         if use_mpi:
             t = MPI.Wtime () - t
             logger.info(f'{t=:4.2f}', extra={'flush': True})
 
     else:
-        bufsize = min(matsize, ((1<<30)//np.array(0.0).itemsize))  # number of doubles to take 1 GiB
+
+        bufsize = min(matsize, (DEFAULT_MAX_CHUNK//np.array(0.0).itemsize))  # number of doubles in a max. chunk
         div, rem = matsize//bufsize, matsize%bufsize
         if nproc==0:
             BMAT = np.zeros(bufsize)
 
-        for ifrac, path_bmat in enumerate(paths_bmat):
-            scatter_jobs(Nproc, nproc, MPI.COMM_WORLD, ntrains[ifrac-1], ntrains[ifrac], do_mol)
+        for ifrac, (frac, ntrain) in enumerate(zip(fracs, ntrains, strict=True)):
+            scatter_jobs(Nproc, nproc, MPI.COMM_WORLD, ntrain[0], ntrain[1], do_mol)
             MPI.COMM_WORLD.barrier()
 
             if nproc==0:
@@ -180,5 +182,5 @@ def get_b(basis, ref_elem, ntrains, trrange,
                 MPI.COMM_WORLD.Reduce(Bmat[i*bufsize:i*bufsize+size], BMAT[:size] if nproc==0 else None, MPI.SUM, 0)
                 if nproc==0:
                     logger.info(f'chunk #{i+1}/{div+1 if rem else div} written', extra={'flush': True})
-                    with open(path_bmat, 'a' if i else 'w') as f:
+                    with open(paths.bmat.format(train_frac=frac), 'a' if i else 'w') as f:
                         BMAT[:size].tofile(f)
