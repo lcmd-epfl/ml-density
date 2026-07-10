@@ -143,18 +143,13 @@ def read_config(config_path=defaults.config, *, print_help=False):
         paths.extra_predicted_coeff   = f'{p['_outexfilebase']}_{{order}}_{{imol}}.dat'
         return paths
 
-    config = Config(config_path=config_path)
-
-    for group, entries in (set_options() | set_paths()).items():
-        config.add_group(group)
-        for dest, spec in entries.items():
-            config.add_entry(group, dest, spec)
+    config = Config(set_options() | set_paths())
 
     if print_help:
         config.print_help()
         sys.exit(0)
 
-    parsed = config.parse()
+    parsed = config.parse(config_path=config_path)
 
     o = postprocess_options(parsed)
     p = postprocess_paths(parsed, o)

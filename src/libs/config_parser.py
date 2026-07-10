@@ -11,24 +11,19 @@ logger = logging.getLogger('__main__')
 class Config:
     """Read, validate, and parse configuration sections."""
 
-    def __init__(self, config_path=defaults.config):
+    def __init__(self, config_groups=None):
         """Initialize a Config instance.
 
         Args:
-            config_path (str | None): Path to the configuration file.
-
-        Raises:
-            RuntimeError: When the file is not found.
+            config_groups(dict[str, dict[str, OptSpecs | PathSpecs]]): Specification of option/path groups and entries.
         """
-        if not os.path.isfile(config_path):
-            msg = f'Cannot open configuration file "{config_path}"'
-            raise RuntimeError(msg)
-        link = f' -> {os.readlink(config_path)}' if os.path.islink(config_path) else ''
-        logger.info(f'Configuration file: {config_path}{link}')
-        parser = configparser.RawConfigParser()
-        parser.read(config_path)
-        self.configuration = dict(parser.items())
         self.groups = {}
+        if config_groups is not None:
+            for group, entries in config_groups.items():
+                self.add_group(group)
+                for dest, spec in entries.items():
+                    self.add_entry(group, dest, spec)
+
 
     def add_group(self, group):
         """Register a new parsing group.
@@ -64,12 +59,28 @@ class Config:
             raise RuntimeError(msg)
         self.groups[group][key] = spec
 
-    def parse(self):
+    def parse(self, config_path):
         """Parse all registered groups.
+
+        Args:
+            config_path (str | None): Path to the configuration file.
 
         Returns:
             dict[str, dict[str, object]]: Parsed values grouped by group name.
+
+        Raises:
+            RuntimeError: When the file is not found.
         """
+        if not os.path.isfile(config_path):
+            msg = f'Cannot open configuration file "{config_path}"'
+            raise RuntimeError(msg)
+        link = f' -> {os.readlink(config_path)}' if os.path.islink(config_path) else ''
+        logger.info(f'Configuration file: {config_path}{link}')
+
+        parser = configparser.RawConfigParser()
+        parser.read(config_path)
+        self.configuration = dict(parser.items())
+
         return {group : self.parse_group(group, options) for group, options in self.groups.items()}
 
     def print_help(self):
