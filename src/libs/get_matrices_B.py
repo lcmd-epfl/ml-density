@@ -139,7 +139,7 @@ def get_b(basis, ref_elem, fracs, ntrains, training_idx, paths, use_mpi):
         print_nodes(Nproc, nproc, MPI.COMM_WORLD)
         t = 0.0
         if nproc==0:
-            print_mem(totsize, ntrains[-2])
+            print_mem(totsize, ntrains[-1][1])
             t = MPI.Wtime()
         MPI.COMM_WORLD.barrier()
     else:
