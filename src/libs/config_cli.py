@@ -30,6 +30,7 @@ def parse_cli_args(return_args=None):
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--config", type=str, default=defaults.config, help='path to the configuration file')
+    parser.add_argument("--help-config", "--config-help", dest='config_help', action='store_true', help='print configuration file help')
     parser.add_argument("--log", type=str, default=logging._levelToName[defaults.loglevel], choices=logging._nameToLevel.keys(), help='logging level')
     add_argument(parser, "--training", dest='training', action='store_true', help='run prediction / compute error on the training set instead of the test set')
     add_argument(parser, "-b", "--b", dest="get_b_matrix", action='store_true', help='if True, get_matrices computes the "B matrix"; if False, the "A vector"')

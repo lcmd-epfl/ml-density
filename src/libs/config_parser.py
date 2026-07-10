@@ -3,7 +3,7 @@
 import os
 import configparser
 import logging
-from libs.config_utils import WhenMissing, CheckFile, defaults, OptSpecs, PathSpecs
+from libs.config_utils import WhenMissing, CheckFile, defaults, OptSpecs, PathSpecs, Choice
 
 logger = logging.getLogger('__main__')
 
@@ -71,6 +71,35 @@ class Config:
             dict[str, dict[str, object]]: Parsed values grouped by group name.
         """
         return {group : self.parse_group(group, options) for group, options in self.groups.items()}
+
+    def print_help(self):
+        """Print an example configuration file generated from registered specs."""
+        def get_value(spec):
+            if spec.default is None:
+                return '<required>'
+            if (dtype:=getattr(spec, 'dtype', None)) and (str_:=getattr(dtype, 'str', None)):
+                return str_(spec.default)
+            return str(spec.default)
+
+        def get_help(spec):
+            descr = getattr(spec, 'help', '')
+            if (dtype:=getattr(spec, 'dtype', None)) and isinstance(dtype, Choice):
+                descr += (f' {'Permitted' if dtype.strict else 'Recommended'} values: {dtype.options}.')
+            return f'  # {descr.strip()}' if descr else ''
+
+        lines = ['# Example configuration file with default values.\n']
+        for group, entries in self.groups.items():
+            lines.append(f'[{group}]')
+            lines_group = []
+            for spec in entries.values():
+                keyval = f'{spec.key} = {get_value(spec)}'
+                descr = get_help(spec)
+                lines_group.append((keyval, descr))
+
+            maxlen = max(len(keyval) for keyval, _ in lines_group)
+            lines.extend([keyval + ' '*(maxlen-len(keyval)) + descr for keyval, descr in lines_group])
+            lines.append('')
+        print('\n'.join(lines).rstrip() + '\n')
 
     def parse_entry(self, group, spec):
         """Parse and resolve one configuration entry.

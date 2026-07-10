@@ -1,5 +1,6 @@
 """Path and option specification assembly for project configuration."""
 
+import sys
 from types import SimpleNamespace
 from collections import ChainMap
 import logging
@@ -10,11 +11,12 @@ from .config_utils import CheckFile, WhenMissing, PathSpecs, OptSpecs, defaults,
 logger = logging.getLogger('__main__')
 
 
-def read_config(config_path=defaults.config):
+def read_config(config_path=defaults.config, *, print_help=False):
     """Read configuration options and derive runtime path templates.
 
     Args:
         config_path (str): Path to the configuration file.
+        print_help (bool): Print help and exit.
 
     Returns:
         tuple[types.SimpleNamespace, types.SimpleNamespace]: Parsed options namespace and resolved paths namespace.
@@ -27,28 +29,28 @@ def read_config(config_path=defaults.config):
         """
         return {
                 'options.training': {
-                    'M'                  : OptSpecs('reference_environments' , 100          , int         ),
-                    'seed'               : OptSpecs('seed'                , 1               , int         ),
-                    'train'              : OptSpecs('train_size'          , 1000            , int         ),
-                    'fracs'              : OptSpecs('train_fractions'     , np.array([1.0]) , Floats()    ),
-                    'reg'                : OptSpecs('regular'             , 1e-6            , float       ),
-                    'jit'                : OptSpecs('jitter'              , 1e-10           , float       ),
+                    'M'                  : OptSpecs('reference_environments', 100, int, 'Number of reference environments to select for sparse regression.'),
+                    'seed'               : OptSpecs('seed', 1, int, 'Random seed for train/test splitting.'),
+                    'train'              : OptSpecs('train_size', 1000, int, 'Number of molecules to assign to the training subset.'),
+                    'fracs'              : OptSpecs('train_fractions', np.array([1.0]), Floats(), 'Comma-separated training fractions for learning curve.'),
+                    'reg'                : OptSpecs('regular', 1e-6, float, 'Ridge regularization strength for regression.'),
+                    'jit'                : OptSpecs('jitter', 1e-10, float, 'Diagonal regularization strength for regression.'),
                     },
                 'options.soap': {
-                    'soap_sigma'         : OptSpecs('soap_sigma'          , 0.3             , float       ),
-                    'soap_rcut'          : OptSpecs('soap_rcut'           , 4.0             , float       ),
-                    'soap_ncut'          : OptSpecs('soap_ncut'           , 8               , int         ),
-                    'soap_lcut'          : OptSpecs('soap_lcut'           , 6               , int         ),
-                    'ps_min_norm'        : OptSpecs('ps_min_norm'         , 1e-20           , float       ),
-                    'ps_normalize'       : OptSpecs('ps_normalize'        , default=True    , dtype=Bool() ),
+                    'soap_sigma'         : OptSpecs('soap_sigma', 0.3, float, 'Gaussian width of atomic neighbor densities in λ-SOAP power spectra.'),
+                    'soap_rcut'          : OptSpecs('soap_rcut', 4.0, float, 'Cutoff radius for λ-SOAP power spectra.'),
+                    'soap_ncut'          : OptSpecs('soap_ncut', 8, int, 'Maximum radial basis index for λ-SOAP power spectra.'),
+                    'soap_lcut'          : OptSpecs('soap_lcut', 6, int, 'Maximum angular momentum λ for λ-SOAP power spectra.'),
+                    'ps_normalize'       : OptSpecs('ps_normalize', default=True, dtype=Bool(), help='Enable normalization of λ-SOAP power spectra.'),
+                    'ps_min_norm'        : OptSpecs('ps_min_norm', 1e-20, float, 'Minimum norm threshold in λ-SOAP power spectra normalization.'),
                     },
                 'options.rho': {
-                    'process_metric'     : OptSpecs('process_metric'      , default=True    , dtype=Bool() ),
-                    'use_charges'        : OptSpecs('number_of_electrons' , 'none'          , Choice(str, ['none', 'charge', 'N'], name='number_of_electrons')),
-                    'basisname'          : OptSpecs('basis'               , 'cc-pvqz-jkfit' , str         ),
-                    'coeff_order'        : OptSpecs('coeff_order'         , 'pyscf'         , Choice(str, ['pyscf', 'gpr'], name='coeff_order',        strict=False)),
-                    'overlap_order'      : OptSpecs('overlap_order'       , 'pyscf'         , Choice(str, ['pyscf', 'gpr'], name='overlap_order',      strict=False)),
-                    'output_coeff_order' : OptSpecs('output_coeff_order'  , 'gpr'           , Choice(str, ['pyscf', 'gpr'], name='output_coeff_order', strict=False)),
+                    'process_metric'     : OptSpecs('process_metric', default=True, dtype=Bool(), help='If true, process overlap metrics from input files.'),
+                    'use_charges'        : OptSpecs('number_of_electrons', 'none', Choice(str, ['none', 'charge', 'N'], name='number_of_electrons'), 'Column in the dataset CSV for target electron count.'),
+                    'basisname'          : OptSpecs('basis', 'cc-pvqz-jkfit', str, 'Basis set name used to build AO representation.'),
+                    'coeff_order'        : OptSpecs('coeff_order', 'pyscf', Choice(str, ['pyscf', 'gpr'], name='coeff_order', strict=False), 'AO ordering convention of input coefficient files.'),
+                    'overlap_order'      : OptSpecs('overlap_order', 'pyscf', Choice(str, ['pyscf', 'gpr'], name='overlap_order', strict=False), 'AO ordering convention of input overlap matrices.'),
+                    'output_coeff_order' : OptSpecs('output_coeff_order', 'gpr', Choice(str, ['pyscf', 'gpr'], name='output_coeff_order', strict=False), 'AO ordering convention for exported predicted coefficients.'),
                     },
                 }
 
@@ -60,36 +62,36 @@ def read_config(config_path=defaults.config):
         """
         return {
                 'paths.input': {
-                    'dataset'            : PathSpecs('dataset'         , WhenMissing.ERROR ,  CheckFile.ERROR_FILE, None),
-                    'xyz'                : PathSpecs('xyz'             , WhenMissing.ERROR ,  CheckFile.ERROR_DIR , None),
-                    'input_metrics'      : PathSpecs('metrics'         , WhenMissing.ERROR ,  CheckFile.ERROR_DIR , None),
-                    'input_coeffs'       : PathSpecs('coeffs'          , WhenMissing.ERROR ,  CheckFile.ERROR_DIR , None),
-                    },
-                'paths.internal': {
-                    'xyzfilename'        : PathSpecs('xyzfile'         , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/dataset.xyz'),
-                    '_splitpsfilebase'   : PathSpecs('ps_split_base'   , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/PS/PS'),
-                    '_refsselfilebase'   : PathSpecs('refs_sel_base'   , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/SELECTIONS/refs_selection'),
-                    '_powerrefbase'      : PathSpecs('ps_ref_base'     , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/PS'),
-                    '_kmmbase'           : PathSpecs('kmm_base'        , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/KMM'),
-                    '_kernelconfbase'    : PathSpecs('kernel_conf_base', WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/KERNELS/kernel_conf'),
-                    '_goodcoeffilebase'  : PathSpecs('goodcoef_base'   , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/coeff/mol'),
-                    '_goodoverfilebase'  : PathSpecs('goodover_base'   , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/metric/mol'),
-                    '_baselinedwbase'    : PathSpecs('baselined_w_base', WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/BASELINED_PROJECTIONS/projections_conf'),
-                    'spherical_averages' : PathSpecs('averages_file'   , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/AVERAGES.mts'),
-                    'train_test_sets'    : PathSpecs('trainingselfile' , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/SELECTIONS/training_selection.csv'),
-                    '_avecfilebase'      : PathSpecs('avec_base'       , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/Avec'),
-                    '_bmatfilebase'      : PathSpecs('bmat_base'       , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/Bmat'),
+                    'dataset'            : PathSpecs('dataset', WhenMissing.ERROR, CheckFile.ERROR_FILE, None, 'CSV dataset with molecule IDs and optional charge columns.'),
+                    'xyz'                : PathSpecs('xyz', WhenMissing.ERROR, CheckFile.ERROR_DIR, None, 'Template path to input XYZ files (uses {mol_name}).'),
+                    'input_metrics'      : PathSpecs('metrics', WhenMissing.ERROR, CheckFile.ERROR_DIR, None, 'Template path to input metric matrices.'),
+                    'input_coeffs'       : PathSpecs('coeffs', WhenMissing.ERROR, CheckFile.ERROR_DIR, None, 'Template path to input coefficient files.'),
                     },
                 'paths.output': {
-                    '_weightsfilebase'   : PathSpecs('weights_base'    , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/weights'),
-                    '_predictfilebase'   : PathSpecs('predict_base'    , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/prediction'),
-                    '_outfilebase'       : PathSpecs('output_base'     , WhenMissing.WARN  ,  CheckFile.MAKE_DIR  , 'INNER/predicted/rho'),
+                    '_weightsfilebase'   : PathSpecs('weights_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/weights', 'Base path for trained model weights.'),
+                    '_predictfilebase'   : PathSpecs('predict_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/prediction', 'Base path for predicted TensorMap coefficients.'),
+                    '_outfilebase'       : PathSpecs('output_base', WhenMissing.WARN, CheckFile.MAKE_DIR, 'INNER/predicted/rho', 'Base path for exported coefficient text files.'),
                     },
                 'paths.extrapolation': {
-                    'xyzexfilename'      : PathSpecs('xyzfile'         , WhenMissing.WARN  ,  CheckFile.ERROR_FILE, None),
-                    '_powerexbase'       : PathSpecs('ps_base'         , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/extra/PS'),
-                    '_kernelexbase'      : PathSpecs('kernel_base'     , WhenMissing.IGNORE,  CheckFile.MAKE_DIR  , 'INNER/extra/kernel'),
-                    '_outexfilebase'     : PathSpecs('output_base'     , WhenMissing.WARN  ,  CheckFile.MAKE_DIR  , 'INNER/extra/rho'),
+                    'xyzexfilename'      : PathSpecs('xyzfile', WhenMissing.WARN, CheckFile.ERROR_FILE, None, 'XYZ file for extrapolation/out-of-sample molecules.'),
+                    '_powerexbase'       : PathSpecs('ps_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/extra/PS', 'Base path for extrapolation/OOS power spectra.'),
+                    '_kernelexbase'      : PathSpecs('kernel_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/extra/kernel', 'Base path for extrapolation/OOS kernels.'),
+                    '_outexfilebase'     : PathSpecs('output_base', WhenMissing.WARN, CheckFile.MAKE_DIR, 'INNER/extra/rho', 'Base path for extrapolation/OOS exported coefficients.'),
+                    },
+                'paths.internal': {
+                    'xyzfilename'        : PathSpecs('xyzfile', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/dataset.xyz', 'Combined XYZ file written from all molecules.'),
+                    '_splitpsfilebase'   : PathSpecs('ps_split_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/PS/PS', 'Base path for per-molecule power spectra.'),
+                    '_refsselfilebase'   : PathSpecs('refs_sel_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/SELECTIONS/refs_selection', 'Base path for selected reference environments.'),
+                    '_powerrefbase'      : PathSpecs('ps_ref_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/PS', 'Base path for merged reference power spectra.'),
+                    '_kmmbase'           : PathSpecs('kmm_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/KMM', 'Base path for reference-reference kernels.'),
+                    '_kernelconfbase'    : PathSpecs('kernel_conf_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/KERNELS/kernel_conf', 'Base path for per-molecule kernels.'),
+                    '_goodcoeffilebase'  : PathSpecs('goodcoef_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/coeff/mol', 'Base path for cleaned/reordered coefficients.'),
+                    '_goodoverfilebase'  : PathSpecs('goodover_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/metric/mol', 'Base path for processed metric matrices.'),
+                    '_baselinedwbase'    : PathSpecs('baselined_w_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/BASELINED_PROJECTIONS/projections_conf', 'Base path for projected coefficients.'),
+                    'spherical_averages' : PathSpecs('averages_file', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/AVERAGES.mts', 'File to store spherical averages.'),
+                    'train_test_sets'    : PathSpecs('trainingselfile', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/SELECTIONS/training_selection.csv', 'CSV file to store train/test molecule indices.'),
+                    '_avecfilebase'      : PathSpecs('avec_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/Avec', 'Base path for A-vector outputs.'),
+                    '_bmatfilebase'      : PathSpecs('bmat_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/Bmat', 'Base path for B-matrix outputs.'),
                     },
                 }
 
@@ -147,6 +149,10 @@ def read_config(config_path=defaults.config):
         config.add_group(group)
         for dest, spec in entries.items():
             config.add_entry(group, dest, spec)
+
+    if print_help:
+        config.print_help()
+        sys.exit(0)
 
     parsed = config.parse()
 

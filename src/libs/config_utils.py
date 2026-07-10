@@ -33,6 +33,7 @@ class PathSpecs(NamedTuple):
     when_missing: WhenMissing
     check_file: CheckFile
     default: str | None
+    help: str
 
 
 class OptSpecs(NamedTuple):
@@ -40,10 +41,13 @@ class OptSpecs(NamedTuple):
     key: str                             # Option key inside the config section.
     default: object                      # Default value when the key is missing.
     dtype: Callable[[str], object]       # Callable converting raw string values.
+    help: str
 
 
 class Floats:
     """Parser converting comma-separated strings to unique float arrays."""
+    __name__ = 'Floats'
+
     def __call__(self, x):
         """Parse a comma-separated list of floats.
 
@@ -55,9 +59,22 @@ class Floats:
         """
         return np.unique(list(map(float, x.split(','))))
 
+    def str(self, x):
+        """Convert floats to a comma-separated list.
+
+        Args:
+            x (np.ndarray[float] | list[float]): list to convert.
+
+        Returns:
+            str: Comma-separated list.
+        """
+        return ','.join(map(str, x))
+
 
 class Bool:
     """Parser converting common textual flags to booleans."""
+    __name__ = 'Bool'
+
     def __call__(self, x):
         """Parse a textual boolean option.
 
@@ -81,6 +98,7 @@ class Bool:
 
 class Choice:
     """Parser wrapper enforcing membership in an allowed option set."""
+    __name__ = 'Choice'
 
     def __init__(self, dtype, options, name, *, strict=True):
         """Initialize a Choice instance.
@@ -95,6 +113,9 @@ class Choice:
         self.options = options
         self.name = name
         self.strict = strict
+
+    def __repr__(self):
+        return f'{self.__name__}({self.dtype.__name__}, {self.options}, name="{self.name}", strict={self.strict})'
 
     def __call__(self, x):
         """Cast and validate a value against the configured choices.

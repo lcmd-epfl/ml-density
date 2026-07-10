@@ -18,5 +18,5 @@ def get_settings(return_args=None):
     """
     args = parse_cli_args(return_args)
     logger.setLevel(args.log)
-    o, p = read_config(args.config)
+    o, p = read_config(args.config, print_help=args.config_help)
     return (args, o, p) if return_args else (o, p)
