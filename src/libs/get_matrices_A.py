@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import metatensor
 from libs.tmap import vector2tmap, tmap2vector
+from libs.functions import get_elements
 
 logger = logging.getLogger('__main__')
 
@@ -27,12 +28,12 @@ def print_batches(fracs, ntrains, path_template):
     logger.info(msg, extra={'flush': True})
 
 
-def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
+def do_work_a(conf, ref_counts, path_proj, path_kern, Avec):
     """Accumulate the A vector contribution for one training molecule.
 
     Args:
         conf (int): Molecule configuration index.
-        ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
+        ref_counts (dict[int, int]): Number of reference environments for each element.
         path_proj (str): Template path to projections.
         path_kern (str): Template path to kernels.
         Avec (metatensor.TensorMap): Accumulator TensorMap for A coefficients.
@@ -42,7 +43,7 @@ def do_work_a(conf, ref_elem, path_proj, path_kern, Avec):
     for (l1, q1), pblock in proj.items():
         kblock = k_NM.block(o3_lambda=l1, center_type=q1)
         ablock = Avec.block(o3_lambda=l1, center_type=q1)
-        for iiref1 in range(np.count_nonzero(ref_elem==q1)):
+        for iiref1 in range(ref_counts[q1]):
             dA = np.einsum('kmM,kmn->Mn', kblock.values[:,:,:,iiref1], pblock.values)
             ablock.values[iiref1,:,:] += dA
 
@@ -62,10 +63,11 @@ def get_a(basis, ref_elem, fracs, ntrains, training_idx, paths):
     print_batches(fracs, ntrains, paths.avec)
 
     totsize = basis.nao_for_mol(ref_elem)
+    ref_counts = get_elements([ref_elem], return_counts=True)
     A1 = vector2tmap(ref_elem, basis.llist, np.zeros(totsize))
     for frac, ntrain in zip(fracs, ntrains, strict=True):
         for imol in range(ntrain[0], ntrain[1]):
             logger.info(f'{0:4d}: {imol:4d}', extra={'flush': True})
-            do_work_a(training_idx[imol], ref_elem, paths.projection, paths.kernel_nm, A1)
+            do_work_a(training_idx[imol], ref_counts, paths.projection, paths.kernel_nm, A1)
         A = tmap2vector(ref_elem, basis.llist, A1)
         np.savetxt(paths.avec.format(train_frac=frac), A)

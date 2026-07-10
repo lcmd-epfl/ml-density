@@ -11,6 +11,18 @@ DEFAULT_MAX_CHUNK = 1<<30  # 1 GiB
 logger = logging.getLogger('__main__')
 
 
+def _build_ref_indices(ref_elem):
+    """Precompute reference-environment positions grouped by element.
+
+    Args:
+        ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
+
+    Returns:
+        dict[int, np.ndarray[int]]: Reference positions for each element.
+    """
+    return {int(q): np.where(ref_elem == q)[0] for q in np.unique(ref_elem)}
+
+
 def print_mem(totsize, ntrain):
     """Log estimated memory usage to store the result.
 
@@ -56,14 +68,14 @@ def mpos(i, j):
     return i + ((j*(j+1))//2)
 
 
-def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
+def do_work_b(idx, nmax, conf, ref_indices, path_over, path_kern, Bmat):
     """Accumulate the B matrix contribution for one training molecule.
 
     Args:
         idx (np.ndarray): Sparse AO start indices per reference environment and angular momentum l.
         nmax (dict[int, np.ndarray[int]]): Radial basis sizes indexed by element and l.
         conf (int): Molecule index.
-        ref_elem (np.ndarray): Reference-environment atomic numbers.
+        ref_indices (dict[int, np.ndarray[int]]): Cached reference positions grouped by element.
         path_over (str): Template path to overlap TensorMaps.
         path_kern (str): Template path to kernel TensorMaps.
         Bmat (np.ndarray): Matrix accumulator.
@@ -80,8 +92,8 @@ def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
         kblock2 = k_NM.block(o3_lambda=l2, center_type=q2)
         oval = oblock.values.reshape(len(kblock1.samples), len(kblock2.samples), msize1, msize2, nsize1, nsize2)
 
-        for iiref1, iref1 in enumerate(np.where(ref_elem==q1)[0]):
-            for iiref2, iref2 in enumerate(np.where(ref_elem==q2)[0]):
+        for iiref1, iref1 in enumerate(ref_indices[q1]):
+            for iiref2, iref2 in enumerate(ref_indices[q2]):
                 if iref1>iref2:
                     continue
                 '''
@@ -94,9 +106,10 @@ def do_work_b(idx, nmax, conf, ref_elem, path_over, path_kern, Bmat):
                 dB = np.einsum('amJNn,amj->njNJ', t1, kblock2.values[...,iiref2])
 
                 i1 = idx[iref1, l1]
+                i2_start = idx[iref2, l2]
                 for n2 in range(nsize2):
                     for im2 in range(msize2):
-                        i2 = idx[iref2, l2]+ n2*msize2 + im2
+                        i2 = i2_start + n2*msize2 + im2
                         i12 = mpos(i1,i2)
                         if (iref1!=iref2) or (iref1==iref2 and l1<l2):
                             Bmat[i12:i12+msize1*nsize1] += dB[n2,im2,:,:].flatten()
@@ -126,11 +139,12 @@ def get_b(basis, ref_elem, fracs, ntrains, training_idx, paths, use_mpi):
         Args:
             imol (int): Index in training_idx identifying the molecule.
         """
-        do_work_b(idx, basis.nmax, training_idx[imol], ref_elem, paths.metric_matrix, paths.kernel_nm, Bmat)
+        do_work_b(idx, basis.nmax, training_idx[imol], ref_indices, paths.metric_matrix, paths.kernel_nm, Bmat)
 
     totsize = basis.nao_for_mol(ref_elem)
     Bmat = np.zeros(matsize := symsize(totsize))
     idx = basis.sparse_indices(ref_elem)
+    ref_indices = _build_ref_indices(ref_elem)
 
     if use_mpi:
         from mpi4py import MPI  # noqa: PLC0415
