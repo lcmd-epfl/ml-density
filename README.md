@@ -16,21 +16,15 @@ Based on:
 ```
 git clone https://github.com/lcmd-epfl/ml-density/
 cd ml-density/
-git checkout use-rascaline-ps
 ```
 
 ### Environment
 
-* install `cargo`
-* install MPI and OpenMP
-* use `environment.yml` or
 ```
-conda env create -f environment.yml
-
+conda env create --file environment.yml --name ml-density
+conda activate ml-density
 ```
-
 or
-
 ```
 conda create -n ml-density python=3.13
 conda activate ml-density
@@ -40,6 +34,7 @@ conda install pandas=2.3
 conda install scipy=1.16.2
 conda install numba=0.62
 conda install mpi4py=4.0
+conda install gxx_linux-64
 pip install ase==3.26 wigners==0.3
 pip install metatensor-core==0.1.17
 pip install featomic==0.6.3
@@ -60,8 +55,6 @@ in progress... see `sidechains_examples/` and `sbatch_examples`
 
 ## TODO
 
-* improve readme
 * add tests
-* replace `print_progress` by `tqdm`
-* ? add `rho-predictor` as a dependency 
-* fix OMP
+* improve readme
+* merge into Q-stack

@@ -9,6 +9,7 @@ dependencies:
   - pandas=2.3
   - numba=0.62.1
   - mpi4py=4.0.3
+  - gxx_linux-64
   - pip:
     - ase==3.26
     - wigners==0.3
