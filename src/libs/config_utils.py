@@ -37,7 +37,7 @@ class PathSpecs(NamedTuple):
 
 class OptSpecs(NamedTuple):
     """Specification of one variable option in a config section."""
-    key: str                             # Option key inside the section.
+    key: str                             # Option key inside the config section.
     default: object                      # Default value when the key is missing.
     dtype: Callable[[str], object]       # Callable converting raw string values.
 

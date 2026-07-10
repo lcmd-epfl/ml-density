@@ -2,7 +2,6 @@
 
 from types import SimpleNamespace
 from collections import ChainMap
-from itertools import starmap
 import logging
 import numpy as np
 from .config_parser import Config
@@ -20,13 +19,13 @@ def read_config(config_path=defaults.config):
     Returns:
         tuple[types.SimpleNamespace, types.SimpleNamespace]: Parsed options namespace and resolved paths namespace.
     """
-    def set_variable_values():
-        """Specify numeric/string options, load, parse, and validate.
+    def set_options():
+        """Build option specifications by configuration section.
 
         Returns:
-            dict[str, object]: Flattened option dictionary ready for post-processing.
+            dict[str, dict[str, OptSpecs]]: Specification of option groups and entries.
         """
-        options = {
+        return {
                 'options.training': {
                     'M'                  : OptSpecs('reference_environments' , 100          , int         ),
                     'seed'               : OptSpecs('seed'                , 1               , int         ),
@@ -52,15 +51,14 @@ def read_config(config_path=defaults.config):
                     'output_coeff_order' : OptSpecs('output_coeff_order'  , 'gpr'           , Choice(str, ['pyscf', 'gpr'], name='output_coeff_order', strict=False)),
                     },
                 }
-        return dict(ChainMap(*[*starmap(conf.get_option_group, options.items())]))
 
-    def get_all_paths():
-        """Specify path entries, load, parse, and validate.
+    def set_paths():
+        """Build path specifications by configuration section.
 
         Returns:
-            dict[str, str]: Flattened dictionary of configured and defaulted paths.
+            dict[str, dict[str, PathSpecs]]: Specification of path groups and entries.
         """
-        paths = {
+        return {
                 'paths.input': {
                     'dataset'            : PathSpecs('dataset'         , WhenMissing.ERROR ,  CheckFile.ERROR_FILE, None),
                     'xyz'                : PathSpecs('xyz'             , WhenMissing.ERROR ,  CheckFile.ERROR_DIR , None),
@@ -94,31 +92,33 @@ def read_config(config_path=defaults.config):
                     '_outexfilebase'     : PathSpecs('output_base'     , WhenMissing.WARN  ,  CheckFile.MAKE_DIR  , 'INNER/extra/rho'),
                     },
                 }
-        return dict(ChainMap(*[*starmap(conf.get_path_group, paths.items())]))
 
-    def postprocess_options(o):
+    def postprocess_options(parsed):
         """Convert raw parsed options to their final runtime representation.
 
         Args:
-            o (dict[str, object]): Raw options dictionary from set_variable_values.
+            parsed (dict[str, dict[str, object]]): Parsed values grouped by section name.
 
         Returns:
             types.SimpleNamespace: Post-processed options namespace.
         """
+        o = dict(ChainMap(*[d for group, d in parsed.items() if group.startswith('options.')]))
         if o['use_charges']=='none':
             o['use_charges'] = None
         return SimpleNamespace(o)
 
-    def postprocess_paths(p, o):
+    def postprocess_paths(parsed, o):
         """Derive path templates.
 
         Args:
-            p (dict[str, str]): Raw path dictionary from get_all_paths.
+            parsed (dict[str, dict[str, object]]): Parsed values grouped by section name.
             o (types.SimpleNamespace): Post-processed options namespace.
 
         Returns:
             types.SimpleNamespace: Namespace exposing all computed path templates.
         """
+        p = dict(ChainMap(*[d for group, d in parsed.items() if group.startswith('paths.')]))
+
         paths = SimpleNamespace({key: val for key, val in p.items() if not key.startswith('_')})
         paths.clean_coefficients      = f'{p['_goodcoeffilebase']}_{{}}.npy'
         paths.metric_matrix           = f'{p['_goodoverfilebase']}_{{}}.mts'
@@ -141,7 +141,15 @@ def read_config(config_path=defaults.config):
         paths.extra_predicted_coeff   = f'{p['_outexfilebase']}_{{order}}_{{imol}}.dat'
         return paths
 
-    conf = Config(config_path=config_path)
-    o = postprocess_options(set_variable_values())
-    p = postprocess_paths(get_all_paths(), o)
+    config = Config(config_path=config_path)
+
+    for group, entries in (set_options() | set_paths()).items():
+        config.add_group(group)
+        for dest, spec in entries.items():
+            config.add_entry(group, dest, spec)
+
+    parsed = config.parse()
+
+    o = postprocess_options(parsed)
+    p = postprocess_paths(parsed, o)
     return o, p

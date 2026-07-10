@@ -3,7 +3,7 @@
 import os
 import configparser
 import logging
-from libs.config_utils import WhenMissing, CheckFile, defaults
+from libs.config_utils import WhenMissing, CheckFile, defaults, OptSpecs, PathSpecs
 
 logger = logging.getLogger('__main__')
 
@@ -28,87 +28,147 @@ class Config:
         parser = configparser.RawConfigParser()
         parser.read(config_path)
         self.configuration = dict(parser.items())
+        self.groups = {}
 
-    def get_option(self, group, specs):
-        """Read and cast one option from a configuration section.
-
-        Args:
-            group (str): Configuration section name.
-            specs (OptSpecs): Parsing specs.
-
-        Returns:
-            object: Parsed option value.
-        """
-        return specs.dtype(val) if (val := self.configuration[group].get(specs.key, None)) is not None else specs.default
-
-    def check_for_unrecognized_options(self, group, options):
-        """Check for unrecognized options.
+    def add_group(self, group):
+        """Register a new parsing group.
 
         Args:
-            group (str): Configuration section name.
-            options (dict[str, .config_utils.PathSpecs | .config_utils.OptSpecs]): Mapping from destination names to parsing specs.
+            group (str): Group/section identifier used by this parser.
 
         Raises:
-            RuntimeError: There are unrecognized options in the config section.
+            RuntimeError: The group is already registered.
         """
-        recognized = [val.key for val in options.values()]
+        if group in self.groups:
+            msg = f'Duplicated group: {group}'
+            raise RuntimeError(msg)
+        self.groups[group] = {}
+
+    def add_entry(self, group, key, spec):
+        """Register one option/path specification under a group.
+
+        Args:
+            group (str): Previously registered group name.
+            key (str): Destination key used in parsed output.
+            spec (OptSpecs | PathSpecs): Specification describing how to parse the entry.
+
+        Raises:
+            RuntimeError: The group does not exist.
+            RuntimeError: The key is already registered in the group.
+        """
+        if group not in self.groups:
+            msg = f'Non-existing group: {group}'
+            raise RuntimeError(msg)
+        if key in self.groups[group]:
+            msg = f'Duplicated key: {key}'
+            raise RuntimeError(msg)
+        self.groups[group][key] = spec
+
+    def parse(self):
+        """Parse all registered groups.
+
+        Returns:
+            dict[str, dict[str, object]]: Parsed values grouped by group name.
+        """
+        return {group : self.parse_group(group, options) for group, options in self.groups.items()}
+
+    def parse_entry(self, group, spec):
+        """Parse and resolve one configuration entry.
+
+        Args:
+            group (str): Configuration section name.
+            spec (OptSpecs | PathSpecs): Parsing spec.
+
+        Returns:
+            object: Parsed option value or resolved path.
+
+        Raises:
+            TypeError: The spec type is unsupported.
+        """
+        if isinstance(spec, OptSpecs):
+            return self._get_option(group, spec)
+        if isinstance(spec, PathSpecs):
+            return self._get_path(group, spec)
+        msg = f'Wrong type of option specification ({type(spec)})'
+        raise TypeError(msg)
+
+    def _get_option(self, group, spec):
+        """Parse one option using its converter and default.
+
+        Args:
+            group (str): Configuration section name.
+            spec (OptSpecs): Option parsing specification.
+
+        Returns:
+            object: Parsed value, or the default when missing.
+        """
+        return spec.dtype(val) if (val := self.configuration[group].get(spec.key, None)) is not None else spec.default
+
+    def check_for_unrecognized_entries(self, group, entries):
+        """Check for unrecognized entries in the config file.
+
+        Args:
+            group (str): Configuration section name.
+            entries (dict[str, PathSpecs | OptSpecs]): Mapping from destination names to parsing specs.
+
+        Raises:
+            RuntimeError: The config section contains undeclared keys.
+        """
+        recognized = [val.key for val in entries.values()]
         present = self.configuration[group].keys()
         if unrecognized := set(present).difference(recognized):
             msg = f'Unrecognized entries in [{group}]: {unrecognized}'
             raise RuntimeError(msg)
 
-    def get_option_group(self, group, options):
-        """Read all options declared for one configuration section.
+    def parse_group(self, group, entries):
+        """Read all entries declared for one configuration section.
 
         Args:
             group (str): Configuration section name.
-            options (dict[str, .config_utils.OptSpecs]): Mapping from destination names to parsing specs.
+            entries (dict[str, PathSpecs | OptSpecs]): Mapping from destination names to parsing specs.
 
         Returns:
-            dict[str, object]: Parsed options keyed by destination name.
+            dict[str, object]: Parsed entries keyed by destination name.
         """
-        self.check_for_unrecognized_options(group, options)
-        return {dest: self.get_option(group, specs) for dest, specs in options.items()}
+        self.check_for_unrecognized_entries(group, entries)
+        return {dest: self.parse_entry(group, specs) for dest, specs in entries.items()}
 
-    def get_path_group(self, group, paths):
-        """Read and validate all path entries for one section.
+    def _get_path(self, group, spec):
+        """Parse and validate one path entry.
 
-        Create empty directories if they are specified and missing.
+        Missing parent directories are created when requested by the spec.
 
         Args:
             group (str): Configuration section name.
-            paths (dict[str, .config_utils.PathSpecs]): Mapping from destination names to parsing specs.
+            spec (PathSpecs): Path parsing specification.
 
         Returns:
-            dict[str, str]: Resolved path values keyed by destination name.
+            str | None: Resolved path value (or None when allowed by the specification).
 
         Raises:
+            RuntimeError: A required path entry is missing.
             RuntimeError: A required file does not exist.
             RuntimeError: A required directory does not exist.
         """
-        self.check_for_unrecognized_options(group, paths)
-        p = {}
-        for dest, spec in paths.items():
-            if (path := self.configuration[group].get(spec.key)) is None:
-                if spec.when_missing==WhenMissing.WARN:
-                    logger.warning(f'Missing recommended config path `{spec.key}`')
-                elif spec.when_missing==WhenMissing.ERROR:
-                    msg = f'Missing required config path `{spec.key}`'
-                    raise RuntimeError(msg)
-                else:
-                    path = spec.default
+        if (path := self.configuration[group].get(spec.key)) is None:
+            if spec.when_missing==WhenMissing.WARN:
+                logger.warning(f'Missing recommended config path `{spec.key}`')
+            elif spec.when_missing==WhenMissing.ERROR:
+                msg = f'Missing required config path `{spec.key}`'
+                raise RuntimeError(msg)
+            else:
+                path = spec.default
 
-            elif spec.check_file==CheckFile.ERROR_FILE:
-                if not os.path.isfile(path):
-                    msg = f'Missing file "{path}" ("{spec.key}")'
+        elif spec.check_file==CheckFile.ERROR_FILE:
+            if not os.path.isfile(path):
+                msg = f'Missing file "{path}" ("{spec.key}")'
+                raise RuntimeError(msg)
+        elif spec.check_file in {CheckFile.ERROR_DIR, CheckFile.MAKE_DIR}:
+            fdir = os.path.dirname(path)
+            if not os.path.isdir(fdir):
+                if spec.check_file==CheckFile.ERROR_DIR:
+                    msg = f'Missing directory "{fdir}" ("{spec.key}")'
                     raise RuntimeError(msg)
-            elif spec.check_file in {CheckFile.ERROR_DIR, CheckFile.MAKE_DIR}:
-                fdir = os.path.dirname(path)
-                if not os.path.isdir(fdir):
-                    if spec.check_file==CheckFile.ERROR_DIR:
-                        msg = f'Missing directory "{fdir}" ("{spec.key}")'
-                        raise RuntimeError(msg)
-                    logger.debug(f'Creating directory "{fdir}" ("{spec.key}")')
-                    os.makedirs(fdir)
-            p[dest] = path
-        return p
+                logger.debug(f'Creating directory "{fdir}" ("{spec.key}")')
+                os.makedirs(fdir)
+        return path
