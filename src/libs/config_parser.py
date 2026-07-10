@@ -3,7 +3,7 @@
 import os
 import configparser
 import logging
-from libs.config_utils import WhenMissing, CheckFile, defaults, OptSpecs, PathSpecs, Choice
+from libs.config_utils import WhenMissing, CheckFile, OptSpecs, PathSpecs, Choice
 
 logger = logging.getLogger('__main__')
 
@@ -23,7 +23,6 @@ class Config:
                 self.add_group(group)
                 for dest, spec in entries.items():
                     self.add_entry(group, dest, spec)
-
 
     def add_group(self, group):
         """Register a new parsing group.

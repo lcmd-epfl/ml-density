@@ -1,9 +1,12 @@
-"""MPI wrappers."""
+"""MPI wrappers.
+
+MPI (mpi4py) is imported in each function, because the module should be able to be imported
+and process_molecules() should work without MPI installed with use_mpi=False.
+"""
 
 import sys
 import logging
 from tqdm import trange
-from mpi4py import MPI
 
 logger = logging.getLogger('__main__')
 
@@ -16,6 +19,7 @@ def print_nodes(Nproc, nproc, comm):
         nproc (int): Current MPI rank.
         comm (mpi4py.MPI.Comm): Active MPI communicator.
     """
+    from mpi4py import MPI
     sys.stdout.flush()
     msg = f'proc {nproc:3d} : {MPI.Get_processor_name()}'
     if nproc == 0:
@@ -37,6 +41,7 @@ def scatter_jobs(Nproc, nproc, comm, bra, ket, do_mol):
         ket (int): Exclusive end index.
         do_mol (Callable[[int], None]): Worker callback run on each assigned molecule index.
     """
+    from mpi4py import MPI
     if nproc == 0:
         for imol in range(bra, ket+Nproc-1):
             (npr, im) = comm.recv(source=MPI.ANY_SOURCE)
@@ -60,6 +65,7 @@ def multi_process(nmol, do_mol):
         nmol (int): Number of molecules to process.
         do_mol (Callable[[int], None]): Callback that processes one molecule index.
     """
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     Nproc = comm.Get_size()
     nproc = comm.Get_rank()
@@ -71,3 +77,18 @@ def multi_process(nmol, do_mol):
             do_mol(imol)
     else:
         scatter_jobs(Nproc, nproc, comm, 0, nmol, do_mol)
+
+
+def process_molecules(nmol, do_mol, *, use_mpi=False):
+    """Run per-molecule processing with consistent MPI/serial behavior.
+
+    Args:
+        nmol (int): Number of molecules to process.
+        do_mol (Callable[[int], None]): Callback that processes one molecule index.
+        use_mpi (bool): Whether to use MPI.
+    """
+    if use_mpi:
+        multi_process(nmol, do_mol)
+    else:
+        for imol in trange(nmol):
+            do_mol(imol)

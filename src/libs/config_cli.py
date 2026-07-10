@@ -35,6 +35,7 @@ def parse_cli_args(return_args=None):
     add_argument(parser, "--training", dest='training', action='store_true', help='run prediction / compute error on the training set instead of the test set')
     add_argument(parser, "-b", "--b", dest="get_b_matrix", action='store_true', help='if True, get_matrices computes the "B matrix"; if False, the "A vector"')
     add_argument(parser, "--missing-only", dest="missing_only", action='store_true', help='dangerous: not recompute existing power spectra / kernels')
+    add_argument(parser, "--extra", "--extrapolation", "--oos", dest="extra", action='store_true', help='run script for an out-of-sample set (extrapolation)')
 
     mpi = parser.add_mutually_exclusive_group()
     mpi.add_argument("--mpi-dummy-argument", dest="mpi", default=defaults.mpi, action='store_true', help=argparse.SUPPRESS)

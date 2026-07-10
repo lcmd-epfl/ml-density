@@ -1,5 +1,6 @@
 """Utility functions."""
 
+from typing import NamedTuple
 import numpy as np
 import pandas as pd
 import ase
@@ -168,7 +169,7 @@ class Basis:
         if not np.all(sorted(l)==l):
             msg = f"Basis functions for {q} are not sorted by angular momentum. This can lead to AO mismatch"
             raise ValueError(msg)
-        lmax = l[-1]
+        lmax = l[-1].item()
         nmax = np.zeros(lmax+1, dtype=int)
         n = []
         m = []
@@ -299,3 +300,25 @@ def make_dummy_mol(atoms, basis, **kwargs):
         pyscf.gto.Mole: Built PySCF molecule with dummy positions.
     """
     return make_pyscf_mol(numbers=atoms, positions=np.zeros((len(atoms), 3)), basis=basis, **kwargs)
+
+
+class DatasetPaths(NamedTuple):
+    """Specific paths and path templates for power spectra and kernel computation."""
+    xyz: str
+    power: str
+    kernel: str
+
+
+def get_dataset_paths(p, *, extra=False):
+    """Collect specific paths and path templates for power spectra and kernel computation.
+
+    Args:
+        p (SimpleNamespace): Paths resolved from the configuration file.
+        extra (bool): If True, use extrapolation/out-of-sample dataset.
+
+    Returns:
+        DatasetPaths: Paths specific for either the "main" (training) or extrapolation/OOS set.
+    """
+    if extra:
+        return DatasetPaths(p.extra_xyzfilename, p.extra_power_spectrum, p.extra_kernel_nm)
+    return DatasetPaths(p.xyzfilename, p.power_spectrum, p.kernel_nm)

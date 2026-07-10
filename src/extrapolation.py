@@ -17,7 +17,7 @@ logger = setup_logger(__name__, __file__)
 def main():  # noqa: D103
     o, p = get_settings()
 
-    atomic_numbers = moldata_read(p.xyzexfilename)
+    atomic_numbers = moldata_read(p.extra_xyzfilename)
     averages = metatensor.load(p.spherical_averages)
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     basis = Basis(o.basisname, elements=ref_elements)

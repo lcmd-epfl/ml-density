@@ -73,7 +73,7 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     '_outfilebase'       : PathSpecs('output_base', WhenMissing.WARN, CheckFile.MAKE_DIR, 'INNER/predicted/rho', 'Base path for exported coefficient text files.'),
                     },
                 'paths.extrapolation': {
-                    'xyzexfilename'      : PathSpecs('xyzfile', WhenMissing.WARN, CheckFile.ERROR_FILE, None, 'XYZ file for extrapolation/out-of-sample molecules.'),
+                    'extra_xyzfilename'  : PathSpecs('xyzfile', WhenMissing.WARN, CheckFile.ERROR_FILE, None, 'XYZ file for extrapolation/out-of-sample molecules.'),
                     '_powerexbase'       : PathSpecs('ps_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/extra/PS', 'Base path for extrapolation/OOS power spectra.'),
                     '_kernelexbase'      : PathSpecs('kernel_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/extra/kernel', 'Base path for extrapolation/OOS kernels.'),
                     '_outexfilebase'     : PathSpecs('output_base', WhenMissing.WARN, CheckFile.MAKE_DIR, 'INNER/extra/rho', 'Base path for extrapolation/OOS exported coefficients.'),
