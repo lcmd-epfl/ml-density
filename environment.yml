@@ -15,4 +15,5 @@ dependencies:
     - metatensor-core==0.1.17
     - metatensor-operations==0.3.4
     - featomic==0.6.3
-    - git+https://github.com/lcmd-epfl/Q-stack.git@d5ac511
+    - pyscf==2.13.1
+    - git+https://github.com/lcmd-epfl/Q-stack.git@d5ac511aa55f27df1d97040118aeed268f0779e2
