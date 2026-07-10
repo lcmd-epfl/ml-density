@@ -4,7 +4,7 @@ import os
 import sys
 import logging
 import copy
-from libs.config import DEFAULT_LOGLEVEL
+from libs.config_utils import defaults
 
 
 class MultilineMixin:
@@ -47,14 +47,14 @@ class StreamFlushingHandler(MultilineMixin, logging.StreamHandler):
         self.flush()
 
 
-def setup_logger(name, caller, level=DEFAULT_LOGLEVEL):
+def setup_logger(name, caller, level=defaults.loglevel):
     """Configure project logging with normal and flushing stream handlers.
 
     Args:
         name (str): Logger name (typically __name__).
         caller (str): Path to the calling script.
         level (int): Logging level (default: INFO). Note: this is usually overwritten
-            by CLI arguments parsing (see libs/config.py).
+                     by CLI arguments parsing.
 
     Returns:
         logging.Logger: Configured logger instance.
