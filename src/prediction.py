@@ -24,10 +24,11 @@ def main():  # noqa: D103
     atomic_numbers = moldata_read(dataset_paths.xyz)
     averages = metatensor.load(p.spherical_averages)
     basis = Basis(o.basisname, elements=averages.keys.column('center_type'))
+    subsets = Subset(p.train_test_sets)
 
     for frac in frac_list:
         weights = metatensor.load(p.weights.format(train_frac=frac))
-        pred_configs, pred_mols, pred_path, c_path_fmter = _get_split(args, p, frac, atomic_numbers)
+        pred_configs, pred_mols, pred_path, c_path_fmter = _get_split(args, p, atomic_numbers, subsets, frac)
         predictions = run_prediction(pred_configs, pred_mols, basis, weights, dataset_paths.kernel,
                                      averages=averages if args.extra else None)
         if pred_path:
@@ -43,32 +44,13 @@ def main():  # noqa: D103
             np.savetxt(c_path_fmter(order=o.output_coeff_order, imol=imol), c)
 
 
-def get_pred_idx(args, p, frac):
-    """Get molecule indices and path to prediction for a subset.
-
-    args (argparse.Namespace): Parsed CLI arguments.
-    p (SimpleNamespace): Paths resolved from the configuration file.
-    frac (float): Training set fraction.
-
-    Returns:
-        tuple[np.nddarray[int], str]: Indices of the current set and path to the prediction file.
-    """
-    if args.training:
-        pred_configs = Subset(p.train_test_sets).get_training(frac)
-        pred_path = p.predictions.format(subset='training', train_frac=frac)
-    else:
-        pred_configs = Subset(p.train_test_sets).get_test()
-        pred_path = p.predictions.format(subset='test', train_frac=frac)
-    return pred_configs, pred_path
-
-
-def _get_split(args, p, frac, atomic_numbers):
+def _get_split(args, p, atomic_numbers, subsets, frac):
     if args.extra:
         pred_configs = np.arange(len(atomic_numbers))
         pred_path = None
         c_path_fmter = p.extra_predicted_coeff.format
     else:
-        pred_configs, pred_path = get_pred_idx(args, p, frac)
+        pred_configs, pred_path = subsets.get_pred_idx(args.training, p.predictions, frac)
         c_path_fmter = partial(p.predicted_coeff.format, train_frac=frac)
     return pred_configs, atomic_numbers[pred_configs], pred_path, c_path_fmter
 

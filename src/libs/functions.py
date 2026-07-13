@@ -96,6 +96,24 @@ class Subset:
         train = self.train[0:sizes[-1]]
         return sizes, train
 
+    def get_pred_idx(self, training, pred_template, frac):
+        """Get molecule indices and path to prediction for a subset.
+
+        training (bool): Whether use the training set instead of test.
+        pred_template (str): Template path for prediction file.
+        frac (float): Training set fraction.
+
+        Returns:
+            tuple[np.nddarray[int], str]: Indices of the current set and path to the prediction file.
+        """
+        if training:
+            pred_configs = self.get_training(frac)
+            pred_path = pred_template.format(subset='training', train_frac=frac)
+        else:
+            pred_configs = self.get_test()
+            pred_path = pred_template.format(subset='test', train_frac=frac)
+        return pred_configs, pred_path
+
 
 class Basis:
     """Basis metadata and indexing utilities."""

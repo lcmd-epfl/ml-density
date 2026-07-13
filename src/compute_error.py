@@ -7,10 +7,9 @@ import metatensor
 from qstack.io.metatensor import split, tensormap_to_array
 from qstack.fields.moments import r2_c as rho_moments
 from libs.config import get_settings
-from libs.functions import moldata_read, make_dummy_mol
+from libs.functions import moldata_read, make_dummy_mol, Subset
 from libs.tmap import tmap_add
 from libs.logger_setup import setup_logger
-from prediction import get_pred_idx
 
 logger = setup_logger(__name__, __file__)
 
@@ -54,7 +53,7 @@ def get_number_of_electrons(use_charges, atomic_numbers, df):
 
 class Error:
     """Prediction errors."""
-    fields = ('abs','rel', 'rel_bl', 'N')
+    fields = ('abs', 'rel', 'rel_bl', 'N')
 
     def __init__(self):
         """Initialize an Error instance with 0."""
@@ -83,6 +82,7 @@ def main():  # noqa: D103
     args, o, p = get_settings(return_args=['training'])
 
     df = pd.read_csv(p.dataset)
+    subsets = Subset(p.train_test_sets)
     averages = metatensor.load(p.spherical_averages)
     atomic_numbers = moldata_read(p.xyzfilename)
     N_all = get_number_of_electrons(o.use_charges, atomic_numbers, df)
@@ -91,7 +91,7 @@ def main():  # noqa: D103
     for frac in o.fracs:
         logger.info(f'fraction = {frac}')
 
-        pred_configs, pred_path = get_pred_idx(args, p, frac)
+        pred_configs, pred_path = subsets.get_pred_idx(args.training, p.predictions, frac)
         predictions = split(metatensor.load(pred_path))
         npred = len(pred_configs)
 
