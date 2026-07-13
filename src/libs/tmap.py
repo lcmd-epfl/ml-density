@@ -98,22 +98,6 @@ def merge_ref_ps(lmax, idx, ps_path_template):
     return metatensor.TensorMap(keys=tm_labels, blocks=[blocks[key] for key in keys])
 
 
-def sph2vector(atoms, basis, tensor):
-    """Convert TensorMap spherical coefficients to flattened AO vector form.
-
-    Args:
-        atoms (np.ndarray | list[int]): Atomic numbers of the molecule.
-        basis (.functions.Basis): Basis used for AO indexing.
-        tensor (metatensor.TensorMap): TensorMap with l=0 spherical coefficients.
-
-    Returns:
-        np.ndarray: Flattened AO vector with per-atom padding applied.
-    """
-    return np.hstack([
-            np.pad(np.squeeze(tensor.block(o3_lambda=0, center_type=q).values), (0, basis.nao_atom[q]-basis.nmax[q][0]))
-           for q in atoms])
-
-
 def tmap_add(x, dx):
     """Add matching TensorMap blocks from dx into x in place.
 

@@ -37,7 +37,7 @@ def parse_cli_args(return_args=None):
 
     subset = parser.add_mutually_exclusive_group()
     subset.add_argument("--subset-dummy-argument", action='store_true', help=argparse.SUPPRESS)
-    add_argument(subset, "--training", dest='training', action='store_true', help='run prediction / compute error on the training set instead of the test set')
+    add_argument(subset, "--training", "--train", dest='training', action='store_true', help='run prediction / compute error on the training set instead of the test set')
     add_argument(subset, "--extra", "--extrapolation", "--oos", dest="extra", action='store_true', help='run script for an out-of-sample set (extrapolation)')
 
     mpi = parser.add_mutually_exclusive_group()

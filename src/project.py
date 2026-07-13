@@ -31,31 +31,37 @@ def main():  # noqa: D103
 
     av_coefs = get_averages(nenv, basis, coefficients, ao_indices)
 
+    norms = np.zeros((len(mol_names), 2))
+
     for imol, (mol_name, coef, atoms, ao_index) in tqdm([*enumerate(zip(mol_names, coefficients, atomic_numbers, ao_indices, strict=True))]):
 
         mol = make_dummy_mol(atoms, basis=o.basisname, ignore=True)
 
         coef = reorder.reorder_ao(mol, coef, dest='gpr', src=o.coeff_order)
         np.save(p.clean_coefficients.format(imol), coef)
-        coef = remove_averages(ao_index, coef, av_coefs)
+        coef_baselined = remove_averages(ao_index, coef, av_coefs)
 
         if o.process_metric:
-            over = np.load(p.input_metrics.format(mol_name=mol_name))
-            over = reorder.reorder_ao(mol, over, dest='gpr', src=o.overlap_order)
-            metatensor.save(p.metric_matrix.format(imol), equio.array_to_tensormap(mol, over, src='gpr'))
+            metric = np.load(p.input_metrics.format(mol_name=mol_name))
+            metric = reorder.reorder_ao(mol, metric, dest='gpr', src=o.overlap_order)
+            metatensor.save(p.metric_matrix.format(imol), equio.array_to_tensormap(mol, metric, src='gpr'))
         else:
-            over = equio.tensormap_to_array(mol, metatensor.load(p.metric_matrix.format(imol)), dest='gpr', fast=True)
+            metric = equio.tensormap_to_array(mol, metatensor.load(p.metric_matrix.format(imol)), dest='gpr', fast=True)
 
-        proj = over @ coef
+        proj = metric @ coef_baselined
+        norm = coef @ metric @ coef
+        norm_baselined = coef_baselined @ proj
+        norms[imol] = (norm, norm_baselined)
         metatensor.save(p.projection.format(imol), equio.array_to_tensormap(mol, proj, src='gpr'))
     metatensor.save(p.spherical_averages, averages2tmap(av_coefs))
+    np.save(p.coef_norms, norms)
 
 
 def prepare_molecules(p):
     """Read dataset molecules, write a combined XYZ file, and return IDs with atomic numbers.
 
     Args:
-        p (types.SimpleNamespace): Paths namespace from get_settings().
+        p (SimpleNamespace): Paths resolved from the configuration file.
 
     Returns:
         tuple[list[str], list[np.ndarray]]: Molecule IDs and per-molecule atomic-number arrays.

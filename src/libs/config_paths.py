@@ -90,6 +90,7 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     '_baselinedwbase'    : PathSpecs('baselined_w_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/BASELINED_PROJECTIONS/projections_conf', 'Base path for projected coefficients.'),
                     'spherical_averages' : PathSpecs('averages_file', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/AVERAGES.mts', 'File to store spherical averages.'),
                     'train_test_sets'    : PathSpecs('trainingselfile', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/SELECTIONS/training_selection.csv', 'CSV file to store train/test molecule indices.'),
+                    'coef_norms'         : PathSpecs('coef_norms', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/norms.npy', 'Path for coefficient norms wrt the metric matrices.'),
                     '_avecfilebase'      : PathSpecs('avec_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/Avec', 'Base path for A-vector outputs.'),
                     '_bmatfilebase'      : PathSpecs('bmat_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/Bmat', 'Base path for B-matrix outputs.'),
                     },

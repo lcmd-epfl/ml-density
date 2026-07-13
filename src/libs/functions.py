@@ -122,7 +122,7 @@ class Basis:
 
     def __repr__(self):
         with np.printoptions(legacy="1.25"):
-            return f'Basis("{self.basisname}", {self.elements})'
+            return f'{self.__class__.__qualname__}("{self.basisname}", {self.elements})'
 
     def cat(self, atoms):
         """Build per-AO metadata table for a molecule.
@@ -256,7 +256,7 @@ class AOIndex:
 
     def __repr__(self):
         with np.printoptions(legacy="1.25"):
-            return f'AOIndex({self.atoms}, {self.basis})'
+            return f'{self.__class__.__qualname__}({self.atoms}, {self.basis})'
 
 
 def make_pyscf_mol(numbers, positions, basis, *, spin=None, charge=None, ignore=False):

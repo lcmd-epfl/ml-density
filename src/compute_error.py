@@ -7,9 +7,10 @@ import metatensor
 from qstack.io.metatensor import split, tensormap_to_array
 from qstack.fields.moments import r2_c as rho_moments
 from libs.config import get_settings
-from libs.functions import moldata_read, Basis, make_dummy_mol, Subset
-from libs.tmap import sph2vector
+from libs.functions import moldata_read, make_dummy_mol
+from libs.tmap import tmap_add
 from libs.logger_setup import setup_logger
+from prediction import get_pred_idx
 
 logger = setup_logger(__name__, __file__)
 
@@ -21,7 +22,7 @@ def correct_number_of_electrons(c, S, q, N):
         c (np.ndarray[float]): Input coefficient vector.
         S (np.ndarray[float]): Metric matrix.
         q (np.ndarray[float]): Number of electrons in each AO.
-        N (float): Target number of electrons.
+        N (int | float): Target number of electrons.
 
     Returns:
         np.ndarray: Corrected coefficient vector with q @ c equal to N.
@@ -51,70 +52,93 @@ def get_number_of_electrons(use_charges, atomic_numbers, df):
     return nuc_charges - inp  # use_charges=='charge'
 
 
+class Error:
+    """Prediction errors."""
+    fields = ('abs','rel', 'rel_bl', 'N')
+
+    def __init__(self):
+        """Initialize an Error instance with 0."""
+        for key in self.fields:
+            setattr(self, key, 0.0)
+
+    def __repr__(self):
+        return self.__class__.__qualname__+'('+', '.join(f'{key}={getattr(self, key)}' for key in self.fields)+')'
+
+    def __iadd__(self, other):
+        if isinstance(other, self.__class__):
+            for key in self.fields:
+                setattr(self, key, getattr(self, key) + getattr(other, key))
+            return self
+        return NotImplemented
+
+    def __itruediv__(self, other):
+        if isinstance(other, (int, float)):
+            for key in self.fields:
+                setattr(self, key, getattr(self, key)/other)
+            return self
+        return NotImplemented
+
+
 def main():  # noqa: D103
     args, o, p = get_settings(return_args=['training'])
 
     df = pd.read_csv(p.dataset)
     averages = metatensor.load(p.spherical_averages)
     atomic_numbers = moldata_read(p.xyzfilename)
-    basis = Basis(o.basisname, elements=averages.keys.column('center_type'))
     N_all = get_number_of_electrons(o.use_charges, atomic_numbers, df)
+    norms = np.load(p.coef_norms)
 
     for frac in o.fracs:
-
         logger.info(f'fraction = {frac}')
-        if args.training:
-            test_configs = Subset(p.train_test_sets).get_training(frac)
-            predictfile = p.predictions.format(subset='training', train_frac=frac)
-        else:
-            test_configs = Subset(p.train_test_sets).get_test()
-            predictfile = p.predictions.format(subset='test', train_frac=frac)
-        ntest = len(test_configs)
-        predictions = split(metatensor.load(predictfile))
 
-        total_N, total_abs, total_rel, total_rel_bl = 0.0, 0.0, 0.0, 0.0
+        pred_configs, pred_path = get_pred_idx(args, p, frac)
+        predictions = split(metatensor.load(pred_path))
+        npred = len(pred_configs)
+
+        total = Error()
 
         print()
-        for itest, imol in enumerate(test_configs):
+        for itest, imol in enumerate(pred_configs):
 
             atoms = atomic_numbers[imol]
-            N = N_all[imol]
-            mol = make_dummy_mol(atoms=atoms, basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
+            N    = N_all[imol]
+            mol  = make_dummy_mol(atoms=atoms, basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
             qvec = rho_moments(mol, rho=None, moments=(0,), per_atom=False)[0]
-
             S    = tensormap_to_array(mol, metatensor.load(p.metric_matrix.format(imol)), dest='gpr', fast=True)
             c0   = np.load(p.clean_coefficients.format(imol))
-            c_bl = tensormap_to_array(mol, predictions[itest], dest='gpr', fast=True)
-            c_av = sph2vector(atoms, basis, averages)
+            norm, norm_bl = norms[imol]
 
-            c0_bl = c0 - c_av
-            c   = c_bl + c_av
-            dc  = c - c0
+            tmap_add(predictions[itest], averages)
+            c = tensormap_to_array(mol, predictions[itest], dest='gpr', fast=True)
+            dc = c - c0
 
-            norm     = c0    @ S @ c0
-            norm_bl  = c0_bl @ S @ c0_bl
+            error = Error()
+            error.abs    = dc @ S @ dc
+            error.rel    = error.abs/norm * 100.0
+            error.rel_bl = error.abs/norm_bl * 100.0
 
-            total_abs    += (error        := dc @ S @ dc)
-            total_rel    += (error_rel    := error/norm * 100.0)
-            total_rel_bl += (error_rel_bl := error/norm_bl * 100.0)
-
-            nel0 = qvec @ c0
-            nel  = qvec @ c
+            N_c0 = qvec @ c0
+            N_pred = qvec @ c
             if o.use_charges:
-                total_N += abs(nel - N)
+                error.N = abs(N_pred - N)
                 dcn = correct_number_of_electrons(c, S, qvec, N) - c0
                 errorn_rel_bl = (dcn @ S @ dcn) / norm_bl * 100.0
-            else:
-                errorn_rel_bl = np.nan
 
-            s1 = f'mol # {itest:{len(str(ntest))}} ({imol:{len(str(len(atomic_numbers)))}}):  '
-            s2 = f'{error_rel_bl:8.3f} %  {error_rel:.2e} %    ( {error:.2e} )   {nel:8.4f} / {nel0:8.4f} ( {N:3d} )     (corr N: {errorn_rel_bl:8.3f} %)    {p.xyz.format(mol_name=df['id'][imol])}'
-            print(s1+s2)
+            total += error
 
-        print(f'\nfrac={frac}\tMAE = {total_rel_bl/ntest:.2e} %  {total_rel/ntest:.2e} %    ( {total_abs/ntest:.2e} )', end='')
+            print(''.join([
+                f'mol # {itest:{len(str(npred))}} ({imol:{len(str(len(atomic_numbers)))}}):  ',
+                f'{error.rel_bl:8.3f} %  {error.rel:.2e} %    ( {error.abs:.2e} )   ',
+                f'{N_pred:8.4f} / {N_c0:8.4f} ( {N:3d} )     ',
+                f'(corr N: {errorn_rel_bl:8.3f} %)    ' if o.use_charges else '',
+                f'{p.xyz.format(mol_name=df['id'][imol])}',
+                ]))
 
-        if o.use_charges:
-            print(f'  ΔN: {total_N/ntest:.2e}')
+        total /= npred
+        print(''.join([
+            f'\nfrac={frac}\tMAE = {total.rel_bl:.2e} %  {total.rel:.2e} %    ( {total.abs:.2e} )',
+            '  ΔN: {total.N:.2e}' if o.use_charges else '',
+            ]))
 
 
 if __name__=='__main__':

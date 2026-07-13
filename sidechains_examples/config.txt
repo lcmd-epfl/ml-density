@@ -58,3 +58,4 @@ goodcoef_base    = INNER/coeff/mol
 averages_file    = INNER/AVERAGES.mts
 baselined_w_base = INNER/BASELINED_PROJECTIONS/projections_conf
 avec_base        = INNER/Avec
+coef_norms       = INNER/coef_norms.npy
