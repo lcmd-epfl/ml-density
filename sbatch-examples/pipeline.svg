@@ -470,7 +470,7 @@
                style="font-size:4.93889px;text-align:center;text-anchor:middle;stroke-width:0.264583"
                y="51.422562"
                x="91.636322"
-               sodipodi:role="line">project.py</tspan></text>
+               sodipodi:role="line">preprocess.py</tspan></text>
         </g>
       </g>
     </g>
@@ -514,7 +514,7 @@
                style="font-size:4.93889px;text-align:center;text-anchor:middle;stroke-width:0.264583"
                y="51.422562"
                x="91.636322"
-               sodipodi:role="line">get_power_spectra.py</tspan></text>
+               sodipodi:role="line">power_spectra.py</tspan></text>
         </g>
       </g>
     </g>
@@ -558,7 +558,7 @@
                style="font-size:4.93888903px;text-align:center;text-anchor:middle;stroke-width:0.26458332"
                y="49.658669"
                x="91.636322"
-               sodipodi:role="line">environments.py</tspan></text>
+               sodipodi:role="line">select_reference_environments.py</tspan></text>
         </g>
       </g>
     </g>
@@ -600,7 +600,7 @@
              x="91.636322"
              y="49.658669"
              style="font-size:4.93888903px;text-align:center;text-anchor:middle;stroke-width:0.26458332"
-             id="tspan839-0-8">power_spectra_ref.py</tspan></text>
+             id="tspan839-0-8">power_spectra_reference.py</tspan></text>
       </g>
     </g>
     <g
@@ -643,7 +643,7 @@
              x="91.636322"
              y="49.658669"
              style="font-size:4.93888903px;text-align:center;text-anchor:middle;stroke-width:0.26458332"
-             id="tspan839-0-26">rmatrix.py</tspan></text>
+             id="tspan839-0-26">kernel_mm.py</tspan></text>
       </g>
     </g>
     <g
@@ -686,7 +686,7 @@
              x="91.636322"
              y="49.658669"
              style="font-size:4.93888903px;text-align:center;text-anchor:middle;stroke-width:0.26458332"
-             id="tspan839-0-1">kernels.py</tspan></text>
+             id="tspan839-0-1">kernel_nm.py</tspan></text>
       </g>
     </g>
     <g
@@ -1067,7 +1067,7 @@
              x="91.636322"
              y="49.658669"
              style="font-size:4.93888903px;text-align:center;text-anchor:middle;stroke-width:0.26458332"
-             id="tspan839-0-87">ex_kernels.py</tspan></text>
+             id="tspan839-0-87">ex_kernel_nm.py</tspan></text>
       </g>
     </g>
     <g

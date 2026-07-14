@@ -12,5 +12,5 @@ module load intelmpi/17.0.4
 
 conda activate density
 path=../GIT/SOURCE
-time $path/environments.py
-time $path/power_spectra_ref.py
+time $path/select_reference_environments.py
+time $path/power_spectra_reference.py

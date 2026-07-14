@@ -12,4 +12,4 @@ module load intelmpi/17.0.4
 
 conda activate density
 path=../GIT/SOURCE
-time srun $path/kernels.py
+time srun $path/kernel_nm.py

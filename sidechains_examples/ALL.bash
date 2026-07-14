@@ -1,18 +1,18 @@
 path=../src
 
-$path/project.py
+$path/preprocess.py
 $path/training_selection.py
-$path/get_power_spectra.py
-$path/environments.py
-$path/power_spectra_ref.py
-$path/rmatrix.py
-$path/kernels.py
+$path/power_spectra.py
+$path/select_reference_environments.py
+$path/power_spectra_reference.py
+$path/kernel_mm.py
+$path/kernel_nm.py
 $path/get_matrices.py
 $path/get_matrices.py -b
 $path/regression.py
 $path/prediction.py
 $path/compute_error.py > error.txt
 
-# $path/get_power_spectra.py --extra
-# $path/kernels.py --extra
+# $path/power_spectra.py --extra
+# $path/kernel_nm.py --extra
 # $path/prediction.py --extra
