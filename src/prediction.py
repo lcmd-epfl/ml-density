@@ -37,10 +37,10 @@ def main():  # noqa: D103
         for imol, atoms, pred in zip(tqdm(pred_configs), pred_mols, predictions, strict=True):
             if not args.extra:
                 tmap_add(pred, averages)
-            c = tmap2vector(atoms, basis.llist, pred)
+            mol = make_dummy_mol(atoms, basis=o.basisname, ignore=True)
+            c = tmap2vector(mol, pred)
             if o.output_coeff_order != 'gpr':
-                pyscf_mol = make_dummy_mol(atoms, basis=o.basisname, ignore=True)
-                c = reorder.reorder_ao(pyscf_mol, c, dest=o.output_coeff_order, src='gpr')
+                c = reorder.reorder_ao(mol, c, dest=o.output_coeff_order, src='gpr')
             np.savetxt(c_path_fmter(order=o.output_coeff_order, imol=imol), c)
 
 
