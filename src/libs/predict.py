@@ -4,6 +4,7 @@ import numpy as np
 import metatensor
 from tqdm import tqdm
 from libs.tmap import vector2tmap
+from libs.functions import make_dummy_mol
 
 
 def compute_prediction(atoms, basis, kernel, weights, averages=None):
@@ -20,7 +21,8 @@ def compute_prediction(atoms, basis, kernel, weights, averages=None):
         metatensor.TensorMap: Predicted coefficient TensorMap for the molecule.
     """
     nao = basis.nao_for_mol(atoms)
-    coeffs = vector2tmap(atoms, basis.llist, np.zeros(nao))
+    mol = make_dummy_mol(atoms, basis=basis.basisname, ignore=True)
+    coeffs = vector2tmap(mol, np.zeros(nao))
     for (l, q), cblock in coeffs.items():
         wblock = weights.block(o3_lambda=l, center_type=q)
         kblock = kernel.block(o3_lambda=l, center_type=q)

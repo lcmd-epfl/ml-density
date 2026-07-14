@@ -5,7 +5,7 @@ reference_environments = 32
 seed = 1
 train_size = 8
 train_fractions = 1.0
-regular = 1e-6
+regularisation = 1e-6
 jitter = 1e-8
 
 [options.soap]
@@ -13,8 +13,8 @@ soap_sigma = 0.3
 soap_rcut  = 4.0
 soap_ncut  = 7
 soap_lcut  = 6
-ps_min_norm = 1e-20
-ps_normalize = true
+power_spectra_min_norm = 1e-20
+power_spectra_normalize = true
 
 [options.rho]
 basis = cc-pvqz-jkfit
@@ -38,24 +38,24 @@ predict_base     = INNER/prediction
 output_base      = INNER/predicted/rho
 
 [paths.extrapolation]
-xyzfile      = extra/1.xyz
-ps_base      = extra/PS
-kernel_base  = extra/kernel
-output_base  = extra/rho
+xyz                       = extra/1.xyz
+power_spectra_base        = extra/PS
+kernel_base               = extra/kernel
+output_base               = extra/rho
 
 # this section is optional and can be safely removed
 [paths.internal]
-xyzfile          = INNER/dataset.xyz
-ps_split_base    = INNER/PS/PS
-ps_ref_base      = INNER/PS
-refs_sel_base    = INNER/SELECTIONS/refs_selection
-trainingselfile  = INNER/SELECTIONS/training_selection.csv
-kmm_base         = INNER/KMM
-kernel_conf_base = INNER/KERNELS/kernel_conf
-goodover_base    = INNER/metric/mol
-bmat_base        = INNER/Bmat
-goodcoef_base    = INNER/coeff/mol
-averages_file    = INNER/AVERAGES.mts
-baselined_w_base = INNER/BASELINED_PROJECTIONS/projections_conf
-avec_base        = INNER/Avec
-coef_norms       = INNER/coef_norms.npy
+xyz                           = INNER/dataset.xyz
+power_spectra_split_base      = INNER/PS/PS
+power_spectra_reference_base  = INNER/PS
+reference_selection_base      = INNER/SELECTIONS/refs_selection
+training_selection            = INNER/SELECTIONS/training_selection.csv
+kmm_base                      = INNER/KMM
+kernel_nm_base                = INNER/KERNELS/kernel_conf
+metric_matrix_base            = INNER/metric/mol
+b_matrix_base                 = INNER/Bmat
+coeffs_base                   = INNER/coeff/mol
+averages                      = INNER/AVERAGES.mts
+baselined_weights_base        = INNER/BASELINED_PROJECTIONS/projections_conf
+a_vector_base                 = INNER/Avec
+coef_norms                    = INNER/coef_norms.npy

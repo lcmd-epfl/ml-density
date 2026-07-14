@@ -4,12 +4,16 @@ import gc
 import numpy as np
 import metatensor
 from qstack.io import metatensor as equio
-from qstack.io.metatensor import _vector_to_tensormap as vector2tmap
+from qstack.io.metatensor import _vector_to_tensormap as vector2tmap  # noqa: F401
 from qstack.io.metatensor import _tensormap_to_vector as tmap2vector  # noqa: F401
 
 
 def averages2tmap(averages):
     """Convert per-element spherical averages to TensorMap format.
+
+    Built directly (not via vector2tmap/_vector_to_tensormap) because `averages` only holds the
+    l=0 subset of each element's basis, while _vector_to_tensormap derives its angular-momentum
+    list from a full pyscf Mole's basis and would require every shell, not just l=0.
 
     Args:
         averages (dict[int, np.ndarray]): Per-element l=0 average coefficient vectors.
@@ -18,9 +22,16 @@ def averages2tmap(averages):
         metatensor.TensorMap: TensorMap storing per-element spherical averages.
     """
     atoms = np.array(sorted(averages.keys()))
-    llist = {q:[0]*len(v) for q, v in averages.items()}
-    c = np.hstack([averages[q] for q in atoms])
-    return vector2tmap(atoms, llist, c)
+    tm_label_vals = [(0, q) for q in atoms]
+    tensor_blocks = []
+    for iat, q in enumerate(atoms):
+        v = averages[q]
+        properties = metatensor.Labels(equio.vector_label_names.block_prop, np.arange(len(v)).reshape(-1,1))
+        samples    = metatensor.Labels(equio.vector_label_names.block_samp, np.array([[iat]]))
+        components = [metatensor.Labels([name], np.array([[0]])) for name in equio.vector_label_names.block_comp]
+        tensor_blocks.append(metatensor.TensorBlock(values=v.reshape(1,1,-1), samples=samples, components=components, properties=properties))
+    tm_labels = metatensor.Labels(equio.vector_label_names.tm, np.array(tm_label_vals))
+    return metatensor.TensorMap(keys=tm_labels, blocks=tensor_blocks)
 
 
 def kernels2tmap(atom_charges, kernel):
