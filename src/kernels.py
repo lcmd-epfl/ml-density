@@ -15,7 +15,7 @@ logger = setup_logger(__name__, __file__)
 
 def main():  # noqa: D103
     args, _, p = get_settings(return_args=['missing_only', 'mpi', 'extra'])
-    dataset_paths = get_dataset_paths(p, args.extra)
+    dataset_paths = get_dataset_paths(p, extra=args.extra)
     run_kernel(dataset_paths, p.reference_power_spectra, missing_only=args.missing_only, use_mpi=args.mpi)
 
 

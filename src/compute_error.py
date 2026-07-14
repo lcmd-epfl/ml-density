@@ -137,7 +137,7 @@ def main():  # noqa: D103
         total /= npred
         print(''.join([
             f'\nfrac={frac}\tMAE = {total.rel_bl:.2e} %  {total.rel:.2e} %    ( {total.abs:.2e} )',
-            '  ΔN: {total.N:.2e}' if o.use_charges else '',
+            f'  ΔN: {total.N:.2e}' if o.use_charges else '',
             ]))
 
 
