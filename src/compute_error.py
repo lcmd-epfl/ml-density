@@ -78,6 +78,41 @@ class Error:
         return NotImplemented
 
 
+def table_legend(use_charges):
+    """Build the legend explaining the columns of the printed error table.
+
+    Args:
+        use_charges (str | None): Mode controlling which dataset column is used (None, "charge", or "N").
+
+    Returns:
+        str: Legend text; the electron-number-correction lines are included only if use_charges is set.
+    """
+    return '\n'.join([
+        '',
+        'TABLE LEGEND',
+        'mol # i (j)  : molecule i within this test set (dataset index j)',
+        'baselined    : (c - c0)^T S (c - c0) / (c0 - c_av)^T S (c0 - c_av) * 100',
+        'relative     : (c - c0)^T S (c - c0) / c0^T S c0 * 100',
+        'absolute     : (c - c0)^T S (c - c0)',
+        'nel_pred     : predicted number of electrons, q^T c',
+        'nel_ref      : reference number of electrons, q^T c0',
+        'N            : expected number of electrons (nuclear charge, or from the dataset charge/N column)',
+        *(['corr N       : baselined relative error after projecting the prediction onto q^T c = N.'] if use_charges else []),
+        'MAE          : mean of the above errors over all molecules in the fraction',
+        *(['ΔN           : mean |nel_pred - N| over all molecules'] if use_charges else []),
+        'where',
+        'c    = predicted coefficients',
+        'c0   = reference (ab initio) coefficients',
+        'c_av = per-element average coefficients, subtracted before training and added back at prediction time',
+        'S    = metric (overlap) matrix',
+        'q    = number of electrons per atomic orbital',
+        '',
+        'The baselined error isolates the ML-predicted part (c - c_av) from the trivial part (c_av),',
+        'making it the more meaningful measure of model error.',
+        '',
+        ])
+
+
 def main():  # noqa: D103
     args, o, p = get_settings(return_args=['training'])
 
@@ -98,6 +133,8 @@ def main():  # noqa: D103
         total = Error()
 
         print()
+        indent = len(f'mol # {0:{len(str(npred))}} ({0:{len(str(len(atomic_numbers)))}}):  ') - 1
+        print(f'{"":<{indent}}{"baselined":<10}   {"relative":^10}   ( {"absolute":^8} )   {"nel_pred":>8} / {"nel_ref":>8} ( {"N":^3} )')
         for itest, imol in enumerate(pred_configs):
 
             atoms = atomic_numbers[imol]
@@ -127,18 +164,20 @@ def main():  # noqa: D103
             total += error
 
             print(''.join([
-                f'mol # {itest:{len(str(npred))}} ({imol:{len(str(len(atomic_numbers)))}}):  ',
-                f'{error.rel_bl:8.3f} %  {error.rel:.2e} %    ( {error.abs:.2e} )   ',
-                f'{N_pred:8.4f} / {N_c0:8.4f} ( {N:3d} )     ',
-                f'(corr N: {errorn_rel_bl:8.3f} %)    ' if o.use_charges else '',
+                f'mol # {itest:{len(str(npred))}} ({imol:{len(str(len(atomic_numbers)))}}):   ',
+                f'{error.rel_bl:8.2e} %  {error.rel:.2e} %  ( {error.abs:.2e} )   ',
+                f'{N_pred:8.4f} / {N_c0:8.4f} ( {N:3d} )   ',
+                f'(corr N: {errorn_rel_bl:8.2e} %)   ' if o.use_charges else '',
                 f'{p.xyz.format(mol_name=df['id'][imol])}',
                 ]))
 
         total /= npred
         print(''.join([
-            f'\nfrac={frac}\tMAE = {total.rel_bl:.2e} %  {total.rel:.2e} %    ( {total.abs:.2e} )',
-            f'  ΔN: {total.N:.2e}' if o.use_charges else '',
+            f'\nfrac={frac}  MAE = {total.rel_bl:.2e} %  {total.rel:.2e} %  ( {total.abs:.2e} )',
+            f'   ΔN: {total.N:.2e}' if o.use_charges else '',
             ]))
+
+    print(table_legend(o.use_charges), end='')
 
 
 if __name__=='__main__':

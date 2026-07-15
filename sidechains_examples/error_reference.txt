@@ -1,13 +1,35 @@
-2026-07-06 21:20:05 compute_error.py [config.py:25] INFO: Configuration file: config.txt
-2026-07-06 21:20:05 compute_error.py [compute_error.py:44] INFO: fraction = 1.0
+2026-07-15 02:33:56 compute_error.py [config_parser.py:77] INFO: Configuration file: config.txt
+2026-07-15 02:33:56 compute_error.py [compute_error.py:127] INFO: fraction = 1.0
 
-mol # 0 ( 0):     9.150 %  6.98e-03 %    ( 1.06e-01 )    79.9043 /  79.9988 (  80 )     (corr N:    9.065 %)    dataset/dimer0001.xyz
-mol # 1 ( 5):   762.373 %  3.10e-01 %    ( 5.17e+00 )    86.9642 /  83.9995 (  84 )     (corr N:  619.242 %)    dataset/dimer0008.xyz
-mol # 2 ( 8):     0.138 %  1.49e-04 %    ( 5.85e-04 )    35.9846 /  35.9995 (  36 )     (corr N:    0.132 %)    dataset/dimer0011.xyz
-mol # 3 ( 9):   410.196 %  3.95e-01 %    ( 3.31e+00 )    47.5636 /  50.0000 (  50 )     (corr N:  310.668 %)    dataset/dimer0012.xyz
-mol # 4 (11):     0.509 %  4.83e-04 %    ( 2.70e-03 )    43.9615 /  43.9995 (  44 )     (corr N:    0.474 %)    dataset/dimer0014.xyz
-mol # 5 (12):     1.094 %  8.48e-04 %    ( 8.00e-03 )    57.9006 /  57.9981 (  58 )     (corr N:    0.931 %)    dataset/dimer0019.xyz
-mol # 6 (14):     0.094 %  9.92e-05 %    ( 3.94e-04 )    35.9961 /  35.9996 (  36 )     (corr N:    0.093 %)    dataset/dimer0021.xyz
-mol # 7 (15):     4.993 %  3.75e-03 %    ( 5.08e-02 )    72.2583 /  71.9991 (  72 )     (corr N:    4.211 %)    dataset/dimer0022.xyz
+              baselined     relative    ( absolute )   nel_pred /  nel_ref (  N  )
+mol # 0 ( 0):   9.15e+00 %  6.98e-03 %  ( 1.06e-01 )    79.9043 /  79.9988 (  80 )   (corr N: 9.06e+00 %)   dataset/dimer0001.xyz
+mol # 1 ( 5):   7.62e+02 %  3.10e-01 %  ( 5.17e+00 )    86.9642 /  83.9995 (  84 )   (corr N: 6.19e+02 %)   dataset/dimer0008.xyz
+mol # 2 ( 8):   1.38e-01 %  1.49e-04 %  ( 5.85e-04 )    35.9846 /  35.9995 (  36 )   (corr N: 1.32e-01 %)   dataset/dimer0011.xyz
+mol # 3 ( 9):   4.10e+02 %  3.95e-01 %  ( 3.31e+00 )    47.5636 /  50.0000 (  50 )   (corr N: 3.11e+02 %)   dataset/dimer0012.xyz
+mol # 4 (11):   5.09e-01 %  4.83e-04 %  ( 2.70e-03 )    43.9615 /  43.9995 (  44 )   (corr N: 4.74e-01 %)   dataset/dimer0014.xyz
+mol # 5 (12):   1.09e+00 %  8.48e-04 %  ( 8.00e-03 )    57.9006 /  57.9981 (  58 )   (corr N: 9.31e-01 %)   dataset/dimer0019.xyz
+mol # 6 (14):   9.38e-02 %  9.92e-05 %  ( 3.94e-04 )    35.9961 /  35.9996 (  36 )   (corr N: 9.34e-02 %)   dataset/dimer0021.xyz
+mol # 7 (15):   4.99e+00 %  3.75e-03 %  ( 5.08e-02 )    72.2583 /  71.9991 (  72 )   (corr N: 4.21e+00 %)   dataset/dimer0022.xyz
 
-frac=1.0	MAE = 1.49e+02 %  8.96e-02 %    ( 1.08e+00 )  ΔN: 7.39e-01
+frac=1.0  MAE = 1.49e+02 %  8.96e-02 %  ( 1.08e+00 )   ΔN: 7.39e-01
+
+TABLE LEGEND
+mol # i (j)  : molecule i within this test set (dataset index j)
+baselined    : (c - c0)^T S (c - c0) / (c0 - c_av)^T S (c0 - c_av) * 100
+relative     : (c - c0)^T S (c - c0) / c0^T S c0 * 100
+absolute     : (c - c0)^T S (c - c0)
+nel_pred     : predicted number of electrons, q^T c
+nel_ref      : reference number of electrons, q^T c0
+N            : expected number of electrons (nuclear charge, or from the dataset charge/N column)
+corr N       : baselined relative error after projecting the prediction onto q^T c = N.
+MAE          : mean of the above errors over all molecules in the fraction
+ΔN           : mean |nel_pred - N| over all molecules
+where
+c    = predicted coefficients
+c0   = reference (ab initio) coefficients
+c_av = per-element average coefficients, subtracted before training and added back at prediction time
+S    = metric (overlap) matrix
+q    = number of electrons per atomic orbital
+
+The baselined error isolates the ML-predicted part (c - c_av) from the trivial part (c_av),
+making it the more meaningful measure of model error.
