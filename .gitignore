@@ -6,7 +6,13 @@
 
 sidechains_examples/INNER/
 sidechains_examples/error.txt
+sidechains_examples/error_gpr.txt
+sidechains_examples/CUBE/
+sidechains_examples/DENSITY/
+sidechains_examples/*.cube
+sidechains_examples/data.txt
 sidechains_examples/extra/PS_0.mts
 sidechains_examples/extra/kernel0.dat.mts
 sidechains_examples/extra/kernel0.mts
 sidechains_examples/extra/rho_gpr_0.dat
+sidechains_examples/extra/rho_gpr_var_0.dat

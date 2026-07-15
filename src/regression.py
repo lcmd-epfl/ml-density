@@ -9,7 +9,8 @@ from numba import jit
 import metatensor
 from libs.tmap import vector2tmap
 from libs.config import get_settings
-from libs.functions import Basis
+from libs.functions import Basis, make_dummy_mol
+from libs.pitc_lib import kmm_cholesky, robust_cholesky
 from libs.logger_setup import setup_logger
 
 logger = setup_logger(__name__, __file__)
@@ -22,19 +23,38 @@ def main():  # noqa: D103
     basis = Basis(o.basisname, ref_elements)
     totsize = basis.nao_for_mol(ref_elements)
 
-    k_MM = metatensor.load(p.kernel_mm)
     mat  = np.ndarray((totsize,totsize))
-    idx = basis.sparse_indices(ref_elements)
+    mol = make_dummy_mol(ref_elements, basis=o.basisname, ignore=True)
 
     logger.debug(f'problem dimensionality = {totsize}')
 
-    for frac in o.fracs:
-        Avec = np.loadtxt(p.avec.format(train_frac=frac))
-        mat[:] = 0
-        fill_matrix(mat, k_MM, p.bmat.format(train_frac=frac), idx, basis.nmax, o.jit, o.reg)
-        weights = spl.solve(mat, Avec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
-        weights = vector2tmap(ref_elements, basis.llist, weights)
-        metatensor.save(p.weights.format(train_frac=frac), weights)
+    if o.full_gpr:
+        k_MM_tmap = metatensor.load(p.kernel_mm)
+        k_mm_dense, _ = kmm_cholesky(basis, ref_elements, k_MM_tmap, o.jit)
+
+        for frac in o.fracs:
+            bvec = np.loadtxt(p.avec.format(train_frac=frac))
+            mat[:] = 0
+            unravel_tril(mat, np.fromfile(p.bmat.format(train_frac=frac)), 0.0)
+            mat += k_mm_dense
+            L, used_jit = robust_cholesky(mat, o.jit)
+            if used_jit!=o.jit:
+                logger.warning(f'PITC system needed jitter {used_jit} (bigger than o.jit={o.jit}) to be positive definite')
+            x = spl.cho_solve((L, True), bvec)
+            np.save(p.cholesky_pitc.format(train_frac=frac), L)
+            weights = vector2tmap(mol, x)
+            metatensor.save(p.weights.format(train_frac=frac), weights)
+    else:
+        k_MM = metatensor.load(p.kernel_mm)
+        idx = basis.sparse_indices(ref_elements)
+
+        for frac in o.fracs:
+            Avec = np.loadtxt(p.avec.format(train_frac=frac))
+            mat[:] = 0
+            fill_matrix(mat, k_MM, p.bmat.format(train_frac=frac), idx, basis.nmax, o.jit, o.reg)
+            weights = spl.solve(mat, Avec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
+            weights = vector2tmap(mol, weights)
+            metatensor.save(p.weights.format(train_frac=frac), weights)
 
 
 @jit(nopython=True)

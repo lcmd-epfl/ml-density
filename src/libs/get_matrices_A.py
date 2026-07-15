@@ -2,8 +2,11 @@
 
 import logging
 import numpy as np
+import scipy.linalg as spl
 import metatensor
+from qstack.io.metatensor import tensormap_to_array
 from libs.tmap import vector2tmap, tmap2vector
+from libs.functions import make_dummy_mol
 
 logger = logging.getLogger('__main__')
 
@@ -44,8 +47,30 @@ def do_work_a(conf, path_proj, path_kern, Avec):
         ablock.values[...] += np.einsum('kmMr,kmn->rMn', kblock.values, pblock.values)
 
 
+def do_work_a_pitc(mol_idx, paths, lambda_inv_i, kmat_i, s_i, mol_i, bvec):
+    """Accumulate the PITC b-vector contribution for one training molecule.
+
+    Computes b_i = K_{I_i,M}^T Lambda_i^-1 S_i^-1 w_i, where w_i is molecule i's AO-basis
+    projection (p.projection).
+
+    Args:
+        mol_idx (int): Molecule index.
+        paths (SimpleNamespace): Configured paths and path templates.
+        lambda_inv_i (np.ndarray): Lambda_i^-1, from molecule_lambda_inv_kmat().
+        kmat_i (np.ndarray): K_{I_i,M}, from molecule_lambda_inv_kmat().
+        s_i (np.ndarray): Jittered S_i, from molecule_lambda_inv_kmat().
+        mol_i (pyscf.gto.Mole): Dummy mol matching molecule i's AO layout, from molecule_lambda_inv_kmat().
+        bvec (np.ndarray): Dense (totsize,) accumulator, updated in place.
+    """
+    proj_i = tensormap_to_array(mol_i, metatensor.load(paths.projection.format(mol_idx)), dest='gpr', fast=True)
+    sinv_w_i = spl.cho_solve(spl.cho_factor(s_i), proj_i)
+    bvec += kmat_i.T @ (lambda_inv_i @ sinv_w_i)
+
+
 def get_a(basis, ref_elem, fracs, ntrains, training_idx, paths):
     """Build and save A vectors for all requested training fractions.
+
+    SoR only (full_GPR=False)
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
@@ -59,10 +84,12 @@ def get_a(basis, ref_elem, fracs, ntrains, training_idx, paths):
     print_batches(fracs, ntrains, paths.avec)
 
     totsize = basis.nao_for_mol(ref_elem)
-    A1 = vector2tmap(ref_elem, basis.llist, np.zeros(totsize))
+    mol = make_dummy_mol(ref_elem, basis=basis.basisname, ignore=True)
+    A1 = vector2tmap(mol, np.zeros(totsize))
+
     for frac, ntrain in zip(fracs, ntrains, strict=True):
         for imol in range(ntrain[0], ntrain[1]):
             logger.info(f'{0:4d}: {imol:4d}', extra={'flush': True})
             do_work_a(training_idx[imol], paths.projection, paths.kernel_nm, A1)
-        A = tmap2vector(ref_elem, basis.llist, A1)
+        A = tmap2vector(mol, A1)
         np.savetxt(paths.avec.format(train_frac=frac), A)

@@ -4,7 +4,7 @@
 import itertools
 import pandas as pd
 from libs.config import get_settings
-from libs.functions import Basis, Subset
+from libs.functions import Basis, Subset, moldata_read
 from libs.get_matrices_A import get_a
 from libs.get_matrices_B import get_b
 from libs.logger_setup import setup_logger
@@ -15,6 +15,10 @@ logger = setup_logger(__name__, __file__)
 def main():  # noqa: D103
     args, o, p = get_settings(return_args=['get_b_matrix', 'mpi'])
 
+    if o.full_gpr and not args.get_b_matrix:
+        msg = 'get_matrices.py (without -b) does not support full_gpr -- run get_matrices.py -b instead, which builds both the A-vector and B-matrix together'
+        raise RuntimeError(msg)
+
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     basis = Basis(o.basisname, elements=ref_elements)
 
@@ -23,7 +27,8 @@ def main():  # noqa: D103
     ntrains = list(itertools.pairwise([0, *ntrains]))
 
     if args.get_b_matrix:
-        get_b(basis, ref_elements, o.fracs, ntrains, train_configs, p, use_mpi=args.mpi)
+        atomic_numbers = moldata_read(p.xyzfilename)
+        get_b(basis, ref_elements, o.fracs, ntrains, train_configs, p, o, atomic_numbers, use_mpi=args.mpi)
     else:
         get_a(basis, ref_elements, o.fracs, ntrains, train_configs, p)
 

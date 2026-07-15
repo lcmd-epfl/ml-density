@@ -35,6 +35,7 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     'fracs'              : OptSpecs('train_fractions', np.array([1.0]), Floats(), 'Comma-separated training fractions for learning curve.'),
                     'reg'                : OptSpecs('regularisation', 1e-6, float, 'Ridge regularization strength for regression.'),
                     'jit'                : OptSpecs('jitter', 1e-10, float, 'Diagonal regularization strength for regression.'),
+                    'full_gpr'           : OptSpecs('full_gpr', default=False, dtype=Bool(), help='Enable full/exact GPR via PITC sparcification, unlocking access to the variance.'),
                     },
                 'options.soap': {
                     'soap_sigma'         : OptSpecs('soap_sigma', 0.3, float, 'Gaussian width of atomic neighbor densities in λ-SOAP power spectra.'),
@@ -138,6 +139,9 @@ def read_config(config_path=defaults.config, *, print_help=False):
         paths.weights                 = f'{p['_weightsfilebase']}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
         paths.predictions             = f'{p['_predictfilebase']}_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
         paths.predicted_coeff         = f'{p['_outfilebase']}_tf{{train_frac}}_{{order}}_{{imol}}.dat'
+        # PITC-only outputs
+        paths.cholesky_pitc           = f'{p['_weightsfilebase']}_cholesky_pitc_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.npy'
+        paths.var_trace               = f'{p['_predictfilebase']}_vartrace_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.csv'
 
         paths.extra_kernel_nm         = f'{p['_kernelexbase']}{{}}.mts'
         paths.extra_power_spectrum    = f'{p['_powerexbase']}_{{}}.mts'

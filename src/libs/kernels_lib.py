@@ -1,5 +1,6 @@
 """Compute kernels with reference environments."""
 
+
 import numpy as np
 import metatensor
 from libs.tmap import kernels2tmap, kmm2tmap
@@ -51,6 +52,70 @@ def kernel_for_mol(atoms, power_ref, power_file, kernel_file):
     power = metatensor.load(power_file)
     k_NM = kernel_nm(atoms, power, power_ref)
     metatensor.save(f'{kernel_file}', k_NM)
+
+
+def kernel_block_to_dense_rect(basis, atoms_left, elem_right, k_tmap):
+    """Expand a K_NM-style kernel TensorMap into a dense (nao_left, nao_right) matrix.
+
+    A kernel value depends only on (l, q), not on the radial channel n, so it is broadcast
+    identically across every (n_left, n_right) radial-channel pair within a given (atom, l) AO
+    block. This differs from regression.fill_matrix()'s diagonal-in-n placement, which is only
+    correct there because it builds an ad hoc regularizer, not a literal kernel value.
+
+    Args:
+        basis (.functions.Basis): Basis used for AO indexing.
+        atoms_left (np.ndarray[int]): Atomic numbers of the molecule side (rows), natural atom order.
+        elem_right (np.ndarray[int]): Atomic numbers of the reference-like side (columns), in the
+            order used to build k_tmap's reference axis (e.g. ref_elem for K_NM/K_N*M).
+        k_tmap (metatensor.TensorMap): Kernel TensorMap keyed by (o3_lambda, center_type), blocks
+            shaped (n_atoms_of_q_left, msize, msize, n_atoms_of_q_right), as produced by kernel_nm().
+
+    Returns:
+        np.ndarray: Dense (nao_left, nao_right) kernel matrix.
+    """
+    idx_left  = basis.sparse_indices(atoms_left)
+    idx_right = basis.sparse_indices(elem_right)
+    dense = np.zeros((basis.nao_for_mol(atoms_left), basis.nao_for_mol(elem_right)))
+    for (l, q), kblock in k_tmap.items():
+        msize = 2*l+1
+        nsize = basis.nmax[q][l]
+        for iiat, iat in enumerate(np.where(atoms_left==q)[0]):
+            i1 = idx_left[iat, l]
+            for iiref, iref in enumerate(np.where(elem_right==q)[0]):
+                i2 = idx_right[iref, l]
+                dk = kblock.values[iiat, :, :, iiref]
+                dense[i1:i1+nsize*msize, i2:i2+nsize*msize] = np.tile(dk, (nsize, nsize))
+    return dense
+
+
+def kernel_block_to_dense_self(basis, elem, k_mm_tmap):
+    """Expand a K_MM-style self/pairwise kernel TensorMap into a dense (nao, nao) matrix.
+
+    Args:
+        basis (.functions.Basis): Basis used for AO indexing.
+        elem (np.ndarray[int]): Atomic numbers defining the AO layout on both sides, in the order
+            matching k_mm_tmap's ref_env1/ref_env2 sample axis (e.g. ref_elem for K_MM, or one
+            molecule's own natural atom order for K_{I_i,I_i} / K_{N*,N*}).
+        k_mm_tmap (metatensor.TensorMap): TensorMap produced by kernel_mm().
+
+    Returns:
+        np.ndarray: Dense symmetric (nao, nao) kernel matrix, full (n1, n2) broadcast.
+    """
+    idx = basis.sparse_indices(elem)
+    dense = np.zeros((basis.nao_for_mol(elem), basis.nao_for_mol(elem)))
+    for (l, q), kblock in k_mm_tmap.items():
+        msize = 2*l+1
+        nsize = basis.nmax[q][l]
+        atoms_of_q = np.where(elem==q)[0]
+        nsamp = len(atoms_of_q)
+        values = kblock.values[...,0].reshape(nsamp, nsamp, msize, msize)
+        for iia, ia in enumerate(atoms_of_q):
+            i1 = idx[ia, l]
+            for iib, ib in enumerate(atoms_of_q):
+                i2 = idx[ib, l]
+                dk = values[iia, iib]
+                dense[i1:i1+nsize*msize, i2:i2+nsize*msize] = np.tile(dk, (nsize, nsize))
+    return dense
 
 
 def kernel_mm(lmax, power_ref):
