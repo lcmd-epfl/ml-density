@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Compute prediction errors and electron number diagnostics."""
 
+import os
+import logging
 import numpy as np
 import pandas as pd
 import metatensor
@@ -78,14 +80,15 @@ class Error:
         return NotImplemented
 
 
-def table_legend(use_charges):
+def table_legend(use_charges, *, has_variance):
     """Build the legend explaining the columns of the printed error table.
 
     Args:
         use_charges (str | None): Mode controlling which dataset column is used (None, "charge", or "N").
+        has_variance (bool): Whether predicted-variance columns were printed for at least one fraction.
 
     Returns:
-        str: Legend text; the electron-number-correction lines are included only if use_charges is set.
+        str: Legend text; the electron-number-correction and variance lines are included only when relevant.
     """
     return '\n'.join([
         '',
@@ -94,12 +97,15 @@ def table_legend(use_charges):
         'baselined    : (c - c0)^T S (c - c0) / (c0 - c_av)^T S (c0 - c_av) * 100',
         'relative     : (c - c0)^T S (c - c0) / c0^T S c0 * 100',
         'absolute     : (c - c0)^T S (c - c0)',
+        *(['pred var     : whole-molecule predictive variance Tr(Sigma_c* S), from variance.py -- an a priori estimate of "absolute" made without knowing c0.'] if has_variance else []),
         'nel_pred     : predicted number of electrons, q^T c',
         'nel_ref      : reference number of electrons, q^T c0',
-        'N            : expected number of electrons (nuclear charge, or from the dataset charge/N column)',
+        'ΔN           : nel_pred - nel_ref for this molecule',
         *(['corr N       : baselined relative error after projecting the prediction onto q^T c = N.'] if use_charges else []),
-        'MAE          : mean of the above errors over all molecules in the fraction',
-        *(['ΔN           : mean |nel_pred - N| over all molecules'] if use_charges else []),
+        'MAE          : mean of the above over all molecules in the fraction',
+        'MAX          : max of the above over all molecules in the fraction',
+        'frac         : fraction of the training set actually used to fit the model being evaluated',
+        *(['corr(absolute, pred var): Pearson correlation between "absolute" and "pred var" across the fraction\'s molecules'] if has_variance else []),
         'where',
         'c    = predicted coefficients',
         'c0   = reference (ab initio) coefficients',
@@ -108,13 +114,167 @@ def table_legend(use_charges):
         'q    = number of electrons per atomic orbital',
         '',
         'The baselined error isolates the ML-predicted part (c - c_av) from the trivial part (c_av),',
-        'making it the more meaningful measure of model error.',
+        'making it the most meaningful measure of model error.',
         '',
         ])
 
 
+def load_variances(o, p, training, frac):
+    """Load per-molecule whole-molecule predictive variance produced by variance.py, if available.
+
+    Args:
+        o (types.SimpleNamespace): Options namespace.
+        p (types.SimpleNamespace): Paths namespace.
+        training (bool): Whether the training or test subset is being reported (matches variance.py's --training).
+        frac (float): Training fraction.
+
+    Returns:
+        dict[int, float] | None: Mapping from dataset molecule index to trace variance, or None if
+        full_gpr is disabled or variance.py hasn't been run yet for this subset/fraction.
+    """
+    if not o.full_gpr:
+        return None
+    path = p.var_trace.format(subset='training' if training else 'test', train_frac=frac)
+    if not os.path.exists(path):
+        logger.info(f'full_gpr=True but {path} does not exist -- run variance.py to include predicted variance here')
+        return None
+    var_df = pd.read_csv(path)
+    return dict(zip(var_df['mol_idx'], var_df['trace_variance'], strict=True))
+
+
+def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, imol, itest, npred, pred_var):
+    """Compute one molecule's prediction error and format its report line.
+
+    Args:
+        o (types.SimpleNamespace): Options namespace.
+        p (types.SimpleNamespace): Paths namespace.
+        df (pd.DataFrame): Dataset CSV, for the molecule's xyz file name.
+        atomic_numbers (list[np.ndarray]): Atomic numbers for each dataset molecule.
+        averages (metatensor.TensorMap): Per-element average coefficients.
+        norms (np.ndarray): Per-molecule (norm, norm_baselined) pairs.
+        N_all (np.ndarray): Per-molecule target electron counts.
+        pred (metatensor.TensorMap): This molecule's predicted (baselined) coefficients.
+        imol (int): Dataset index of the molecule.
+        itest (int): Position of the molecule within the current subset.
+        npred (int): Number of molecules in the current subset.
+        pred_var (float | None): Predicted whole-molecule variance from variance.py, if available.
+
+    Returns:
+        tuple[Error, list[str]]: The molecule's Error, and its formatted column values in table
+        order (mol label, baselined, relative, absolute, [pred var], nel_pred, nel_ref, ΔN,
+        [corr N], xyz file). Column widths aren't decided here -- that needs every molecule's
+        fields first, so it's the caller's job (see format_row).
+    """
+    atoms = atomic_numbers[imol]
+    N    = N_all[imol]
+    mol  = make_dummy_mol(atoms=atoms, basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
+    qvec = rho_moments(mol, rho=None, moments=(0,), per_atom=False)[0]
+    S    = tensormap_to_array(mol, metatensor.load(p.metric_matrix.format(imol)), dest='gpr', fast=True)
+    c0   = np.load(p.clean_coefficients.format(imol))
+    norm, norm_bl = norms[imol]
+
+    tmap_add(pred, averages)
+    c = tensormap_to_array(mol, pred, dest='gpr', fast=True)
+    dc = c - c0
+
+    error = Error()
+    error.abs    = dc @ S @ dc
+    error.rel    = error.abs/norm * 100.0
+    error.rel_bl = error.abs/norm_bl * 100.0
+
+    N_c0 = qvec @ c0
+    N_pred = qvec @ c
+    dN = N_pred - N_c0  # signed, so the printed row reads exactly as nel_pred - nel_ref = ΔN
+    errorn_rel_bl = None
+    if o.use_charges:
+        error.N = abs(dN)
+        dcn = correct_number_of_electrons(c, S, qvec, N) - c0
+        errorn_rel_bl = (dcn @ S @ dcn) / norm_bl * 100.0
+
+    fields = [
+        f'mol # {itest:{len(str(npred))}} ({imol:{len(str(len(atomic_numbers)))}}):',
+        f'{error.rel_bl:.2e} %',
+        f'{error.rel:.2e} %',
+        f'{error.abs:.2e}',
+        ]
+    if pred_var is not None:
+        fields.append(f'{pred_var:.2e}')
+    fields += [f'{N_pred:>9.4f}', f'{N_c0:.4f}', f'{dN:+.4f}']
+    if o.use_charges:
+        fields.append(f'{errorn_rel_bl:.2e} %')
+    fields.append(p.xyz.format(mol_name=df['id'][imol]))
+    return error, fields
+
+
+def format_row(fields, widths, separators):
+    """Center-pad fields to per-column widths and join them with per-gap separators.
+
+    Args:
+        fields (list[str]): Formatted field values, in column order.
+        widths (list[int]): Column width for every field except the last.
+        separators (list[str]): Separator placed after each field except the last (see
+            main()'s `gap_after`: normally '   ', but ' - ' and ' = ' around nel_pred/nel_ref/ΔN
+            so the row reads as the equation nel_pred - nel_ref = ΔN).
+
+    Returns:
+        str: The assembled, aligned row.
+    """
+    padded = (f'{field:^{width}}' for field, width in zip(fields, widths, strict=True))
+    return ''.join(f'{field}{sep}' for field, sep in zip(padded, separators, strict=True))
+
+
+def summary_line(label, err, headers, widths, separators, *, use_charges, var_value=None):
+    """Format one MAE/MAX-style summary line, aligned to the table columns above it.
+
+    Args:
+        label (str): Line label, e.g. 'MAE' or 'MAX'.
+        err (Error): Aggregated (mean- or max-reduced) error for baselined, relative and absolute error.
+        headers (list[str]): Table column headers, from main().
+        widths (list[int]): Table column widths, from main().
+        separators (list[str]): Table column separators, from main().
+        use_charges (str | None): Mode controlling which dataset column is used (None, "charge", or "N").
+        var_value (float | None): Aggregated predicted variance to report, if available.
+
+    Returns:
+        str: The formatted summary line.
+    """
+    fields = ['' for _ in headers]
+    # - 2 because = should be aligned with :
+    fields[0] = f'{label:>{widths[0] - 2}} ='
+    fields[headers.index('baselined')] = f'{err.rel_bl:.2e} %'
+    fields[headers.index('relative')] = f'{err.rel:.2e} %'
+    fields[headers.index('absolute')] = f'{err.abs:.2e}'
+    if var_value is not None:
+        fields[headers.index('pred var')] = f'{var_value:.2e}'
+    if use_charges:
+        fields[headers.index('ΔN')] = f'{err.N:+.4f}'
+    blanks = [' ' * len(sep) for sep in separators]
+    return format_row(fields, widths, blanks).rstrip()
+
+
+def get_settings_quiet(return_args):
+    """Load settings while suppressing get_settings' INFO "Configuration file: ..." log line.
+
+    That line is emitted by config parsing during get_settings, so it can only be silenced around
+    the call itself. INFO (and below) is disabled just for this call, keeping this script's stdout
+    to the report table alone (it is redirected to a file); WARNING/ERROR still get through, and
+    other scripts are unaffected.
+
+    Args:
+        return_args (list[str]): Script-specific CLI flags to parse (forwarded to get_settings).
+
+    Returns:
+        tuple: (args, options, paths), as returned by get_settings.
+    """
+    logging.disable(logging.INFO)
+    try:
+        return get_settings(return_args=return_args)
+    finally:
+        logging.disable(logging.NOTSET)
+
+
 def main():  # noqa: D103
-    args, o, p = get_settings(return_args=['training'])
+    args, o, p = get_settings_quiet(return_args=['training'])
 
     df = pd.read_csv(p.dataset)
     subsets = Subset(p.train_test_sets)
@@ -123,61 +283,59 @@ def main():  # noqa: D103
     N_all = get_number_of_electrons(o.use_charges, atomic_numbers, df)
     norms = np.load(p.coef_norms)
 
+    any_variance = False
     for frac in o.fracs:
-        logger.info(f'fraction = {frac}')
-
         pred_configs, pred_path = subsets.get_pred_idx(args.training, p.predictions, frac)
         predictions = split(metatensor.load(pred_path))
         npred = len(pred_configs)
+        variances = load_variances(o, p, args.training, frac)
+        any_variance |= variances is not None
+
+        headers = ['', 'baselined', 'relative', 'absolute']
+        if variances is not None:
+            headers.append('pred var')
+        headers += ['|nel pred', 'nel ref|', 'ΔN']
+        if o.use_charges:
+            headers.append('corr N')
+        headers.append('xyz file')
+
+        # nel_pred - nel_ref = ΔN, spelled out with real operators instead of the usual 3-space gap
+        gap_after = {'|nel pred': '  -  ', 'nel ref|': '  =  '}
+        separators = [gap_after.get(headers[i], '   ') for i in range(len(headers))]
 
         total = Error()
-
-        print()
-        indent = len(f'mol # {0:{len(str(npred))}} ({0:{len(str(len(atomic_numbers)))}}):  ') - 1
-        print(f'{"":<{indent}}{"baselined":<10}   {"relative":^10}   ( {"absolute":^8} )   {"nel_pred":>8} / {"nel_ref":>8} ( {"N":^3} )')
+        max_error = Error()
+        abs_errors, pred_vars, rows = [], [], []
         for itest, imol in enumerate(pred_configs):
-
-            atoms = atomic_numbers[imol]
-            N    = N_all[imol]
-            mol  = make_dummy_mol(atoms=atoms, basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
-            qvec = rho_moments(mol, rho=None, moments=(0,), per_atom=False)[0]
-            S    = tensormap_to_array(mol, metatensor.load(p.metric_matrix.format(imol)), dest='gpr', fast=True)
-            c0   = np.load(p.clean_coefficients.format(imol))
-            norm, norm_bl = norms[imol]
-
-            tmap_add(predictions[itest], averages)
-            c = tensormap_to_array(mol, predictions[itest], dest='gpr', fast=True)
-            dc = c - c0
-
-            error = Error()
-            error.abs    = dc @ S @ dc
-            error.rel    = error.abs/norm * 100.0
-            error.rel_bl = error.abs/norm_bl * 100.0
-
-            N_c0 = qvec @ c0
-            N_pred = qvec @ c
-            if o.use_charges:
-                error.N = abs(N_pred - N)
-                dcn = correct_number_of_electrons(c, S, qvec, N) - c0
-                errorn_rel_bl = (dcn @ S @ dcn) / norm_bl * 100.0
-
+            pred_var = variances[imol] if variances is not None else None
+            error, fields = evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all,
+                                              predictions[itest], imol, itest, npred, pred_var)
             total += error
+            for key in Error.fields:
+                setattr(max_error, key, max(getattr(max_error, key), getattr(error, key)))
+            if pred_var is not None:
+                abs_errors.append(error.abs)
+                pred_vars.append(pred_var)
+            rows.append(fields)
 
-            print(''.join([
-                f'mol # {itest:{len(str(npred))}} ({imol:{len(str(len(atomic_numbers)))}}):   ',
-                f'{error.rel_bl:8.2e} %  {error.rel:.2e} %  ( {error.abs:.2e} )   ',
-                f'{N_pred:8.4f} / {N_c0:8.4f} ( {N:3d} )   ',
-                f'(corr N: {errorn_rel_bl:8.2e} %)   ' if o.use_charges else '',
-                f'{p.xyz.format(mol_name=df['id'][imol])}',
-                ]))
+        widths = [max(len(headers[i]), max(len(row[i]) for row in rows)) for i in range(len(headers))]
+        print(format_row(headers, widths, separators))
+        for fields in rows:
+            print(format_row(fields, widths, separators))
 
         total /= npred
-        print(''.join([
-            f'\nfrac={frac}  MAE = {total.rel_bl:.2e} %  {total.rel:.2e} %  ( {total.abs:.2e} )',
-            f'   ΔN: {total.N:.2e}' if o.use_charges else '',
-            ]))
+        mean_var = np.mean(pred_vars) if variances is not None else None
+        max_var = max(pred_vars) if variances is not None else None
+        corr_extra = ''
+        if variances is not None:
+            corr = np.corrcoef(abs_errors, pred_vars)[0, 1] if npred > 1 else float('nan')
+            corr_extra = f'   corr(absolute, pred var) = {corr:.2f}'
+        print()
+        print(summary_line('MAE', total, headers, widths, separators, use_charges=o.use_charges, var_value=mean_var))
+        print(summary_line('MAX', max_error, headers, widths, separators, use_charges=o.use_charges, var_value=max_var))
+        print(f"frac={frac}", corr_extra)
 
-    print(table_legend(o.use_charges), end='')
+    print(table_legend(o.use_charges, has_variance=any_variance), end='')
 
 
 if __name__=='__main__':
