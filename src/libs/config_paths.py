@@ -46,11 +46,11 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     'ps_min_norm'        : OptSpecs('power_spectra_min_norm', 1e-20, float, 'Minimum norm threshold in λ-SOAP power spectra normalization.'),
                     },
                 'options.rho': {
-                    'process_metric'     : OptSpecs('process_metric', default=True, dtype=Bool(), help='If true, process overlap metrics from input files.'),
+                    'process_metric'     : OptSpecs('process_metric', default=True, dtype=Bool(), help='If true, process Coulomb metric matrices from input files.'),
                     'use_charges'        : OptSpecs('number_of_electrons', 'none', Choice(str, ['none', 'charge', 'N'], name='number_of_electrons'), 'Column in the dataset CSV for target electron count.'),
                     'basisname'          : OptSpecs('basis', 'cc-pvqz-jkfit', str, 'Basis set name used to build AO representation.'),
                     'coeff_order'        : OptSpecs('coeff_order', 'pyscf', Choice(str, ['pyscf', 'gpr'], name='coeff_order', strict=False), 'AO ordering convention of input coefficient files.'),
-                    'overlap_order'      : OptSpecs('overlap_order', 'pyscf', Choice(str, ['pyscf', 'gpr'], name='overlap_order', strict=False), 'AO ordering convention of input overlap matrices.'),
+                    'metric_order'       : OptSpecs('metric_order', 'pyscf', Choice(str, ['pyscf', 'gpr'], name='metric_order', strict=False), 'AO ordering convention of input metric matrices.'),
                     'output_coeff_order' : OptSpecs('output_coeff_order', 'gpr', Choice(str, ['pyscf', 'gpr'], name='output_coeff_order', strict=False), 'AO ordering convention for exported predicted coefficients.'),
                     },
                 }
@@ -87,7 +87,7 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     '_kmmbase'           : PathSpecs('kmm_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/KMM', 'Base path for reference-reference kernels.'),
                     '_kernelconfbase'    : PathSpecs('kernel_nm_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/KERNELS/kernel_conf', 'Base path for per-molecule kernels.'),
                     '_goodcoeffilebase'  : PathSpecs('coeffs_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/coeff/mol', 'Base path for cleaned/reordered coefficients.'),
-                    '_goodoverfilebase'  : PathSpecs('metric_matrix_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/metric/mol', 'Base path for processed metric matrices.'),
+                    '_goodmetricfilebase': PathSpecs('metric_matrix_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/metric/mol', 'Base path for processed metric matrices.'),
                     '_baselinedwbase'    : PathSpecs('baselined_weights_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/BASELINED_PROJECTIONS/projections_conf', 'Base path for projected coefficients.'),
                     'spherical_averages' : PathSpecs('averages', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/AVERAGES.mts', 'File to store spherical averages.'),
                     'train_test_sets'    : PathSpecs('training_selection', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/SELECTIONS/training_selection.csv', 'CSV file to store train/test molecule indices.'),
@@ -125,7 +125,7 @@ def read_config(config_path=defaults.config, *, print_help=False):
 
         paths = SimpleNamespace({key: val for key, val in p.items() if not key.startswith('_')})
         paths.clean_coefficients      = f'{p['_goodcoeffilebase']}_{{}}.npy'
-        paths.metric_matrix           = f'{p['_goodoverfilebase']}_{{}}.mts'
+        paths.metric_matrix           = f'{p['_goodmetricfilebase']}_{{}}.mts'
         paths.projection              = f'{p['_baselinedwbase']}{{}}.mts'
 
         paths.power_spectrum          = f'{p['_splitpsfilebase']}_{{}}.mts'

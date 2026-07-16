@@ -21,7 +21,7 @@ power_spectra_normalize = true
 basis = cc-pvqz-jkfit
 number_of_electrons = charge
 coeff_order = pyscf
-overlap_order = pyscf
+metric_order = pyscf
 output_coeff_order = gpr
 process_metric = true
 

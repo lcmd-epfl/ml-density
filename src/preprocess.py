@@ -43,7 +43,7 @@ def main():  # noqa: D103
 
         if o.process_metric:
             metric = np.load(p.input_metrics.format(mol_name=mol_name))
-            metric = reorder.reorder_ao(mol, metric, dest='gpr', src=o.overlap_order)
+            metric = reorder.reorder_ao(mol, metric, dest='gpr', src=o.metric_order)
             metatensor.save(p.metric_matrix.format(imol), equio.array_to_tensormap(mol, metric, src='gpr'))
         else:
             metric = equio.tensormap_to_array(mol, metatensor.load(p.metric_matrix.format(imol)), dest='gpr', fast=True)
