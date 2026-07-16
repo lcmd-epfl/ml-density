@@ -3,27 +3,12 @@
 
 Reports one number per molecule, computed a priori without the reference coefficients c0:
 
-    var_relative = Tr(Sigma_c* J) / [(c - c_av)^T J (c - c_av)] * 100
+    var_relative = Tr(Sigma_c* M) / [(c - c_av)^T M (c - c_av)] * 100
 
-Both numerator and denominator are Coulomb-metric and carry units of Hartree, so the ratio is
-dimensionless; the *100 matches compute_error.py's convention for its own error columns, which
-likewise scale in the code and print a bare ' %'.
+The denominator is the *baselined* density rho - rho_av, not rho itself, to assess the variance 
+of what the model really learned independently of the baseline.
 
-The denominator is the *baselined* density rho - rho_av, not rho itself, because this column
-exists to be the a priori counterpart of compute_error.py's "baselined" column. That one reports
-dc^T J dc / (c0 - c_av)^T J (c0 - c_av), and Tr(Sigma_c* J) = E[dc^T J dc], so dividing by the
-same baselined norm is what puts the two on one scale and makes the correlation between them
-meaningful. Only the predicted c is used, never c0: extrapolation molecules have no reference.
-
-Normalising by the full c^T J c instead would break that correspondence, and would add a size
-bias on top. Measured over this example's 8 test molecules (nel 36-84, so the fits are indicative
-rather than converged): the un-baselined norm is core-dominated (~nel^1.70, corr(nel) = 1.00,
-with the per-element averages carrying ~98% of it) while Tr(Sigma_c* J) is essentially size-free
-on its own (~nel^0.00, corr(nel) = 0.03), so dividing by it drives the ratio to ~nel^-1.71
-(corr -0.88) against the baselined norm's ~nel^-0.94 (corr -0.69).
-
-See libs/variance_lib.py for why the Coulomb metric is the one that makes this number comparable
-to the error it is meant to predict.
+Both numerator and denominator are metric dependent (here Coulomb).
 """
 
 import os
@@ -46,10 +31,6 @@ logger = setup_logger(__name__, __file__)
 
 def coeff_path_formatter(args, o, p, frac):
     """Build the path formatter for prediction.py's exported coefficient files.
-
-    Mirrors prediction.py::_get_split, which is what writes these files: the extrapolation
-    subset has no train_frac in its path and saves no joined .mts (pred_path is None there),
-    so the per-molecule .dat files are the one source that covers every subset uniformly.
 
     Args:
         args (argparse.Namespace): Parsed CLI arguments (only .extra is used).
