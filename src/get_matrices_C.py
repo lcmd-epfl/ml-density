@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble regression "B matrix" and "A vector" (C backend)."""
+"""Assemble the regression Gram matrix and target vector (C backend)."""
 
 import sys
 import os
@@ -15,7 +15,7 @@ logger = setup_logger(__name__, __file__)
 
 
 def main():  # noqa: D103
-    args, o, p = get_settings(return_args=['get_b_matrix'])
+    args, o, p = get_settings(return_args=['get_gram_matrix'])
 
     # load molecules
     atomic_numbers = moldata_read(p.xyzfilename)
@@ -45,13 +45,13 @@ def main():  # noqa: D103
     # C arguments
     outputfiles = (ctypes.c_char_p * nfrac)()
     for i, frac in enumerate(o.fracs):
-        outputfiles[i] = (p.bmat if args.get_b_matrix else p.avec).format(train_frac=frac).encode('ascii')
+        outputfiles[i] = (p.gram_mat if args.get_gram_matrix else p.target_vec).format(train_frac=frac).encode('ascii')
 
     kernelfiles = (ctypes.c_char_p * nmol)()
     qcfiles     = (ctypes.c_char_p * nmol)()
     for imol in range(nmol):
         kernelfiles[imol] = p.kernel_nm.format(imol).encode('ascii')
-        qcfiles[imol] = (p.metric_matrix if args.get_b_matrix else p.projection).format(imol).encode('ascii')
+        qcfiles[imol] = (p.metric_matrix if args.get_gram_matrix else p.projection).format(imol).encode('ascii')
 
     array_1d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=1, flags='CONTIGUOUS')
     array_2d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
@@ -75,7 +75,8 @@ def main():  # noqa: D103
             strict=True)
 
     get_matrices = ctypes.cdll.LoadLibrary(os.path.dirname(sys.argv[0])+"/clibs/get_matrices.so")
-    func = get_matrices.get_b if args.get_b_matrix else get_matrices.get_a
+    # the compiled library keeps the historical get_a/get_b symbol names
+    func = get_matrices.get_b if args.get_gram_matrix else get_matrices.get_a
     func.restype = ctypes.c_int
     func.argtypes = argtypes
     return func(*arguments)

@@ -1,4 +1,4 @@
-"""Compute the "A vector" (kernel * projection)."""
+"""Compute the target vector (kernel-projected fit targets)."""
 
 import logging
 import numpy as np
@@ -14,7 +14,7 @@ logger = logging.getLogger('__main__')
 def print_batches(fracs, ntrains, path_template):
     """Log matrix-output batch boundaries and target files.
 
-    The Avec/Bmat are computed via sum over training set molecules.
+    The target vector/Gram matrix are computed via sum over training set molecules.
     If there are two training set fraction used, e.g. 0.5 and 1.0,
     sum over the first 50% training molecules is computed first and saved (first batch).
     Then a sum over the last 50% training molecules is added (second batch).
@@ -30,27 +30,27 @@ def print_batches(fracs, ntrains, path_template):
     logger.info(msg, extra={'flush': True})
 
 
-def do_work_a(conf, path_proj, path_kern, Avec):
-    """Accumulate the A vector contribution for one training molecule.
+def do_work_target(conf, path_proj, path_kern, target_tmap):
+    """Accumulate the target-vector contribution for one training molecule.
 
     Args:
         conf (int): Molecule configuration index.
         path_proj (str): Template path to projections.
         path_kern (str): Template path to kernels.
-        Avec (metatensor.TensorMap): Accumulator TensorMap for A coefficients.
+        target_tmap (metatensor.TensorMap): Accumulator TensorMap for the target vector.
     """
     proj = metatensor.load(path_proj.format(conf))
     k_NM = metatensor.load(path_kern.format(conf))
     for (l1, q1), pblock in proj.items():
         kblock = k_NM.block(o3_lambda=l1, center_type=q1)
-        ablock = Avec.block(o3_lambda=l1, center_type=q1)
-        ablock.values[...] += np.einsum('kmMr,kmn->rMn', kblock.values, pblock.values)
+        tblock = target_tmap.block(o3_lambda=l1, center_type=q1)
+        tblock.values[...] += np.einsum('kmMr,kmn->rMn', kblock.values, pblock.values)
 
 
-def do_work_a_pitc(mol_idx, paths, lambda_inv_i, kmat_i, metric_i, mol_i, bvec):
-    """Accumulate the PITC b-vector contribution for one training molecule.
+def do_work_target_pitc(mol_idx, paths, lambda_inv_i, kmat_i, metric_i, mol_i, target_vec):
+    """Accumulate the PITC target-vector contribution for one training molecule.
 
-    Computes b_i = K_{I_i,M}^T Lambda_i^-1 metric_i^-1 w_i, where w_i is molecule i's AO-basis
+    Computes t_i = K_{I_i,M}^T Lambda_i^-1 metric_i^-1 w_i, where w_i is molecule i's AO-basis
     projection (p.projection).
 
     Args:
@@ -60,15 +60,15 @@ def do_work_a_pitc(mol_idx, paths, lambda_inv_i, kmat_i, metric_i, mol_i, bvec):
         kmat_i (np.ndarray): K_{I_i,M}, from molecule_lambda_inv_kmat().
         metric_i (np.ndarray): Jittered metric matrix of molecule i, from molecule_lambda_inv_kmat().
         mol_i (pyscf.gto.Mole): Dummy mol matching molecule i's AO layout, from molecule_lambda_inv_kmat().
-        bvec (np.ndarray): Dense (totsize,) accumulator, updated in place.
+        target_vec (np.ndarray): Dense (totsize,) accumulator, updated in place.
     """
     proj_i = tensormap_to_array(mol_i, metatensor.load(paths.projection.format(mol_idx)), dest='gpr', fast=True)
     metric_inv_w_i = spl.cho_solve(spl.cho_factor(metric_i), proj_i)
-    bvec += kmat_i.T @ (lambda_inv_i @ metric_inv_w_i)
+    target_vec += kmat_i.T @ (lambda_inv_i @ metric_inv_w_i)
 
 
-def get_a(basis, ref_elem, fracs, ntrains, training_idx, paths):
-    """Build and save A vectors for all requested training fractions.
+def get_target_vector(basis, ref_elem, fracs, ntrains, training_idx, paths):
+    """Build and save target vectors for all requested training fractions.
 
     SoR only (full_GPR=False)
 
@@ -81,15 +81,15 @@ def get_a(basis, ref_elem, fracs, ntrains, training_idx, paths):
         training_idx (np.ndarray[int]): Training molecules indices.
         paths (SimpleNamespace): Configured paths and path templates..
     """
-    print_batches(fracs, ntrains, paths.avec)
+    print_batches(fracs, ntrains, paths.target_vec)
 
     totsize = basis.nao_for_mol(ref_elem)
     mol = make_dummy_mol(ref_elem, basis=basis.basisname, ignore=True)
-    A1 = vector2tmap(mol, np.zeros(totsize))
+    target_tmap = vector2tmap(mol, np.zeros(totsize))
 
     for frac, ntrain in zip(fracs, ntrains, strict=True):
         for imol in range(ntrain[0], ntrain[1]):
             logger.info(f'{0:4d}: {imol:4d}', extra={'flush': True})
-            do_work_a(training_idx[imol], paths.projection, paths.kernel_nm, A1)
-        A = tmap2vector(mol, A1)
-        np.savetxt(paths.avec.format(train_frac=frac), A)
+            do_work_target(training_idx[imol], paths.projection, paths.kernel_nm, target_tmap)
+        target_vec = tmap2vector(mol, target_tmap)
+        np.savetxt(paths.target_vec.format(train_frac=frac), target_vec)

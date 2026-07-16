@@ -5,7 +5,7 @@ Reports one number per molecule, computed a priori without the reference coeffic
 
     var_relative = Tr(Sigma_c* M) / [(c - c_av)^T M (c - c_av)] * 100
 
-The denominator is the *baselined* density rho - rho_av, not rho itself, to assess the variance 
+The denominator is the *baselined* density rho - rho_av, not rho itself, to assess the variance
 of what the model really learned independently of the baseline.
 
 Both numerator and denominator are metric dependent (here Coulomb).

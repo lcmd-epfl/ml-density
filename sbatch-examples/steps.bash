@@ -31,7 +31,7 @@ echo
 # 7) Compute A and B
 
 time mpirun -np 9 python3 $path/get_matrices.py
-time mpirun -np 9 python3 $path/get_matrices.py b
+time mpirun -np 9 python3 $path/get_matrices.py -b
 echo
 
 # 8) REGRESSION!

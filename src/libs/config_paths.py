@@ -92,8 +92,8 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     'spherical_averages' : PathSpecs('averages', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/AVERAGES.mts', 'File to store spherical averages.'),
                     'train_test_sets'    : PathSpecs('training_selection', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/SELECTIONS/training_selection.csv', 'CSV file to store train/test molecule indices.'),
                     'coef_norms'         : PathSpecs('coef_norms', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/norms.npy', 'Path for coefficient norms wrt the metric matrices.'),
-                    '_avecfilebase'      : PathSpecs('a_vector_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/Avec', 'Base path for A-vector outputs.'),
-                    '_bmatfilebase'      : PathSpecs('b_matrix_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/Bmat', 'Base path for B-matrix outputs.'),
+                    '_targetvecfilebase' : PathSpecs('target_vector_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/target_vec', 'Base path for target-vector outputs.'),
+                    '_grammatfilebase'   : PathSpecs('gram_matrix_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/gram_mat', 'Base path for Gram-matrix outputs.'),
                     },
                 }
 
@@ -134,8 +134,8 @@ def read_config(config_path=defaults.config, *, print_help=False):
         paths.kernel_mm               = f'{p['_kmmbase']}{o.M}.mts'
         paths.kernel_nm               = f'{p['_kernelconfbase']}{{}}.mts'
 
-        paths.avec                    = f'{p['_avecfilebase']}_M{o.M}_trainfrac{{train_frac}}.txt'
-        paths.bmat                    = f'{p['_bmatfilebase']}_M{o.M}_trainfrac{{train_frac}}.dat'
+        paths.target_vec              = f'{p['_targetvecfilebase']}_M{o.M}_trainfrac{{train_frac}}.txt'
+        paths.gram_mat                = f'{p['_grammatfilebase']}_M{o.M}_trainfrac{{train_frac}}.dat'
         paths.weights                 = f'{p['_weightsfilebase']}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
         paths.predictions             = f'{p['_predictfilebase']}_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
         paths.predicted_coeff         = f'{p['_outfilebase']}_tf{{train_frac}}_{{order}}_{{imol}}.dat'

@@ -9,7 +9,7 @@ $path/select_reference_environments.py
 $path/power_spectra_reference.py
 $path/kernel_mm.py
 $path/kernel_nm.py
-$path/get_matrices.py -b   # also computes the A-vector under full_gpr, no separate call needed
+$path/get_matrices.py -b   # also computes the target vector under full_gpr, no separate call needed
 $path/regression.py
 $path/prediction.py
 $path/variance.py

@@ -33,14 +33,14 @@ def main():  # noqa: D103
         k_mm_dense, _ = kmm_cholesky(basis, ref_elements, k_MM_tmap, o.jit)
 
         for frac in o.fracs:
-            bvec = np.loadtxt(p.avec.format(train_frac=frac))
+            target_vec = np.loadtxt(p.target_vec.format(train_frac=frac))
             mat[:] = 0
-            unravel_tril(mat, np.fromfile(p.bmat.format(train_frac=frac)), 0.0)
+            unravel_tril(mat, np.fromfile(p.gram_mat.format(train_frac=frac)), 0.0)
             mat += k_mm_dense
             L, used_jit = robust_cholesky(mat, o.jit)
             if used_jit!=o.jit:
                 logger.warning(f'PITC system needed jitter {used_jit} (bigger than o.jit={o.jit}) to be positive definite')
-            x = spl.cho_solve((L, True), bvec)
+            x = spl.cho_solve((L, True), target_vec)
             np.save(p.cholesky_pitc.format(train_frac=frac), L)
             weights = vector2tmap(mol, x)
             metatensor.save(p.weights.format(train_frac=frac), weights)
@@ -49,10 +49,10 @@ def main():  # noqa: D103
         idx = basis.sparse_indices(ref_elements)
 
         for frac in o.fracs:
-            Avec = np.loadtxt(p.avec.format(train_frac=frac))
+            target_vec = np.loadtxt(p.target_vec.format(train_frac=frac))
             mat[:] = 0
-            fill_matrix(mat, k_MM, p.bmat.format(train_frac=frac), idx, basis.nmax, o.jit, o.reg)
-            weights = spl.solve(mat, Avec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
+            fill_matrix(mat, k_MM, p.gram_mat.format(train_frac=frac), idx, basis.nmax, o.jit, o.reg)
+            weights = spl.solve(mat, target_vec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
             weights = vector2tmap(mol, weights)
             metatensor.save(p.weights.format(train_frac=frac), weights)
 
@@ -77,19 +77,19 @@ def unravel_tril(mat, data, jitter):
         mat[j,j] += jitter
 
 
-def fill_matrix(mat, k_MM, bmatfile, idx, nmax, jitter, reg):
-    """Assemble the regression matrix from the B matrix and add regularization.
+def fill_matrix(mat, k_MM, gram_file, idx, nmax, jitter, reg):
+    """Assemble the regression matrix from the Gram matrix and add regularization.
 
     Args:
         mat (np.ndarray): Vector representation of the lower triangle of a symmetric matrix.
         k_MM (metatensor.TensorMap): Reference-reference kernel.
-        bmatfile (str): Path to packed B-matrix binary file.
+        gram_file (str): Path to packed Gram-matrix binary file.
         idx (np.ndarray): Sparse AO start indices per reference and l.
         nmax (dict[int, np.ndarray]): Radial basis sizes indexed by element and l.
-        jitter (float): Diagonal jitter added after unpacking B.
+        jitter (float): Diagonal jitter added after unpacking the Gram matrix.
         reg (float): Regularization coefficient scaling kernel blocks.
     """
-    data = np.fromfile(bmatfile)
+    data = np.fromfile(gram_file)
     unravel_tril(mat, data, jitter)
     del data
     gc.collect()

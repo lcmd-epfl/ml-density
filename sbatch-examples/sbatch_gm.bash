@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-#SBATCH --job-name=bmat
+#SBATCH --job-name=gram-mat
 #SBATCH --ntasks=24
 #SBATCH --mem-per-cpu=6GB
 #SBATCH --cpus-per-task=4
@@ -12,5 +12,5 @@ module load intelmpi/17.0.4
 
 conda activate density
 path=../GIT/SOURCE
-time srun $path/get_matrices.py b
+time srun $path/get_matrices.py -b
 #time srun $path/get_matrices_old.py b --config=config_elec.txt

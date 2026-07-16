@@ -1,9 +1,9 @@
 """PITC (Partially Independent Training Conditional) sparsification helpers.
 
-Shared by the full_gpr=True branches of get_matrices_A.py/get_matrices_B.py/regression.py to
+Shared by the full_gpr=True branches of target_vector.py/gram_matrix.py/regression.py to
 build, per training molecule i, the precision matrix Lambda_i = D_i + eta*metric_i^-1, with
 D_i = K_{I_i,I_i} - K_{I_i,M} K_MM^-1 K_{M,I_i} (all three matrices are block-diagonal per molecule),
-and the shared K_MM Cholesky factor both get_matrices_A.py and get_matrices_B.py need.
+and the shared K_MM Cholesky factor both target_vector.py and gram_matrix.py need.
 """
 
 import numpy as np

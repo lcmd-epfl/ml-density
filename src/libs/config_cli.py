@@ -32,7 +32,7 @@ def parse_cli_args(return_args=None):
     parser.add_argument("--config", type=str, default=defaults.config, help='path to the configuration file')
     parser.add_argument("--help-config", "--config-help", dest='config_help', action='store_true', help='print configuration file help')
     parser.add_argument("--log", type=str, default=logging._levelToName[defaults.loglevel], choices=logging._nameToLevel.keys(), help='logging level')
-    add_argument(parser, "-b", "--b", dest="get_b_matrix", action='store_true', help='if True, get_matrices computes the "B matrix"; if False, the "A vector"')
+    add_argument(parser, "-b", "--gram-matrix", dest="get_gram_matrix", action='store_true', help='if True, get_matrices computes the Gram matrix; if False, the target vector')
     add_argument(parser, "--missing-only", dest="missing_only", action='store_true', help='dangerous: not recompute existing power spectra / kernels')
 
     subset = parser.add_mutually_exclusive_group()
