@@ -16,20 +16,20 @@ from libs.logger_setup import setup_logger
 logger = setup_logger(__name__, __file__)
 
 
-def correct_number_of_electrons(c, S, q, N):
+def correct_number_of_electrons(c, metric, q, N):
     """Project coefficients onto the subspace with the constrained electron number.
 
     Args:
         c (np.ndarray[float]): Input coefficient vector.
-        S (np.ndarray[float]): Metric matrix.
+        metric (np.ndarray[float]): Metric matrix.
         q (np.ndarray[float]): Number of electrons in each AO.
         N (int | float): Target number of electrons.
 
     Returns:
         np.ndarray: Corrected coefficient vector with q @ c equal to N.
     """
-    S1q = np.linalg.solve(S, q)
-    return c + S1q * (N - c@q)/(q@S1q)
+    metric_inv_q = np.linalg.solve(metric, q)
+    return c + metric_inv_q * (N - c@q)/(q@metric_inv_q)
 
 
 def get_number_of_electrons(use_charges, atomic_numbers, df):
@@ -94,10 +94,10 @@ def table_legend(use_charges, *, has_variance):
         '',
         'TABLE LEGEND',
         'mol # i (j)  : molecule i within this test set (dataset index j)',
-        'baselined    : (c - c0)^T S (c - c0) / (c0 - c_av)^T S (c0 - c_av) * 100',
-        'relative     : (c - c0)^T S (c - c0) / c0^T S c0 * 100',
-        'absolute     : (c - c0)^T S (c - c0)',
-        *(['pred var     : whole-molecule predictive variance Tr(Sigma_c* S), from variance.py -- an a priori estimate of "absolute" made without knowing c0.'] if has_variance else []),
+        'baselined    : (c - c0)^T M (c - c0) / (c0 - c_av)^T M (c0 - c_av) * 100',
+        'relative     : (c - c0)^T M (c - c0) / c0^T J c0 * 100',
+        'absolute     : (c - c0)^T M (c - c0)',
+        *(['pred var     : Tr(Sigma_c* M) / (c - c_av)^T M (c - c_av) * 100'] if has_variance else []),
         'nel_pred     : predicted number of electrons, q^T c',
         'nel_ref      : reference number of electrons, q^T c0',
         'ΔN           : nel_pred - nel_ref for this molecule',
@@ -105,16 +105,24 @@ def table_legend(use_charges, *, has_variance):
         'MAE          : mean of the above over all molecules in the fraction',
         'MAX          : max of the above over all molecules in the fraction',
         'frac         : fraction of the training set actually used to fit the model being evaluated',
-        *(['corr(absolute, pred var): Pearson correlation between "absolute" and "pred var" across the fraction\'s molecules'] if has_variance else []),
+        *(['corr(baselined, pred var): Pearson correlation between "baselined" and "pred var" across the fraction\'s molecules'] if has_variance else []),
         'where',
         'c    = predicted coefficients',
         'c0   = reference (ab initio) coefficients',
         'c_av = per-element average coefficients, subtracted before training and added back at prediction time',
-        'S    = metric (overlap) matrix',
+        'M    = Metric used. Currently it is the 2-center Coulomb (RI) metric, int int phi_i(r) phi_j(r\')/|r-r\'| dr dr\' based on '
+        'Briling, K. R., Fabrizio, A. & Corminboeuf, C. Impact of quantum-chemical metrics on the machine learning prediction of electron density. J. Chem. Phys. 155, 024107 (2021).',
         'q    = number of electrons per atomic orbital',
         '',
+        'Notes:',
         'The baselined error isolates the ML-predicted part (c - c_av) from the trivial part (c_av),',
         'making it the most meaningful measure of model error.',
+        *(['',
+           'pred var is the a priori counterpart of the baselined error: Sigma_c* is the GPR predictive covariance',
+           'over c - c0, so Tr(Sigma_c* M) = E[(c - c0)^T M (c - c0)] estimates "absolute" before c0 is known.',
+           'Its magnitude is NOT calibrated: the kernel carries no amplitude hyperparameter, so the prior sits far',
+           'above the true scale of the density and pred var reads orders of magnitude high. Rank molecules by it',
+           '-- which is what corr(baselined, pred var) measures -- but do not read its absolute value.'] if has_variance else []),
         '',
         ])
 
@@ -129,7 +137,8 @@ def load_variances(o, p, training, frac):
         frac (float): Training fraction.
 
     Returns:
-        dict[int, float] | None: Mapping from dataset molecule index to trace variance, or None if
+        dict[int, float] | None: Mapping from dataset molecule index to the dimensionless
+        predicted variance relative to the baselined density, as a percentage, or None if
         full_gpr is disabled or variance.py hasn't been run yet for this subset/fraction.
     """
     if not o.full_gpr:
@@ -139,7 +148,7 @@ def load_variances(o, p, training, frac):
         logger.info(f'full_gpr=True but {path} does not exist -- run variance.py to include predicted variance here')
         return None
     var_df = pd.read_csv(path)
-    return dict(zip(var_df['mol_idx'], var_df['trace_variance'], strict=True))
+    return dict(zip(var_df['mol_idx'], var_df['var_relative'], strict=True))
 
 
 def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, imol, itest, npred, pred_var):
@@ -165,12 +174,12 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
         [corr N], xyz file). Column widths aren't decided here -- that needs every molecule's
         fields first, so it's the caller's job (see format_row).
     """
-    atoms = atomic_numbers[imol]
-    N    = N_all[imol]
-    mol  = make_dummy_mol(atoms=atoms, basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
-    qvec = rho_moments(mol, rho=None, moments=(0,), per_atom=False)[0]
-    S    = tensormap_to_array(mol, metatensor.load(p.metric_matrix.format(imol)), dest='gpr', fast=True)
-    c0   = np.load(p.clean_coefficients.format(imol))
+    atoms  = atomic_numbers[imol]
+    N      = N_all[imol]
+    mol    = make_dummy_mol(atoms=atoms, basis=o.basisname, charge=sum(atoms)-N, spin=N%2)
+    qvec   = rho_moments(mol, rho=None, moments=(0,), per_atom=False)[0]
+    metric = tensormap_to_array(mol, metatensor.load(p.metric_matrix.format(imol)), dest='gpr', fast=True)
+    c0     = np.load(p.clean_coefficients.format(imol))
     norm, norm_bl = norms[imol]
 
     tmap_add(pred, averages)
@@ -178,7 +187,7 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
     dc = c - c0
 
     error = Error()
-    error.abs    = dc @ S @ dc
+    error.abs    = dc @ metric @ dc
     error.rel    = error.abs/norm * 100.0
     error.rel_bl = error.abs/norm_bl * 100.0
 
@@ -188,8 +197,8 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
     errorn_rel_bl = None
     if o.use_charges:
         error.N = abs(dN)
-        dcn = correct_number_of_electrons(c, S, qvec, N) - c0
-        errorn_rel_bl = (dcn @ S @ dcn) / norm_bl * 100.0
+        dcn = correct_number_of_electrons(c, metric, qvec, N) - c0
+        errorn_rel_bl = (dcn @ metric @ dcn) / norm_bl * 100.0
 
     fields = [
         f'mol # {itest:{len(str(npred))}} ({imol:{len(str(len(atomic_numbers)))}}):',
@@ -198,8 +207,8 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
         f'{error.abs:.2e}',
         ]
     if pred_var is not None:
-        fields.append(f'{pred_var:.2e}')
-    fields += [f'{N_pred:>9.4f}', f'{N_c0:.4f}', f'{dN:+.4f}']
+        fields.append(f'{pred_var:.2e} %')
+    fields += [f'{N_pred:.4f}', f'{N_c0:.4f}', f'{dN:+.4f}']
     if o.use_charges:
         fields.append(f'{errorn_rel_bl:.2e} %')
     fields.append(p.xyz.format(mol_name=df['id'][imol]))
@@ -245,7 +254,7 @@ def summary_line(label, err, headers, widths, separators, *, use_charges, var_va
     fields[headers.index('relative')] = f'{err.rel:.2e} %'
     fields[headers.index('absolute')] = f'{err.abs:.2e}'
     if var_value is not None:
-        fields[headers.index('pred var')] = f'{var_value:.2e}'
+        fields[headers.index('pred var')] = f'{var_value:.2e} %'
     if use_charges:
         fields[headers.index('ΔN')] = f'{err.N:+.4f}'
     blanks = [' ' * len(sep) for sep in separators]
@@ -294,27 +303,30 @@ def main():  # noqa: D103
         headers = ['', 'baselined', 'relative', 'absolute']
         if variances is not None:
             headers.append('pred var')
-        headers += ['|nel pred', 'nel ref|', 'ΔN']
+        headers += ['nel pred', 'nel ref', 'ΔN']
         if o.use_charges:
             headers.append('corr N')
         headers.append('xyz file')
 
         # nel_pred - nel_ref = ΔN, spelled out with real operators instead of the usual 3-space gap
-        gap_after = {'|nel pred': '  -  ', 'nel ref|': '  =  '}
+        gap_after = {'nel pred': '  -  ', 'nel ref': '  =  '}
         separators = [gap_after.get(headers[i], '   ') for i in range(len(headers))]
 
         total = Error()
         max_error = Error()
-        abs_errors, pred_vars, rows = [], [], []
+        # pred var is E[dc^T M dc] over the same baselined norm and the same metric, so "baselined"
+        # is its like-for-like partner: this correlation is a calibration check, not a comparison
+        # across metrics.
+        bl_errors, pred_vars, rows = [], [], []
         for itest, imol in enumerate(pred_configs):
             pred_var = variances[imol] if variances is not None else None
             error, fields = evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all,
                                               predictions[itest], imol, itest, npred, pred_var)
             total += error
             for key in Error.fields:
-                setattr(max_error, key, max(getattr(max_error, key), getattr(error, key)))
+                setattr(max_error, key, max(getattr(max_error, key), getattr(error, key), key=abs))
             if pred_var is not None:
-                abs_errors.append(error.abs)
+                bl_errors.append(error.rel_bl)
                 pred_vars.append(pred_var)
             rows.append(fields)
 
@@ -328,8 +340,8 @@ def main():  # noqa: D103
         max_var = max(pred_vars) if variances is not None else None
         corr_extra = ''
         if variances is not None:
-            corr = np.corrcoef(abs_errors, pred_vars)[0, 1] if npred > 1 else float('nan')
-            corr_extra = f'   corr(absolute, pred var) = {corr:.2f}'
+            corr = np.corrcoef(bl_errors, pred_vars)[0, 1] if npred > 1 else float('nan')
+            corr_extra = f'   corr(baselined, pred var) = {corr:.2f}'
         print()
         print(summary_line('MAE', total, headers, widths, separators, use_charges=o.use_charges, var_value=mean_var))
         print(summary_line('MAX', max_error, headers, widths, separators, use_charges=o.use_charges, var_value=max_var))
