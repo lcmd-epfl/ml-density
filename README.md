@@ -39,7 +39,7 @@ pip install ase==3.26 wigners==0.3
 pip install metatensor-core==0.1.17
 pip install featomic==0.6.3
 pip install pyscf==2.13.1
-pip install git+https://github.com/lcmd-epfl/Q-stack.git@d5ac511aa55f27df1d97040118aeed268f0779e2
+pip install git+https://github.com/lcmd-epfl/Q-stack.git@c9df0aa
 ```
 
 ### Build
