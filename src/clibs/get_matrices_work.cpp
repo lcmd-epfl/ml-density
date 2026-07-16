@@ -44,16 +44,12 @@ void do_work_a(
     const unsigned int conf,
     const unsigned int * const atomcount, // number of elements
     const ao_t         * const aoref,     // number of elements
-    const char * const path_proj,
-    const char * const path_kern,
+    const char ** const path_proj,
+    const char ** const path_kern,
     double * Avec){
 
-  char file_proj[MAX_PATH_LENGTH], file_kern[MAX_PATH_LENGTH];
-  sprintf(file_proj, "%s%d.mts", path_proj, conf);
-  sprintf(file_kern, "%s%d.mts", path_kern, conf);
-
-  auto ktensor = TensorMap::load(file_kern);
-  auto ptensor = TensorMap::load(file_proj);
+  auto ktensor = TensorMap::load(path_kern[conf]);
+  auto ptensor = TensorMap::load(path_proj[conf]);
 
 #pragma omp parallel shared(Avec)
 #pragma omp for schedule(dynamic)
@@ -94,15 +90,12 @@ void do_work_b(
     const unsigned int * const alnum     ,//[nelem],
     const unsigned int * const annum     ,//[llmax1][nelem],
     const ao_t         * const aoref     ,//[totsize],
-    const char * const path_over,
-    const char * const path_kern,
+    const char ** const path_over,
+    const char ** const path_kern,
     double * Bmat){
 
-  char file_over[MAX_PATH_LENGTH], file_kern[MAX_PATH_LENGTH];
-  sprintf(file_over, "%s%d.mts", path_over, conf);
-  sprintf(file_kern, "%s%d.mts", path_kern, conf);
-  auto ktensor = TensorMap::load(file_kern);
-  auto otensor = TensorMap::load(file_over);
+  auto ktensor = TensorMap::load(path_kern[conf]);
+  auto otensor = TensorMap::load(path_over[conf]);
 
   double ** kvalues = (double **)calloc(nelem*llmax1, sizeof(double *));
   double ** ovalues = (double **)calloc(nelem*nelem*llmax1*llmax1, sizeof(double *));

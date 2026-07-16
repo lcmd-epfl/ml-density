@@ -16,24 +16,30 @@ Based on:
 ```
 git clone https://github.com/lcmd-epfl/ml-density/
 cd ml-density/
-git checkout use-rascaline-ps
 ```
 
 ### Environment
 
-* install `cargo`
-* install MPI and OpenMP
-* use `environment.yml` or
 ```
-conda create -n ml-density python=3.11
+conda env create --file environment.yml --name ml-density
 conda activate ml-density
-conda install pip=25.1.1
-conda install numpy=1.23
-conda install scipy=1.10
-conda install numba=0.60.0
-pip install mpi4py==3.1.4 ase==3.22 wigners==0.3
-pip install metatensor-core==0.1.14
-pip install git+https://github.com/metatensor/featomic.git@4968429ece4f5fc7935047d0c2e813cac21018ab
+```
+or
+```
+conda create -n ml-density python=3.13
+conda activate ml-density
+conda install pip=25.2
+conda install numpy=2.3
+conda install pandas=2.3
+conda install scipy=1.16.2
+conda install numba=0.62
+conda install mpi4py=4.0
+conda install gxx_linux-64
+pip install ase==3.26 wigners==0.3
+pip install metatensor-core==0.1.17
+pip install featomic==0.6.3
+pip install pyscf==2.13.1
+pip install git+https://github.com/lcmd-epfl/Q-stack.git@c9df0aa
 ```
 
 ### Build
@@ -49,8 +55,6 @@ in progress... see `sidechains_examples/` and `sbatch_examples`
 
 ## TODO
 
-* improve readme
 * add tests
-* replace `print_progress` by `tqdm`
-* ? add `rho-predictor` as a dependency 
-* fix OMP
+* improve readme
+* merge into Q-stack

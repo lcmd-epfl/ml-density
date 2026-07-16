@@ -1,37 +1,31 @@
 #!/usr/bin/env python3
+"""Assemble regression "B matrix" and "A vector" (Python implementation)."""
 
-import sys
-import numpy as np
-from libs.config import read_config
-from libs.basis import basis_read
-from libs.functions import moldata_read, nao_for_mol, get_training_sets
+import itertools
+import pandas as pd
+from libs.config import get_settings
+from libs.functions import Basis, Subset
 from libs.get_matrices_A import get_a
 from libs.get_matrices_B import get_b
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
-def main():
-    o, p = read_config(sys.argv)
+def main():  # noqa: D103
+    args, o, p = get_settings(return_args=['get_b_matrix', 'mpi'])
 
-    atomic_numbers = moldata_read(p.xyzfilename)
-    lmax, nmax = basis_read(p.basisfilename)
-
-    # reference environments
-    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
-    totsize = nao_for_mol(ref_elements, lmax, nmax)
+    ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
+    basis = Basis(o.basisname, elements=ref_elements)
 
     # training set selection
-    nfrac, ntrains, train_configs = get_training_sets(p.trainfilename, o.fracs)
+    ntrains, train_configs = Subset(p.train_test_sets).get_training_all(o.fracs)
+    ntrains = list(itertools.pairwise([0, *ntrains]))
 
-    if len(sys.argv)>1 and sys.argv[1][0].lower()=='b':
-        bmatfiles = [f'{p.bmatfilebase}_M{o.M}_trainfrac{frac}.dat' for frac in o.fracs]
-        get_b(lmax, nmax, totsize, ref_elements,
-              nfrac, ntrains, train_configs,
-              p.goodoverfilebase, p.kernelconfbase, bmatfiles)
+    if args.get_b_matrix:
+        get_b(basis, ref_elements, o.fracs, ntrains, train_configs, p, use_mpi=args.mpi)
     else:
-        avecfiles = [f'{p.avecfilebase}_M{o.M}_trainfrac{frac}.txt' for frac in o.fracs]
-        get_a(lmax, nmax, totsize, ref_elements,
-              nfrac, ntrains, train_configs,
-              p.baselinedwbase, p.kernelconfbase, avecfiles)
+        get_a(basis, ref_elements, o.fracs, ntrains, train_configs, p)
 
 
 if __name__=='__main__':

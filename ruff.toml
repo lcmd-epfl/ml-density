@@ -1,0 +1,62 @@
+exclude = [
+    ".git",
+    ".pytest_cache",
+    ".ruff_cache",
+]
+
+line-length = 128
+indent-width = 4
+
+target-version = "py313"
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint]
+
+preview = true
+
+allowed-confusables = ["ρ", "×", "–", "γ"]
+
+select = [
+  "A", "E",  "F",  "B",
+  "S", "COM", "C4", "EXE", "ICN", "PIE", "PLR1714", "ARG",
+  "PERF",  "FURB",  "PLE",  "TRY",  "W",  "UP",  "RUF", "SIM", "NPY",
+  "EM", "RET", "PLR", "BLE", "PLC", "FBT",
+  #"Q",
+  "FIX", "TD",
+  "D",
+  "DOC",
+  "ERA",
+]
+ignore = [
+  "D105",     # undocumented-magic-method
+  "NPY002",   # numpy-legacy-random
+  "E741",     # ambiguous-variable-name
+  "E501",     # line-too-long
+  'PLR0912', # too-many-branches
+  'PLR0913', # too-many-arguments
+  'PLR0914', # too-many-locals
+  'PLR0917', # too-many-positional-arguments
+  'PLR1702', # too-many-nested-blocks
+  'PLR6301', # no-self-use
+  "FURB118", # reimplemented-operator
+  "FURB101", "FURB103", # pathlib
+# whitespaces
+  "E201", "E202", "E203", "E211",
+  "E221", "E222", "E225", "E226", "E227", "E228",
+  "E231", "E241", "E271", "E272",
+]
+
+
+[lint.per-file-ignores]
+"src/get_matrices_C.py" = ["COM819"]  # prohibited-trailing-comma
+"src/libs/tmap.py"      = ["E251", "PLC2701"]  # unexpected-spaces-around-keyword-parameter-equals, import-private-name
+"src/libs/lsoap.py"     = ["PLC0415", "PLC2701"]  # import-outside-top-level, import-private-name
+"src/libs/multi.py"     = ["PLC0415"]  # import-outside-top-level

@@ -1,38 +1,58 @@
 #!/usr/bin/env python3
+"""Run model prediction and export coefficients for main or extra datasets."""
 
-import sys
+from functools import partial
 import numpy as np
 import metatensor
-from libs.config import read_config
-from libs.functions import moldata_read, get_test_set, get_training_set
-from libs.basis import basis_read
+from tqdm import tqdm
+from qstack.io.metatensor import join
+from qstack import reorder
+from libs.config import get_settings
+from libs.functions import moldata_read, Basis, Subset, make_dummy_mol, get_dataset_paths
 from libs.predict import run_prediction
-from libs.tmap import join
+from libs.tmap import tmap2vector, tmap_add
+from libs.logger_setup import setup_logger
+
+logger = setup_logger(__name__, __file__)
 
 
-def main():
-    o, p = read_config(sys.argv)
-    training = 'training' in sys.argv[1:]
+def main():  # noqa: D103
+    args, o, p = get_settings(return_args=['training', 'extra'])
+    dataset_paths = get_dataset_paths(p, extra=args.extra)
+    frac_list = o.fracs[-1:] if args.extra else o.fracs
 
-    atomic_numbers = moldata_read(p.xyzfilename)
-    lmax, nmax = basis_read(p.basisfilename)
-    ref_elements = np.loadtxt(f'{p.refsselfilebase}{o.M}.txt', dtype=int)[:,1]
+    atomic_numbers = moldata_read(dataset_paths.xyz)
+    averages = metatensor.load(p.spherical_averages)
+    basis = Basis(o.basisname, elements=averages.keys.column('center_type'))
+    subsets = Subset(p.train_test_sets)
 
-    for frac in o.fracs:
-        weights = np.load(f'{p.weightsfilebase}_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.npy')
-        if not training:
-            ntest, test_configs = get_test_set(p.trainfilename, len(atomic_numbers))
-            predictfile = f'{p.predictfilebase}_test_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.mts'
-        else:
-            ntest, test_configs = get_training_set(p.trainfilename, frac)
-            predictfile = f'{p.predictfilebase}_training_M{o.M}_trainfrac{frac}_reg{o.reg}_jit{o.jit}.mts'
+    for frac in frac_list:
+        weights = metatensor.load(p.weights.format(train_frac=frac))
+        pred_configs, pred_mols, pred_path, c_path_fmter = _get_split(args, p, atomic_numbers, subsets, frac)
+        predictions = run_prediction(pred_configs, pred_mols, basis, weights, dataset_paths.kernel,
+                                     averages=averages if args.extra else None)
+        if pred_path:
+            metatensor.save(pred_path, join(predictions))
 
-        print(f'Number of testing molecules = {ntest}')
-        predictions = run_prediction(test_configs, atomic_numbers[test_configs],
-                                     lmax, nmax, weights, ref_elements,
-                                     p.kernelconfbase)
-        predictions = join(predictions)
-        metatensor.save(predictfile, predictions)
+        for imol, atoms, pred in zip(tqdm(pred_configs), pred_mols, predictions, strict=True):
+            if not args.extra:
+                tmap_add(pred, averages)
+            c = tmap2vector(atoms, basis.llist, pred)
+            if o.output_coeff_order != 'gpr':
+                pyscf_mol = make_dummy_mol(atoms, basis=o.basisname, ignore=True)
+                c = reorder.reorder_ao(pyscf_mol, c, dest=o.output_coeff_order, src='gpr')
+            np.savetxt(c_path_fmter(order=o.output_coeff_order, imol=imol), c)
+
+
+def _get_split(args, p, atomic_numbers, subsets, frac):
+    if args.extra:
+        pred_configs = np.arange(len(atomic_numbers))
+        pred_path = None
+        c_path_fmter = p.extra_predicted_coeff.format
+    else:
+        pred_configs, pred_path = subsets.get_pred_idx(args.training, p.predictions, frac)
+        c_path_fmter = partial(p.predicted_coeff.format, train_frac=frac)
+    return pred_configs, atomic_numbers[pred_configs], pred_path, c_path_fmter
 
 
 if __name__=='__main__':

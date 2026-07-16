@@ -36,7 +36,7 @@ clean:
 
 warn:
 	@echo
-	@echo -e "\e[1;31mATTENTION!\e[0m" Build the library in the same environment you are going to use it in.
+	@echo -e "\e[1;35mATTENTION!\e[0m" Build the library in the same environment you are going to use it in.
 	@echo Current metatensor path:
 	@echo $(EQUISTORE_PATH)
 	@echo

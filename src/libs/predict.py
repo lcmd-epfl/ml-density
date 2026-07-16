@@ -1,12 +1,26 @@
+"""Predict AO coefficients."""
+
 import numpy as np
 import metatensor
-from libs.functions import nao_for_mol, print_progress
+from tqdm import tqdm
 from libs.tmap import vector2tmap
 
 
-def compute_prediction(atoms, lmax, nmax, kernel, weights, averages=None):
-    nao = nao_for_mol(atoms, lmax, nmax)
-    coeffs = vector2tmap(atoms, lmax, nmax, np.zeros(nao))
+def compute_prediction(atoms, basis, kernel, weights, averages=None):
+    """Predict AO coefficients for one molecule from kernels and weights.
+
+    Args:
+        atoms (np.ndarray | list[int]): Atomic numbers of the target molecule.
+        basis (.functions.Basis): Basis used for AO indexing.
+        kernel (metatensor.TensorMap): Kernel between the target molecule and reference environments.
+        weights (metatensor.TensorMap): Regression weights.
+        averages (metatensor.TensorMap | None): Optional l=0 averages added back to predictions.
+
+    Returns:
+        metatensor.TensorMap: Predicted coefficient TensorMap for the molecule.
+    """
+    nao = basis.nao_for_mol(atoms)
+    coeffs = vector2tmap(atoms, basis.llist, np.zeros(nao))
     for (l, q), cblock in coeffs.items():
         wblock = weights.block(o3_lambda=l, center_type=q)
         kblock = kernel.block(o3_lambda=l, center_type=q)
@@ -20,14 +34,22 @@ def compute_prediction(atoms, lmax, nmax, kernel, weights, averages=None):
 
 
 def run_prediction(test_configs, atomic_numbers,
-                   lmax, nmax, weights, ref_elements,
-                   kernelbase, averages=None):
+                   basis, weights, path_kern, averages=None):
+    """Run predictions for multiple molecules and return TensorMap outputs.
 
-    weights = vector2tmap(ref_elements, lmax, nmax, weights)
+    Args:
+        test_configs (list[int] | np.ndarray): Molecule indices to predict.
+        atomic_numbers (list[np.ndarray]): Atomic numbers for each selected molecule.
+        basis (Basis): Basis helper used for AO indexing.
+        weights (metatensor.TensorMap): Regression weights TensorMap.
+        path_kern (str): Template path to per-molecule kernel files.
+        averages (metatensor.TensorMap | None): Optional l=0 averages added back to predictions.
 
+    Returns:
+        list[metatensor.TensorMap]: Predicted coefficients for all requested molecules.
+    """
     predictions = []
-    for i, (imol, atoms) in enumerate(zip(test_configs, atomic_numbers)):
-        print_progress(i, len(test_configs))
-        kernel = metatensor.load(f'{kernelbase}{imol}.mts')
-        predictions.append(compute_prediction(atoms, lmax, nmax, kernel, weights, averages=averages))
+    for imol, atoms in zip(tqdm(test_configs), atomic_numbers, strict=True):
+        kernel = metatensor.load(path_kern.format(imol))
+        predictions.append(compute_prediction(atoms, basis, kernel, weights, averages=averages))
     return predictions
