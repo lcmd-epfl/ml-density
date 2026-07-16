@@ -34,6 +34,21 @@ def averages2tmap(averages):
     return metatensor.TensorMap(keys=tm_labels, blocks=tensor_blocks)
 
 
+def tmap2averages(tmap):
+    """Convert a spherical-averages TensorMap back to per-element l=0 coefficient vectors.
+
+    Inverse of averages2tmap: keys are (o3_lambda=0, center_type=q) and each block holds one
+    element's l=0 averages with shape (1, 1, nmax_l0).
+
+    Args:
+        tmap (metatensor.TensorMap): TensorMap storing per-element spherical averages.
+
+    Returns:
+        dict[int, np.ndarray]: Per-element l=0 average coefficient vectors.
+    """
+    return {int(key['center_type']): block.values.reshape(-1).copy() for key, block in tmap.items()}
+
+
 def kernels2tmap(atom_charges, kernel):
     """Convert kernel dictionary blocks to TensorMap format.
 

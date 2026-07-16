@@ -277,6 +277,26 @@ class AOIndex:
             return f'{self.__class__.__qualname__}({self.atoms}, {self.basis})'
 
 
+def remove_averages(ao_index, coef, av_coefs):
+    """Subtract per-element l=0 averages from one coefficient vector.
+
+    Only l=0 AOs are touched: the averages are spherical, so higher-l channels have no average
+    to remove.
+
+    Args:
+        ao_index (AOIndex): AO index.
+        coef (np.ndarray): Input coefficient vector, GPR AO order.
+        av_coefs (dict[int, np.ndarray]): Per-element average l=0 coefficients.
+
+    Returns:
+        np.ndarray: Coefficient vector with averages removed.
+    """
+    coef_new = np.copy(coef)
+    for iat, q in enumerate(ao_index.atoms):
+        coef_new[ao_index.find(iat=iat, l=0)] -= av_coefs[q]
+    return coef_new
+
+
 def make_pyscf_mol(numbers, positions, basis, *, spin=None, charge=None, ignore=False):
     """Construct and build a PySCF Mole object.
 

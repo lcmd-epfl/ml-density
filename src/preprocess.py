@@ -9,7 +9,7 @@ import metatensor
 from qstack import reorder
 from qstack.io import metatensor as equio
 from libs.config import get_settings
-from libs.functions import get_elements, Basis, make_dummy_mol
+from libs.functions import get_elements, Basis, make_dummy_mol, remove_averages
 from libs.tmap import averages2tmap
 from libs.logger_setup import setup_logger
 
@@ -108,23 +108,6 @@ def get_averages(nenv, basis, coefficients, ao_indices):
     for q in av_coefs:
         av_coefs[q] /= nenv[q]
     return av_coefs
-
-
-def remove_averages(ao_index, coef, av_coefs):
-    """Subtract per-element l=0 averages from one coefficient vector.
-
-    Args:
-        ao_index (AOIndex): AO index.
-        coef (np.ndarray): Input coefficient vector.
-        av_coefs (dict[int, np.ndarray]): Per-element average l=0 coefficients.
-
-    Returns:
-        np.ndarray: Coefficient vector with averages removed.
-    """
-    coef_new = np.copy(coef)
-    for iat, q in enumerate(ao_index.atoms):
-        coef_new[ao_index.find(iat=iat, l=0)] -= av_coefs[q]
-    return coef_new
 
 
 if __name__=='__main__':
