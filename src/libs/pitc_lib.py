@@ -1,7 +1,7 @@
 """PITC (Partially Independent Training Conditional) sparsification helpers.
 
 Shared by the full_gpr=True branches of get_matrices_A.py/get_matrices_B.py/regression.py to
-build, per training molecule i, the precision matrix Lambda_i = D_i + eta*S_i^-1, with
+build, per training molecule i, the precision matrix Lambda_i = D_i + eta*metric_i^-1, with
 D_i = K_{I_i,I_i} - K_{I_i,M} K_MM^-1 K_{M,I_i} (all three matrices are block-diagonal per molecule),
 and the shared K_MM Cholesky factor both get_matrices_A.py and get_matrices_B.py need.
 """
@@ -60,7 +60,7 @@ def robust_cholesky(mat, jit, max_tries=10):
 
 
 def molecule_lambda_inv_kmat(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit):
-    """Compute Lambda_i^-1, K_{I_i,M} and S_i for one training molecule.
+    """Compute Lambda_i^-1, K_{I_i,M} and metric_i for one training molecule.
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
@@ -72,22 +72,18 @@ def molecule_lambda_inv_kmat(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta
         eta (float): Noise scale (the theory document's eta; callers pass o.reg -- eta and the
             SoR path's regularization coefficient are the same symbol in the theory, see
             regression.py's PITC branch).
-        jit (float): Diagonal jitter added to S_i before inverting it. S_i is often severely
+        jit (float): Diagonal jitter added to metric_i before inverting it. metric_i is often severely
             ill-conditioned for redundant density-fitting auxiliary bases (e.g. cc-pvqz-jkfit,
             condition numbers ~1e7 observed), so its raw inverse amplifies floating-point noise by
             a comparable factor; jittering caps this the same way kmm_cholesky() does for K_MM.
 
     Returns:
         tuple[np.ndarray, np.ndarray, np.ndarray, pyscf.gto.Mole]: Lambda_i^-1 (nao_i, nao_i),
-        K_{I_i,M} (nao_i, totsize), the jittered S_i (nao_i, nao_i) -- returned jittered so that
-        any downstream S_i^-1 solve (e.g. get_matrices_A.py's S_i^-1 w_i) stays consistent with
-        the S_i^-1 used here to build Lambda_i -- and mol_i, the dummy mol matching molecule i's
-        AO layout (built here for S_i; returned so callers needing it, e.g. for the projection,
-        don't have to build it a second time).
+        K_{I_i,M} (nao_i, totsize), the jittered metric_i (nao_i, nao_i)
     """
     mol_i = make_dummy_mol(atoms_i, basis=basis.basisname, ignore=True)
-    s_i = tensormap_to_array(mol_i, metatensor.load(paths.metric_matrix.format(mol_idx)), dest='gpr', fast=True)
-    s_i[np.diag_indices_from(s_i)] += jit
+    metric_i = tensormap_to_array(mol_i, metatensor.load(paths.metric_matrix.format(mol_idx)), dest='gpr', fast=True)
+    metric_i[np.diag_indices_from(metric_i)] += jit
 
     kmat_i = kernel_block_to_dense_rect(basis, atoms_i, ref_elem, metatensor.load(paths.kernel_nm.format(mol_idx)))
 
@@ -102,8 +98,8 @@ def molecule_lambda_inv_kmat(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta
     y_i = spl.cho_solve((l_mm, True), kmat_i.T)              # K_MM^-1 K_{M,I_i}
     d_i = kself_i - kmat_i @ y_i
 
-    sinv_i = spl.cho_solve(spl.cho_factor(s_i), np.eye(s_i.shape[0]))
-    lambda_i = d_i + eta * sinv_i
+    metric_inv_i = spl.cho_solve(spl.cho_factor(metric_i), np.eye(metric_i.shape[0]))
+    lambda_i = d_i + eta * metric_inv_i
     lambda_inv_i = np.linalg.inv(lambda_i)
 
-    return lambda_inv_i, kmat_i, s_i, mol_i
+    return lambda_inv_i, kmat_i, metric_i, mol_i

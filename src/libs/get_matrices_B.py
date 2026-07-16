@@ -69,7 +69,7 @@ def mpos(i, j):
     return i + ((j*(j+1))//2)
 
 
-def do_work_b(idx, nmax, conf, ref_indices, path_over, path_kern, Bmat):
+def do_work_b(idx, nmax, conf, ref_indices, path_metric, path_kern, Bmat):
     """Accumulate the B matrix contribution for one training molecule.
 
     Args:
@@ -77,21 +77,21 @@ def do_work_b(idx, nmax, conf, ref_indices, path_over, path_kern, Bmat):
         nmax (dict[int, np.ndarray[int]]): Radial basis sizes indexed by element and l.
         conf (int): Molecule index.
         ref_indices (dict[int, np.ndarray[int]]): Cached reference positions grouped by element.
-        path_over (str): Template path to overlap TensorMaps.
+        path_metric (str): Template path to metric-matrix TensorMaps.
         path_kern (str): Template path to kernel TensorMaps.
         Bmat (np.ndarray): Matrix accumulator.
     """
-    over = metatensor.load(path_over.format(conf))
+    metric = metatensor.load(path_metric.format(conf))
     k_NM = metatensor.load(path_kern.format(conf))
 
-    for (l1, l2, q1, q2), oblock in over.items():
+    for (l1, l2, q1, q2), mblock in metric.items():
         msize1 = 2*l1+1
         msize2 = 2*l2+1
         nsize1 = nmax[q1][l1]
         nsize2 = nmax[q2][l2]
         kblock1 = k_NM.block(o3_lambda=l1, center_type=q1)
         kblock2 = k_NM.block(o3_lambda=l2, center_type=q2)
-        oval = oblock.values.reshape(len(kblock1.samples), len(kblock2.samples), msize1, msize2, nsize1, nsize2)
+        mval = mblock.values.reshape(len(kblock1.samples), len(kblock2.samples), msize1, msize2, nsize1, nsize2)
 
         for iiref1, iref1 in enumerate(ref_indices[q1]):
             for iiref2, iref2 in enumerate(ref_indices[q2]):
@@ -100,10 +100,10 @@ def do_work_b(idx, nmax, conf, ref_indices, path_over, path_kern, Bmat):
                 '''
                 Non-optimized:
                 ```
-                dB = np.einsum('AMJ,AaMmNn,amj->NnJj', kblock1.values[...,iiref1], oval, kblock2.values[...,iiref2])
+                dB = np.einsum('AMJ,AaMmNn,amj->NnJj', kblock1.values[...,iiref1], mval, kblock2.values[...,iiref2])
                 ```
                 '''
-                t1 = np.einsum('AMJ,AaMmNn->amJNn', kblock1.values[...,iiref1], oval)
+                t1 = np.einsum('AMJ,AaMmNn->amJNn', kblock1.values[...,iiref1], mval)
                 dB = np.einsum('amJNn,amj->njNJ', t1, kblock2.values[...,iiref2])
 
                 i1 = idx[iref1, l1]
@@ -155,13 +155,13 @@ def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, B
         paths (SimpleNamespace): Configured paths and path templates.
         l_mm (np.ndarray): Lower Cholesky factor of the (jittered) dense K_MM.
         eta (float): PITC noise scale.
-        jit (float): Diagonal jitter added to S_i before inverting it (see molecule_lambda_inv_kmat).
+        jit (float): Diagonal jitter added to metric_i before inverting it (see molecule_lambda_inv_kmat).
         Bmat (np.ndarray): Packed lower-triangular B-matrix accumulator, updated in place.
         bvec (np.ndarray): Dense (totsize,) A-vector accumulator, updated in place.
     """
-    lambda_inv_i, kmat_i, s_i, mol_i = molecule_lambda_inv_kmat(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit)
+    lambda_inv_i, kmat_i, metric_i, mol_i = molecule_lambda_inv_kmat(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit)
     do_work_b_pitc(lambda_inv_i, kmat_i, Bmat)
-    do_work_a_pitc(mol_idx, paths, lambda_inv_i, kmat_i, s_i, mol_i, bvec)
+    do_work_a_pitc(mol_idx, paths, lambda_inv_i, kmat_i, metric_i, mol_i, bvec)
 
 
 def _l_mm_for_pitc(basis, ref_elem, paths, o):

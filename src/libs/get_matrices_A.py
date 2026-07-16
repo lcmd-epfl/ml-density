@@ -47,10 +47,10 @@ def do_work_a(conf, path_proj, path_kern, Avec):
         ablock.values[...] += np.einsum('kmMr,kmn->rMn', kblock.values, pblock.values)
 
 
-def do_work_a_pitc(mol_idx, paths, lambda_inv_i, kmat_i, s_i, mol_i, bvec):
+def do_work_a_pitc(mol_idx, paths, lambda_inv_i, kmat_i, metric_i, mol_i, bvec):
     """Accumulate the PITC b-vector contribution for one training molecule.
 
-    Computes b_i = K_{I_i,M}^T Lambda_i^-1 S_i^-1 w_i, where w_i is molecule i's AO-basis
+    Computes b_i = K_{I_i,M}^T Lambda_i^-1 metric_i^-1 w_i, where w_i is molecule i's AO-basis
     projection (p.projection).
 
     Args:
@@ -58,13 +58,13 @@ def do_work_a_pitc(mol_idx, paths, lambda_inv_i, kmat_i, s_i, mol_i, bvec):
         paths (SimpleNamespace): Configured paths and path templates.
         lambda_inv_i (np.ndarray): Lambda_i^-1, from molecule_lambda_inv_kmat().
         kmat_i (np.ndarray): K_{I_i,M}, from molecule_lambda_inv_kmat().
-        s_i (np.ndarray): Jittered S_i, from molecule_lambda_inv_kmat().
+        metric_i (np.ndarray): Jittered metric matrix of molecule i, from molecule_lambda_inv_kmat().
         mol_i (pyscf.gto.Mole): Dummy mol matching molecule i's AO layout, from molecule_lambda_inv_kmat().
         bvec (np.ndarray): Dense (totsize,) accumulator, updated in place.
     """
     proj_i = tensormap_to_array(mol_i, metatensor.load(paths.projection.format(mol_idx)), dest='gpr', fast=True)
-    sinv_w_i = spl.cho_solve(spl.cho_factor(s_i), proj_i)
-    bvec += kmat_i.T @ (lambda_inv_i @ sinv_w_i)
+    metric_inv_w_i = spl.cho_solve(spl.cho_factor(metric_i), proj_i)
+    bvec += kmat_i.T @ (lambda_inv_i @ metric_inv_w_i)
 
 
 def get_a(basis, ref_elem, fracs, ntrains, training_idx, paths):
