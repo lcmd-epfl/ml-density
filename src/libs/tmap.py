@@ -4,8 +4,32 @@ import gc
 import numpy as np
 import metatensor
 from qstack.io import metatensor as equio
-from qstack.io.metatensor import _vector_to_tensormap as vector2tmap  # noqa: F401
-from qstack.io.metatensor import _tensormap_to_vector as tmap2vector  # noqa: F401
+
+
+def vector2tmap(mol, v):
+    """Convert a flattened AO coefficient vector into a TensorMap representation.
+
+    Args:
+        mol (pyscf.gto.Mole): Molecule defining the AO block layout.
+        v (np.ndarray): Flattened AO vector in gpr order.
+
+    Returns:
+        metatensor.TensorMap: TensorMap with blocks grouped by (l, center_type).
+    """
+    return equio.array_to_tensormap(mol, v, src='gpr')
+
+
+def tmap2vector(mol, tensor):
+    """Convert a coefficient TensorMap back into a flattened AO vector.
+
+    Args:
+        mol (pyscf.gto.Mole): Molecule defining the AO block layout.
+        tensor (metatensor.TensorMap): TensorMap with AO coefficients.
+
+    Returns:
+        np.ndarray: Flattened AO vector in gpr order.
+    """
+    return equio.tensormap_to_array(mol, tensor, dest='gpr')
 
 
 def averages2tmap(averages):
