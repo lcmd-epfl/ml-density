@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import ase.io
 import metatensor
-from tqdm import tqdm
+from libs.progress import tqdm
 from qstack import reorder
 from libs.config import get_settings
 from libs.functions import Basis, Subset, get_dataset_paths, make_dummy_mol, remove_averages

@@ -4,7 +4,7 @@
 from functools import partial
 import numpy as np
 import metatensor
-from tqdm import tqdm
+from libs.progress import tqdm
 from qstack.io.metatensor import join
 from qstack import reorder
 from libs.config import get_settings

@@ -9,7 +9,7 @@ Note:
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from libs.progress import tqdm
 from ase.data import chemical_symbols
 from qstack.mathutils.fps import do_fps
 from libs.config import get_settings

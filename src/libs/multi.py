@@ -6,7 +6,7 @@ and process_molecules() should work without MPI installed with use_mpi=False.
 
 import sys
 import logging
-from tqdm import trange
+from libs.progress import trange
 
 logger = logging.getLogger('__main__')
 

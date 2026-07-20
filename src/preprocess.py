@@ -3,7 +3,7 @@
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from libs.progress import tqdm
 import ase.io
 import metatensor
 from qstack import reorder

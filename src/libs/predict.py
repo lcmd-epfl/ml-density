@@ -2,7 +2,7 @@
 
 import numpy as np
 import metatensor
-from tqdm import tqdm
+from libs.progress import tqdm
 from libs.tmap import vector2tmap
 from libs.functions import make_dummy_mol
 
