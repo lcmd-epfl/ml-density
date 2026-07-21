@@ -128,10 +128,10 @@ def do_work_gram(idx, nmax, conf, ref_indices, path_metric, path_kern, gram_mat)
 def do_work_gram_pitc(lambda_inv_i, kmat_i, gram_mat):
     """Accumulate the PITC-weighted Gram-matrix contribution for one training molecule.
 
-    Computes d_gram = K_{I_i,M}^T Lambda_i^-1 K_{I_i,M}. Unlike do_work_gram()'s SoR accumulation,
-    which only ever touches (l,q)-block-sparse AO pairs, Lambda_i^-1 mixes across reference (l,q)
-    blocks, so d_gram is a genuinely dense (totsize, totsize) contribution; its lower triangle is
-    packed into the shared gram_mat accumulator via the same mpos() convention as do_work_gram().
+    Computes d_gram = K_{I_i,M}^T Lambda_i^-1 K_{I_i,M} as one dense (totsize, totsize) matrix, whose
+    lower triangle is packed into the shared gram_mat accumulator via the same mpos() convention as
+    do_work_gram(). The SoR Gram is equally dense across (l,q) blocks (the Coulomb metric couples them);
+    do_work_gram() differs only by scattering small per-pair blocks rather than forming this full temporary.
 
     Args:
         lambda_inv_i (np.ndarray): Lambda_i^-1, from molecule_lambda_inv_kmat().
