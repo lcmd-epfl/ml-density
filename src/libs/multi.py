@@ -24,7 +24,7 @@ def print_nodes(Nproc, nproc, comm):
     msg = f'proc {nproc:3d} : {MPI.Get_processor_name()}'
     if nproc == 0:
         msg = [msg] + [comm.recv(source=i) for i in range(1, Nproc)]
-        logger.info('\n'.join(msg), extra={'flush': True})
+        logger.debug('\n'.join(msg), extra={'flush': True})
     else:
         comm.send(msg, dest=0)
     comm.barrier()
@@ -47,7 +47,7 @@ def scatter_jobs(Nproc, nproc, comm, bra, ket, do_mol):
             (npr, im) = comm.recv(source=MPI.ANY_SOURCE)
             im = imol if imol<ket else -1
             comm.send(im, dest=npr)
-            logger.info(f'sent {npr} : {im}', extra={'flush': True})
+            logger.debug(f'sent {npr} : {im}', extra={'flush': True})
     else:
         imol = -1
         while True:
@@ -55,7 +55,7 @@ def scatter_jobs(Nproc, nproc, comm, bra, ket, do_mol):
             if (imol := comm.recv(source=0)) < 0:
                 break
             do_mol(imol)
-        logger.info(f'{nproc} : finished', extra={'flush': True})
+        logger.debug(f'{nproc} : finished', extra={'flush': True})
 
 
 def multi_process(nmol, do_mol):

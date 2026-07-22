@@ -68,32 +68,6 @@ static void print_mem(const int totsize, const int ntrain, FILE * f){
 }
 
 #ifdef USE_MPI
-static void print_nodes(FILE * f){
-
-  char processor_name[MPI_MAX_PROCESSOR_NAME];
-  int name_len;
-  MPI_Get_processor_name(processor_name, &name_len);
-
-  char buf[256];
-  snprintf(buf, sizeof(buf), " proc %4d : %s\n", nproc, processor_name);
-
-  if(nproc){
-    MPI_Send(buf, strlen(buf)+1, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
-  }
-  else{
-    fputs(buf, f);
-    MPI_Status status;
-    for(int i=1; i<Nproc; i++) {
-      MPI_Recv(buf, sizeof(buf), MPI_CHAR, i, 0, MPI_COMM_WORLD, &status);
-      fputs(buf, f);
-    }
-    fputs("\n", f);
-    fflush(f);
-  }
-  MPI_Barrier(MPI_COMM_WORLD);
-  return;
-}
-
 static void send_jobs(const int bra, const int ket){
   for(int imol=bra; imol<ket+(Nproc-1); imol++){
     MPI_Status status;
@@ -101,7 +75,6 @@ static void send_jobs(const int bra, const int ket){
     MPI_Recv(p, 2, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
     p[1] = (imol<ket) ? imol : -1;
     MPI_Send(p, 2, MPI_INT, p[0], 0, MPI_COMM_WORLD);
-    printf("%4d: %4d\n", p[0], p[1]);
   }
   return;
 }
@@ -186,7 +159,6 @@ int get_a(
   MPI_Init (&argc, &argv);
   MPI_Comm_size (MPI_COMM_WORLD, &Nproc);
   MPI_Comm_rank (MPI_COMM_WORLD, &nproc);
-  print_nodes(stdout);
 #else
   nproc = 0;
   Nproc = 1;
@@ -208,7 +180,6 @@ int get_a(
   if(Nproc==1){
     for(int ifrac=0; ifrac<nfrac; ifrac++){
       for(int imol=(ifrac==0?0:ntrains[ifrac-1]); imol<ntrains[ifrac]; imol++){
-        printf("%4d: %4d\n", nproc, imol);
         do_work_a(totsize, trrange[imol], atomcount[imol], aoref, path_proj, path_kern, Avec);
       }
       vec_print(totsize, Avec, "w", paths_avec[ifrac]);
@@ -240,7 +211,6 @@ int get_a(
           }
           do_work_a(totsize, trrange[imol], atomcount[imol], aoref, path_proj, path_kern, Avec);
         }
-        printf("%4d: finished work\n", nproc);
       }
 
       MPI_Barrier(MPI_COMM_WORLD);
@@ -292,7 +262,6 @@ int get_b(
   MPI_Init (&argc, &argv);
   MPI_Comm_size (MPI_COMM_WORLD, &Nproc);
   MPI_Comm_rank (MPI_COMM_WORLD, &nproc);
-  print_nodes(stdout);
 #else
   nproc = 0;
   Nproc = 1;
@@ -332,7 +301,6 @@ int get_b(
   if(Nproc==1){
     for(int ifrac=0; ifrac<nfrac; ifrac++){
       for(int imol=(ifrac==0?0:ntrains[ifrac-1]); imol<ntrains[ifrac]; imol++){
-        printf("%4d: %4d\n", nproc, imol);
         do_work_b(totsize, nelem, llmax1, trrange[imol], atomcount[imol], nref, elements, alnum, annum, aoref, path_over, path_kern, Bmat);
       }
       vec_write(symsize(totsize), Bmat, "w", paths_bmat[ifrac]);
@@ -364,7 +332,6 @@ int get_b(
           }
           do_work_b(totsize, nelem, llmax1, trrange[imol], atomcount[imol], nref, elements, alnum, annum, aoref, path_over, path_kern, Bmat);
         }
-        printf("%4d: finished work\n", nproc);
       }
 
       MPI_Barrier(MPI_COMM_WORLD);

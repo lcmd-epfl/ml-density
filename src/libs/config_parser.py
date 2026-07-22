@@ -3,7 +3,7 @@
 import os
 import configparser
 import logging
-from libs.config_utils import WhenMissing, CheckFile, OptSpecs, PathSpecs, Choice
+from libs.config_utils import WhenMissing, CheckFile, OptSpecs, PathSpecs, Choice, mpi_rank
 
 logger = logging.getLogger('__main__')
 
@@ -74,7 +74,8 @@ class Config:
             msg = f'Cannot open configuration file "{config_path}"'
             raise RuntimeError(msg)
         link = f' -> {os.readlink(config_path)}' if os.path.islink(config_path) else ''
-        logger.info(f'Configuration file: {config_path}{link}')
+        if mpi_rank() == 0:
+            logger.info(f'Configuration file: {config_path}{link}')
 
         parser = configparser.RawConfigParser()
         parser.read(config_path)

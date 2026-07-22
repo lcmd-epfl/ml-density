@@ -1,5 +1,6 @@
 """Utilities for configuration and CLI parsing."""
 
+import os
 import logging
 from types import SimpleNamespace
 from typing import NamedTuple
@@ -11,6 +12,22 @@ logger = logging.getLogger('__main__')
 
 
 defaults = SimpleNamespace(config='config.txt', mpi=True, loglevel=logging.INFO)
+
+
+def mpi_rank():
+    """Best-effort MPI rank from launcher environment variables.
+
+    Reads the rank exported by the job launcher (``srun`` or ``mpirun``) without
+    importing ``mpi4py`` (which would trigger ``MPI_Init``). Used to keep rank-0-only
+    log lines from being duplicated across ranks that share one stdout.
+
+    Returns:
+        int: The current MPI rank, or 0 when not running under a recognised launcher.
+    """
+    for var in ('OMPI_COMM_WORLD_RANK', 'PMI_RANK', 'PMIX_RANK', 'SLURM_PROCID'):
+        if (val := os.environ.get(var)) is not None:
+            return int(val)
+    return 0
 
 
 class WhenMissing(Enum):
