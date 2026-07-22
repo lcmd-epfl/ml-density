@@ -11,7 +11,11 @@ from libs.target_vector import print_batches, do_work_target_pitc
 from libs.multi import print_nodes, scatter_jobs
 from libs.pitc_lib import kmm_cholesky, molecule_lambda_inv_kmat
 
+# Buffer for the final MPI Reduce of the packed Gram onto rank 0 (communication phase, rank 0 only; larger just means fewer messages).
 DEFAULT_MAX_CHUNK = 1<<30  # 1 GiB
+# Cap on the transient per-molecule d_gram block in do_work_gram_pitc (assembly phase, every rank;
+# smaller keeps the per-rank memory peak low).
+DEFAULT_GRAM_CHUNK_BYTES = 256<<20  # 256 MiB
 
 logger = logging.getLogger('__main__')
 
@@ -125,23 +129,28 @@ def do_work_gram(idx, nmax, conf, ref_indices, path_metric, path_kern, gram_mat)
                             gram_mat[i12a:i12b] += d_gram[n2,im2,n2,:im2+1]
 
 
-def do_work_gram_pitc(lambda_inv_i, kmat_i, gram_mat):
+def do_work_gram_pitc(lambda_inv_i, kmat_i, gram_mat, chunk_bytes=DEFAULT_GRAM_CHUNK_BYTES):
     """Accumulate the PITC-weighted Gram-matrix contribution for one training molecule.
 
-    Computes d_gram = K_{I_i,M}^T Lambda_i^-1 K_{I_i,M} as one dense (totsize, totsize) matrix, whose
-    lower triangle is packed into the shared gram_mat accumulator via the same mpos() convention as
-    do_work_gram(). The SoR Gram is equally dense across (l,q) blocks (the Coulomb metric couples them);
-    do_work_gram() differs only by scattering small per-pair blocks rather than forming this full temporary.
+    Adds d_gram = K_{I_i,M}^T Lambda_i^-1 K_{I_i,M} into the packed lower-triangular accumulator
 
     Args:
-        lambda_inv_i (np.ndarray): Lambda_i^-1, from molecule_lambda_inv_kmat().
-        kmat_i (np.ndarray): K_{I_i,M}, from molecule_lambda_inv_kmat().
+        lambda_inv_i (np.ndarray): Lambda_i^-1 (n_i, n_i), from molecule_lambda_inv_kmat().
+        kmat_i (np.ndarray): K_{I_i,M} (n_i, totsize), from molecule_lambda_inv_kmat().
         gram_mat (np.ndarray): Packed lower-triangular matrix accumulator, updated in place.
+        chunk_bytes (int): Upper bound on the per-chunk dense temporary (default DEFAULT_GRAM_CHUNK_BYTES).
     """
-    d_gram = kmat_i.T @ lambda_inv_i @ kmat_i
-    for j in range(d_gram.shape[0]):
-        start = mpos(0, j)
-        gram_mat[start:start+j+1] += d_gram[:j+1, j]
+    totsize = kmat_i.shape[1]
+    z = lambda_inv_i @ kmat_i          # (n_i, totsize)
+    kmat_t = kmat_i.T                  # (totsize, n_i)
+    # Column-chunk width so the worst-case (totsize, c) temporary stays under chunk_bytes.
+    c = max(1, min(totsize, chunk_bytes // (totsize * z.itemsize)))
+    for j0 in range(0, totsize, c):
+        j1 = min(j0 + c, totsize)
+        block = kmat_t[:j1] @ z[:, j0:j1]   # (j1, j1-j0); rows > j are discarded on scatter
+        for j in range(j0, j1):
+            start = mpos(0, j)
+            gram_mat[start:start+j+1] += block[:j+1, j-j0]
 
 
 def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, gram_mat, target_vec):

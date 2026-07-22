@@ -115,8 +115,8 @@ $$
 | A3 | $\mathbf{S}_i^{-1}$ = `cho_factor` + `cho_solve(I)` | Cholesky + solve → explicit inverse | $n_i \times n_i$ | $O(n_i^3)$ | [`pitc_lib.py:101`](../src/libs/pitc_lib.py) |
 | A4 | $\mathbf{\Lambda}_i = \mathbf{D}_i + \eta\,\mathbf{S}_i^{-1}$ | add | $n_i \times n_i$ | $O(n_i^2)$ | [`pitc_lib.py:102`](../src/libs/pitc_lib.py) |
 | A5 | $\mathbf{\Lambda}_i^{-1}$ = `np.linalg.inv` | dense inverse (LU) | $n_i \times n_i$ | $O(n_i^3)$ | [`pitc_lib.py:103`](../src/libs/pitc_lib.py) |
-| A6 | $\mathbf{G}_i = \mathbf{K}_{I_i M}^{\top}\,\mathbf{\Lambda}_i^{-1}\,\mathbf{K}_{I_i M}$ | two matrix–matrix products → **dense** $P\times P$ | $P \times P$ | $O(n_i^2 P) + O(P^2 n_i)$ | [`gram_matrix.py:141`](../src/libs/gram_matrix.py) |
-| A7 | add lower-triangle of $\mathbf{G}_i$ into packed Gram | accumulate | $P(P{+}1)/2$ | $O(P^2)$ | [`gram_matrix.py:142`](../src/libs/gram_matrix.py) |
+| A6 | $\mathbf{G}_i = \mathbf{K}_{I_i M}^{\top}\,\mathbf{\Lambda}_i^{-1}\,\mathbf{K}_{I_i M}$ | matrix products in **column chunks** (no full $P\times P$ temporary) | temp $\le$ `chunk_bytes` | $O(n_i^2 P) + O(P^2 n_i)$ | [`gram_matrix.py:154`](../src/libs/gram_matrix.py) |
+| A7 | scatter each chunk's columns into packed Gram | accumulate | $P(P{+}1)/2$ | $O(P^2)$ | [`gram_matrix.py:157`](../src/libs/gram_matrix.py) |
 | A8 | $\mathbf{S}_i^{-1}\mathbf{w}_i$ = `cho_solve` | triangular solve, matrix–vector | $n_i$ | $O(n_i^2)$ | [`target_vector.py:66`](../src/libs/target_vector.py) |
 | A9 | $\mathbf{t}_i = \mathbf{K}_{I_i M}^{\top}(\mathbf{\Lambda}_i^{-1}\mathbf{S}_i^{-1}\mathbf{w}_i)$ | matrix–vector | $P$ | $O(P n_i)$ | [`target_vector.py:67`](../src/libs/target_vector.py) |
 
@@ -157,7 +157,7 @@ The factor $\mathbf{L}$ is persisted ([`regression.py:44`](../src/regression.py)
 | Stage | Dominant op | Complexity | Frequency |
 |-------|-------------|-----------|-----------|
 | A0 — $\mathbf{K}_{MM}$ Cholesky | Cholesky | $O(P^3)$ | once |
-| **A1–A9 — Gram/target assembly** | per-molecule dense $P\times P$ update | $O(P^2 \sum_i n_i) = O(P^2 N\bar n)$ | per molecule × $N$ |
+| **A1–A9 — Gram/target assembly** | per-molecule $P\times P$ update (chunked) | $O(P^2 \sum_i n_i) = O(P^2 N\bar n)$ | per molecule × $N$ |
 | B3 — $\mathbf{\Sigma}_M$ Cholesky | Cholesky | $O(P^3)$ | once |
 | B4 — weight solve | triangular solve | $O(P^2)$ | once |
 
@@ -178,16 +178,21 @@ The streaming assembly dominates the total FLOP count. It is also the only part 
 scales with the dataset size $N$, so it is what grows as you add training data.
 
 **2. Memory bottleneck — the dense $P \times P$ arrays (Stage A).**
-Real difference compared to `full_gpr = False`. The difference is that PITC materializes each
-molecule's $\mathbf{G}_i$ (step A6) as a **full dense $P \times P$ matrix** in one matmul
-([`gram_matrix.py:141`](../src/libs/gram_matrix.py)) and keeps a dense $\mathbf{K}_{MM}$ resident,
-whereas SoR assembles the same dense Gram from small block updates with no large temporaries (see
-the [contrast section](./training_complexity.md#contrast-sor-training-full_gpr--false)).
+Real difference compared to `full_gpr = False`. PITC keeps a dense $\mathbf{K}_{MM}$ factor resident
+and accumulates each molecule's $\mathbf{G}_i$ (step A6); that per-molecule product used to be formed
+as a **full dense $P \times P$ matrix**, but is now scattered in column chunks
+([`gram_matrix.py:154`](../src/libs/gram_matrix.py)), leaving the resident dense $\mathbf{K}_{MM}$ as
+the main excess over SoR — which assembles the same dense Gram from small block updates with no large
+temporaries (see the [contrast section](./training_complexity.md#contrast-sor-training-full_gpr--false)).
 
-Each MPI rank simultaneously holds several dense $P \times P$ double-precision arrays: the
-packed Gram accumulator ($\tfrac{P^2}{2}\cdot 8$ B), the dense $\mathbf{K}_{MM}$ behind
-$\mathbf{L}_{MM}$ ($P^2\cdot 8$ B), and the per-molecule $\mathbf{G}_i$ ($P^2\cdot 8$ B).
-This is $O(P^2)$ memory *per rank* and is the practical limiter. Ranks must therefore be capped so total memory fits the node.
+Each MPI rank holds the packed Gram accumulator ($\tfrac{P^2}{2}\cdot 8$ B) and the dense
+$\mathbf{K}_{MM}$ behind $\mathbf{L}_{MM}$ ($P^2\cdot 8$ B). The per-molecule
+$\mathbf{G}_i = \mathbf{K}_{I_iM}^{\top}\mathbf{\Lambda}_i^{-1}\mathbf{K}_{I_iM}$ used to add a
+*third* dense $P\times P$ array, but is now accumulated in column chunks bounded by `chunk_bytes`
+([`gram_matrix.py:154`](../src/libs/gram_matrix.py)), so the per-rank peak is ~$1.5\,P^2$ (down
+from ~$2.5\,P^2$). This is still $O(P^2)$ per rank and the practical limiter; ranks must be capped
+so total memory fits the node. A further drop to ~$0.5\,P^2$ is possible by node-sharing the
+read-only $\mathbf{L}_{MM}$ (see the contrast section).
 
 **In short:** the $O(P^3)$ Cholesky is the textbook GPR "cubic-in-inducing-points"
 cost, but in this pipeline the **assembly of the dense PITC Gram matrix (Stage A) is the
@@ -208,17 +213,21 @@ What actually makes SoR lighter:
 
 - **Memory (the main win).** `do_work_gram` ([`gram_matrix.py:76`](../src/libs/gram_matrix.py)) builds
   $\mathbf{B}$ from *small* per-reference-pair block updates (`einsum`s) scattered straight into the
-  packed accumulator — it **never forms a full dense $P\times P$ temporary and never holds a dense
-  $\mathbf{K}_{MM}$**. PITC's `do_work_gram_pitc` ([`gram_matrix.py:141`](../src/libs/gram_matrix.py))
-  instead forms the full $P\times P$ product `kmat_i.T @ lambda_inv_i @ kmat_i` per molecule *and*
-  keeps dense $\mathbf{K}_{MM}$ resident. Counting the $P^2$-sized arrays each rank holds:
+  packed accumulator, and **never holds a dense $\mathbf{K}_{MM}$**. PITC's `do_work_gram_pitc`
+  ([`gram_matrix.py:154`](../src/libs/gram_matrix.py)) now *also* scatters its contribution in column
+  chunks (bounded by `chunk_bytes`), but still keeps the dense $\mathbf{K}_{MM}$ factor resident.
+  Counting the $P^2$-sized arrays each rank holds:
 
   | | packed Gram | dense $\mathbf{K}_{MM}$ | per-mol dense $P{\times}P$ | total |
   |---|---|---|---|---|
-  | SoR  | $0.5\,P^2$ | — | — | $0.5\,P^2$ |
-  | PITC | $0.5\,P^2$ | $1.0\,P^2$ | $1.0\,P^2$ | $2.5\,P^2$ |
+  | SoR            | $0.5\,P^2$ | —          | —                  | $0.5\,P^2$ |
+  | PITC (before)  | $0.5\,P^2$ | $1.0\,P^2$ | $1.0\,P^2$         | $2.5\,P^2$ |
+  | PITC (chunked) | $0.5\,P^2$ | $1.0\,P^2$ | bounded by chunk   | $1.5\,P^2$ |
 
-  So PITC's dense-array footprint is ~5× SoR's — this is what the ~20 GiB/rank requirement is about.
+  Chunking the per-molecule product removed a full $P\times P$ temporary, cutting PITC's peak from
+  ~$2.5\,P^2$ to ~$1.5\,P^2$ (~3× SoR) — this is what the ~20 GiB/rank requirement was about.
+  Node-sharing the read-only $\mathbf{K}_{MM}$ factor across ranks would drop it further to
+  ~$0.5\,P^2$, matching SoR.
 
 - **Compute (a smaller, constant-factor win).** SoR uses $\mathbf{M}_i$ directly, so it needs **no
   inversions**: no $\mathbf{S}_i^{-1}$, no $\mathbf{\Lambda}_i^{-1}$, no Nyström residual $\mathbf{D}_i$
