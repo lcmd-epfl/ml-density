@@ -38,7 +38,7 @@ cd "${SLURM_SUBMIT_DIR:-$PWD}"
 src=../src
 cfg=$1
 [ -f "$cfg" ] || { echo "config '$cfg' not found (expected config_{dz,tz,aqz}.txt; pass basis as arg 1)" >&2; exit 1; }
-echo "[run] basis=${basis}  config=${cfg}  job=${SLURM_JOB_NAME:-?}  jobid=${SLURM_JOB_ID:-?}"
+echo "[run] config=${cfg}  job=${SLURM_JOB_NAME:-?}  jobid=${SLURM_JOB_ID:-?}"
 echo "Config file:"
 echo ${cfg}
 # The conda env's mpi4py is built against conda-forge MPICH (its own Hydra mpirun), which is
@@ -96,7 +96,7 @@ run_step "get_matrices"                  "$MPI $src/get_matrices.py -b --config=
 run_step "regression"                    "$src/regression.py --config=$cfg"                         # solve -> weights (+ PITC Cholesky)
 run_step "prediction"                    "$src/prediction.py --config=$cfg"                         # predict test-set coefficients
 run_step "variance"                      "$src/variance.py --config=$cfg"                           # PITC predictive variance
-run_step "compute_error"                 "$src/compute_error.py --config=$cfg > error_gpr_${basis}.txt"
+run_step "compute_error"                 "$src/compute_error.py --config=$cfg > error_gpr_${SLURM_JOB_NAME:-?}.txt"
 
 # --- extrapolation / out-of-sample (extra/qm7_extra.xyz) ---
 run_step "power_spectra_extra" "$MPI $src/power_spectra.py --extra --config=$cfg"

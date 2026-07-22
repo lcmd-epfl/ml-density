@@ -95,7 +95,7 @@ def table_legend(use_charges, *, has_variance):
         'TABLE LEGEND',
         'mol # i (j)  : molecule i within this test set (dataset index j)',
         'baselined    : (c - c0)^T M (c - c0) / (c0 - c_av)^T M (c0 - c_av) * 100',
-        'relative     : (c - c0)^T M (c - c0) / c0^T J c0 * 100',
+        'relative     : (c - c0)^T M (c - c0) / c0^T M c0 * 100',
         'absolute     : (c - c0)^T M (c - c0)',
         *(['pred var     : Tr(Sigma_c* M) / (c - c_av)^T M (c - c_av) * 100'] if has_variance else []),
         'nel_pred     : predicted number of electrons, q^T c',

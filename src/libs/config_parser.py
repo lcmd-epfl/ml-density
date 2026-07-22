@@ -191,24 +191,26 @@ class Config:
             RuntimeError: A required directory does not exist.
         """
         if (path := self.configuration[group].get(spec.key)) is None:
-            if spec.when_missing==WhenMissing.WARN:
-                logger.warning(f'Missing recommended config path `{spec.key}`')
-            elif spec.when_missing==WhenMissing.ERROR:
+            if spec.when_missing==WhenMissing.ERROR:
                 msg = f'Missing required config path `{spec.key}`'
                 raise RuntimeError(msg)
-            else:
-                path = spec.default
+            if spec.when_missing==WhenMissing.WARN:
+                logger.warning(f'Missing recommended config path `{spec.key}`')
+            path = spec.default
 
-        elif spec.check_file==CheckFile.ERROR_FILE:
+        if path is None:  # neither configured nor defaulted: nothing to validate
+            return None
+
+        if spec.check_file==CheckFile.ERROR_FILE:
             if not os.path.isfile(path):
                 msg = f'Missing file "{path}" ("{spec.key}")'
                 raise RuntimeError(msg)
         elif spec.check_file in {CheckFile.ERROR_DIR, CheckFile.MAKE_DIR}:
             fdir = os.path.dirname(path)
-            if not os.path.isdir(fdir):
+            if fdir and not os.path.isdir(fdir):
                 if spec.check_file==CheckFile.ERROR_DIR:
                     msg = f'Missing directory "{fdir}" ("{spec.key}")'
                     raise RuntimeError(msg)
                 logger.debug(f'Creating directory "{fdir}" ("{spec.key}")')
-                os.makedirs(fdir)
+                os.makedirs(fdir, exist_ok=True)  # exist_ok: every MPI rank parses the config
         return path

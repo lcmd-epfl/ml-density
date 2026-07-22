@@ -79,9 +79,8 @@ def setup_logger(name, caller, level=defaults.loglevel):
             datefmt='%Y-%m-%d %H:%M:%S',
             )
 
-    # normal handler
+    # normal handler. Deliberately left at NOTSET so that it inherits the logger level.
     handler = StreamHandler(sys.stdout)
-    handler.setLevel(level)
     handler.setFormatter(formatter)
     handler.addFilter(lambda x: not only_flush(x))
     logger.addHandler(handler)
