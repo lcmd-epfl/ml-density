@@ -1,0 +1,62 @@
+[options]
+
+[options.training]
+reference_environments = 512
+seed = 1
+train_size = 2048
+train_fractions = 1.0
+regularisation = 1e-6
+jitter = 1e-8
+full_gpr = true
+
+[options.soap]
+soap_sigma = 0.3
+soap_rcut  = 4.0
+soap_ncut  = 7
+soap_lcut  = 6
+power_spectra_min_norm = 1e-20
+power_spectra_normalize = true
+
+[options.rho]
+basis = aug-cc-pvqz-jkfit
+number_of_electrons = none
+coeff_order = pyscf
+metric_order = pyscf
+output_coeff_order = gpr
+process_metric = true
+
+[paths]
+
+[paths.input]
+dataset          = dataset.csv
+xyz              = compounds/{mol_name}.xyz
+metrics          = metric_aqz/{mol_name}.npy
+coeffs           = computed/coeffsCCSDccpvdz-augccpvqzjkfit-{mol_name}.npy
+
+[paths.output]
+weights_base     = INNER_aqz/weights
+predict_base     = INNER_aqz/prediction
+output_base      = INNER_aqz/predicted/rho
+
+[paths.extrapolation]
+xyz                       = extra/qm7_extra.xyz
+power_spectra_base        = INNER_aqz/extra/PS
+kernel_base               = INNER_aqz/extra/kernel
+output_base               = INNER_aqz/extra/rho
+
+# this section is optional and can be safely removed
+[paths.internal]
+xyz                           = INNER_aqz/dataset.xyz
+power_spectra_split_base      = INNER_aqz/PS/PS
+power_spectra_reference_base  = INNER_aqz/PS
+reference_selection_base      = INNER_aqz/SELECTIONS/refs_selection
+training_selection            = INNER_aqz/SELECTIONS/training_selection.csv
+kmm_base                      = INNER_aqz/KMM
+kernel_nm_base                = INNER_aqz/KERNELS/kernel_conf
+metric_matrix_base            = INNER_aqz/metric/mol
+gram_matrix_base              = INNER_aqz/gram_mat
+coeffs_base                   = INNER_aqz/coeff/mol
+averages                      = INNER_aqz/AVERAGES.mts
+baselined_weights_base        = INNER_aqz/BASELINED_PROJECTIONS/projections_conf
+target_vector_base            = INNER_aqz/target_vec
+coef_norms                    = INNER_aqz/coef_norms.npy
