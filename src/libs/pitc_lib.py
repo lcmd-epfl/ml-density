@@ -25,7 +25,7 @@ def kmm_cholesky(basis, ref_elem, k_mm_tmap, jit):
         jit (float): Diagonal jitter added for numerical stability before the Cholesky factorization.
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: Dense, jittered K_MM (totsize, totsize), and its lower
+        tuple[np.ndarray, np.ndarray]: Dense, jittered K_MM (nao_ref, nao_ref), and its lower
         Cholesky factor.
     """
     k_mm_dense = kernel_block_to_dense_self(basis, ref_elem, k_mm_tmap)
@@ -59,7 +59,7 @@ def robust_cholesky(mat, jit, max_tries=10):
     return spl.cholesky(mat + cur_jit*eye, lower=True), cur_jit
 
 
-def molecule_lambda_inv_kmat(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit):
+def molecule_lambda_inv_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit):
     """Compute Lambda_i^-1, K_{I_i,M} and metric_i for one training molecule.
 
     Args:
@@ -79,13 +79,13 @@ def molecule_lambda_inv_kmat(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta
 
     Returns:
         tuple[np.ndarray, np.ndarray, np.ndarray, pyscf.gto.Mole]: Lambda_i^-1 (nao_i, nao_i),
-        K_{I_i,M} (nao_i, totsize), the jittered metric_i (nao_i, nao_i)
+        K_{I_i,M} (nao_i, nao_ref), the jittered metric_i (nao_i, nao_i)
     """
     mol_i = make_dummy_mol(atoms_i, basis=basis.basisname, ignore=True)
     metric_i = tensormap_to_array(mol_i, metatensor.load(paths.metric_matrix.format(mol_idx)), dest='gpr', fast=True)
     metric_i[np.diag_indices_from(metric_i)] += jit
 
-    kmat_i = kernel_block_to_dense_rect(basis, atoms_i, ref_elem, metatensor.load(paths.kernel_nm.format(mol_idx)))
+    k_nm_i = kernel_block_to_dense_rect(basis, atoms_i, ref_elem, metatensor.load(paths.kernel_nm.format(mol_idx)))
 
     idx_i = [(q, mol_idx, iat) for iat, q in enumerate(atoms_i)]
     # merge_ref_ps builds a block for every (l,q) in the passed lmax, so it must be scoped to this
@@ -95,11 +95,11 @@ def molecule_lambda_inv_kmat(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta
     power_i = merge_ref_ps(lmax_i, idx_i, paths.power_spectrum)
     kself_i = kernel_block_to_dense_self(basis, atoms_i, kernel_mm(lmax_i, power_i))
 
-    y_i = spl.cho_solve((l_mm, True), kmat_i.T)              # K_MM^-1 K_{M,I_i}
-    d_i = kself_i - kmat_i @ y_i
+    y_i = spl.cho_solve((l_mm, True), k_nm_i.T)              # K_MM^-1 K_{M,I_i}
+    d_i = kself_i - k_nm_i @ y_i
 
     metric_inv_i = spl.cho_solve(spl.cho_factor(metric_i), np.eye(metric_i.shape[0]))
     lambda_i = d_i + eta * metric_inv_i
     lambda_inv_i = np.linalg.inv(lambda_i)
 
-    return lambda_inv_i, kmat_i, metric_i, mol_i
+    return lambda_inv_i, k_nm_i, metric_i, mol_i

@@ -21,11 +21,11 @@ def main():  # noqa: D103
 
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
     basis = Basis(o.basisname, ref_elements)
-    totsize = basis.nao_for_mol(ref_elements)
+    nao_ref = basis.nao_for_mol(ref_elements)
 
-    mat  = np.ndarray((totsize,totsize))
+    mat  = np.ndarray((nao_ref,nao_ref))
 
-    logger.debug(f'problem dimensionality = {totsize}')
+    logger.debug(f'problem dimensionality = {nao_ref}')
 
     if o.full_gpr:
         k_MM_tmap = metatensor.load(p.kernel_mm)

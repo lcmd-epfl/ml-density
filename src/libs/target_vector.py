@@ -46,7 +46,7 @@ def do_work_target(conf, path_proj, path_kern, target_tmap):
         tblock.values[...] += np.einsum('kmMr,kmn->rMn', kblock.values, pblock.values)
 
 
-def do_work_target_pitc(mol_idx, paths, lambda_inv_i, kmat_i, metric_i, mol_i, target_vec):
+def do_work_target_pitc(mol_idx, paths, lambda_inv_i, k_nm_i, metric_i, mol_i, target_vec):
     """Accumulate the PITC target-vector contribution for one training molecule.
 
     Computes t_i = K_{I_i,M}^T Lambda_i^-1 metric_i^-1 w_i, where w_i is molecule i's AO-basis
@@ -55,15 +55,15 @@ def do_work_target_pitc(mol_idx, paths, lambda_inv_i, kmat_i, metric_i, mol_i, t
     Args:
         mol_idx (int): Molecule index.
         paths (SimpleNamespace): Configured paths and path templates.
-        lambda_inv_i (np.ndarray): Lambda_i^-1, from molecule_lambda_inv_kmat().
-        kmat_i (np.ndarray): K_{I_i,M}, from molecule_lambda_inv_kmat().
-        metric_i (np.ndarray): Jittered metric matrix of molecule i, from molecule_lambda_inv_kmat().
-        mol_i (pyscf.gto.Mole): Dummy mol matching molecule i's AO layout, from molecule_lambda_inv_kmat().
-        target_vec (np.ndarray): Dense (totsize,) accumulator, updated in place.
+        lambda_inv_i (np.ndarray): Lambda_i^-1, from molecule_lambda_inv_knm().
+        k_nm_i (np.ndarray): K_{I_i,M}, from molecule_lambda_inv_knm().
+        metric_i (np.ndarray): Jittered metric matrix of molecule i, from molecule_lambda_inv_knm().
+        mol_i (pyscf.gto.Mole): Dummy mol matching molecule i's AO layout, from molecule_lambda_inv_knm().
+        target_vec (np.ndarray): Dense (nao_ref,) accumulator, updated in place.
     """
     proj_i = tensormap_to_array(mol_i, metatensor.load(paths.projection.format(mol_idx)), dest='gpr', fast=True)
     metric_inv_w_i = spl.cho_solve(spl.cho_factor(metric_i), proj_i)
-    target_vec += kmat_i.T @ (lambda_inv_i @ metric_inv_w_i)
+    target_vec += k_nm_i.T @ (lambda_inv_i @ metric_inv_w_i)
 
 
 def get_target_vector(basis, ref_elem, fracs, ntrains, training_idx, paths):
@@ -82,8 +82,8 @@ def get_target_vector(basis, ref_elem, fracs, ntrains, training_idx, paths):
     """
     print_batches(fracs, ntrains, paths.target_vec)
 
-    totsize = basis.nao_for_mol(ref_elem)
-    target_tmap = vector2tmap(ref_elem, basis.llist, np.zeros(totsize))
+    nao_ref = basis.nao_for_mol(ref_elem)
+    target_tmap = vector2tmap(ref_elem, basis.llist, np.zeros(nao_ref))
 
     for frac, ntrain in zip(fracs, ntrains, strict=True):
         for imol in range(ntrain[0], ntrain[1]):

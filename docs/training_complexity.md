@@ -32,7 +32,7 @@ forms the dense `N × N` kernel over all training atoms.
 | $M$ | number of reference (inducing) environments | `o.M` ([`config_paths.py:32`](../src/libs/config_paths.py)) |
 | $n_i$ | number of density-fitting AO coefficients for molecule $i$ | `nao_i` ([`pitc_lib.py:82`](../src/libs/pitc_lib.py)) |
 | $\bar n$ | average $n_i$; $\sum_i n_i$ = total training AO coefficients | — |
-| $P$ | **problem dimensionality** = total AO coefficients over the $M$ references = size of the weight vector and of the Gram matrix | `totsize = basis.nao_for_mol(ref_elements)` ([`regression.py:24`](../src/regression.py), [`gram_matrix.py:245`](../src/libs/gram_matrix.py)) |
+| $P$ | **problem dimensionality** = total AO coefficients over the $M$ references = size of the weight vector and of the Gram matrix | `nao_ref = basis.nao_for_mol(ref_elements)` ([`regression.py:24`](../src/regression.py), [`gram_matrix.py:245`](../src/libs/gram_matrix.py)) |
 | $\eta$ | PITC noise scale (per-molecule precision) | `o.reg` ([`config_paths.py:36`](../src/libs/config_paths.py)) |
 
 Key size relations (used in the bottleneck analysis):
@@ -106,11 +106,11 @@ $$
 |---|-----------|------|-------|-----------|------|
 | A0 | $\mathbf{L}_{MM} = \operatorname{chol}(\mathbf{K}_{MM} + \text{jit}\cdot\mathbf{I})$ | Cholesky | $P \times P$ | $O(P^3)$ | [`pitc_lib.py:33`](../src/libs/pitc_lib.py) |
 
-**Per training molecule $i$** (`molecule_lambda_inv_kmat`, [`pitc_lib.py:62`](../src/libs/pitc_lib.py)):
+**Per training molecule $i$** (`molecule_lambda_inv_knm`, [`pitc_lib.py:62`](../src/libs/pitc_lib.py)):
 
 | # | Operation | Kind | Shape | Complexity | Code |
 |---|-----------|------|-------|-----------|------|
-| A1 | $\mathbf{y}_i = \mathbf{K}_{MM}^{-1}\mathbf{K}_{M I_i}$ = `cho_solve((L_MM), kmat_i.T)` | triangular solve, $n_i$ RHS | $P \times n_i$ | $O(P^2 n_i)$ | [`pitc_lib.py:98`](../src/libs/pitc_lib.py) |
+| A1 | $\mathbf{y}_i = \mathbf{K}_{MM}^{-1}\mathbf{K}_{M I_i}$ = `cho_solve((L_MM), k_nm_i.T)` | triangular solve, $n_i$ RHS | $P \times n_i$ | $O(P^2 n_i)$ | [`pitc_lib.py:98`](../src/libs/pitc_lib.py) |
 | A2 | $\mathbf{D}_i = \mathbf{K}_{I_i I_i} - \mathbf{K}_{I_i M}\mathbf{y}_i$ | matrix–matrix | $n_i \times n_i$ | $O(n_i^2 P)$ | [`pitc_lib.py:99`](../src/libs/pitc_lib.py) |
 | A3 | $\mathbf{S}_i^{-1}$ = `cho_factor` + `cho_solve(I)` | Cholesky + solve → explicit inverse | $n_i \times n_i$ | $O(n_i^3)$ | [`pitc_lib.py:101`](../src/libs/pitc_lib.py) |
 | A4 | $\mathbf{\Lambda}_i = \mathbf{D}_i + \eta\,\mathbf{S}_i^{-1}$ | add | $n_i \times n_i$ | $O(n_i^2)$ | [`pitc_lib.py:102`](../src/libs/pitc_lib.py) |

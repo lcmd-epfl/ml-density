@@ -9,7 +9,7 @@ import numpy as np
 import metatensor
 from libs.target_vector import print_batches, do_work_target_pitc
 from libs.multi import print_nodes, scatter_jobs
-from libs.pitc_lib import kmm_cholesky, molecule_lambda_inv_kmat
+from libs.pitc_lib import kmm_cholesky, molecule_lambda_inv_knm
 
 # Buffer for the final MPI Reduce of the packed Gram onto rank 0 (communication phase, rank 0 only; larger just means fewer messages).
 DEFAULT_MAX_CHUNK = 1<<30  # 1 GiB
@@ -32,17 +32,17 @@ def _build_ref_indices(ref_elem):
     return {int(q): np.where(ref_elem == q)[0] for q in np.unique(ref_elem)}
 
 
-def print_mem(totsize, ntrain):
+def print_mem(nao_ref, ntrain):
     """Log estimated memory usage to store the result.
 
     Args:
-        totsize (int): Problem dimensionality (number of AO coefficients).
+        nao_ref (int): Problem dimensionality (number of AO coefficients).
         ntrain (int): Number of training molecules.
     """
     b2mib = 1.0/(1<<20)
     b2gib = 1.0/(1<<30)
-    size = symsize(totsize)*np.array(0.0).itemsize
-    logger.info(f"""Problem dimensionality = {totsize}\n\
+    size = symsize(nao_ref)*np.array(0.0).itemsize
+    logger.info(f"""Problem dimensionality = {nao_ref}\n\
 Number of training molecules = {ntrain}\n\
 output: {size:16d} bytes ({size*b2mib:10.2f} MiB, {size*b2gib:6.2f} GiB)\n""", extra={'flush': True})
 
@@ -129,25 +129,27 @@ def do_work_gram(idx, nmax, conf, ref_indices, path_metric, path_kern, gram_mat)
                             gram_mat[i12a:i12b] += d_gram[n2,im2,n2,:im2+1]
 
 
-def do_work_gram_pitc(lambda_inv_i, kmat_i, gram_mat, chunk_bytes=DEFAULT_GRAM_CHUNK_BYTES):
+def do_work_gram_pitc(lambda_inv_i, k_nm_i, gram_mat, chunk_bytes=DEFAULT_GRAM_CHUNK_BYTES):
     """Accumulate the PITC-weighted Gram-matrix contribution for one training molecule.
 
     Adds d_gram = K_{I_i,M}^T Lambda_i^-1 K_{I_i,M} into the packed lower-triangular accumulator
+    without forming the full nao_ref^2 matrix: the per-chunk temporary is bounded by chunk_bytes
+    (independent of nao_ref). See docs/training_complexity.md.
 
     Args:
-        lambda_inv_i (np.ndarray): Lambda_i^-1 (n_i, n_i), from molecule_lambda_inv_kmat().
-        kmat_i (np.ndarray): K_{I_i,M} (n_i, totsize), from molecule_lambda_inv_kmat().
+        lambda_inv_i (np.ndarray): Lambda_i^-1 (nao_i, nao_i), from molecule_lambda_inv_knm().
+        k_nm_i (np.ndarray): K_{I_i,M} (nao_i, nao_ref), from molecule_lambda_inv_knm().
         gram_mat (np.ndarray): Packed lower-triangular matrix accumulator, updated in place.
         chunk_bytes (int): Upper bound on the per-chunk dense temporary (default DEFAULT_GRAM_CHUNK_BYTES).
     """
-    totsize = kmat_i.shape[1]
-    z = lambda_inv_i @ kmat_i          # (n_i, totsize)
-    kmat_t = kmat_i.T                  # (totsize, n_i)
-    # Column-chunk width so the worst-case (totsize, c) temporary stays under chunk_bytes.
-    c = max(1, min(totsize, chunk_bytes // (totsize * z.itemsize)))
-    for j0 in range(0, totsize, c):
-        j1 = min(j0 + c, totsize)
-        block = kmat_t[:j1] @ z[:, j0:j1]   # (j1, j1-j0); rows > j are discarded on scatter
+    nao_ref = k_nm_i.shape[1]
+    z = lambda_inv_i @ k_nm_i          # (nao_i, nao_ref)
+    k_nm_i_t = k_nm_i.T                  # (nao_ref, nao_i)
+    # Column-chunk width so the worst-case (nao_ref, c) temporary stays under chunk_bytes.
+    c = max(1, min(nao_ref, chunk_bytes // (nao_ref * z.itemsize)))
+    for j0 in range(0, nao_ref, c):
+        j1 = min(j0 + c, nao_ref)
+        block = k_nm_i_t[:j1] @ z[:, j0:j1]   # (j1, j1-j0); rows > j are discarded on scatter
         for j in range(j0, j1):
             start = mpos(0, j)
             gram_mat[start:start+j+1] += block[:j+1, j-j0]
@@ -169,13 +171,13 @@ def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, g
         paths (SimpleNamespace): Configured paths and path templates.
         l_mm (np.ndarray): Lower Cholesky factor of the (jittered) dense K_MM.
         eta (float): PITC noise scale.
-        jit (float): Diagonal jitter added to metric_i before inverting it (see molecule_lambda_inv_kmat).
+        jit (float): Diagonal jitter added to metric_i before inverting it (see molecule_lambda_inv_knm).
         gram_mat (np.ndarray): Packed lower-triangular Gram-matrix accumulator, updated in place.
-        target_vec (np.ndarray): Dense (totsize,) target-vector accumulator, updated in place.
+        target_vec (np.ndarray): Dense (nao_ref,) target-vector accumulator, updated in place.
     """
-    lambda_inv_i, kmat_i, metric_i, mol_i = molecule_lambda_inv_kmat(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit)
-    do_work_gram_pitc(lambda_inv_i, kmat_i, gram_mat)
-    do_work_target_pitc(mol_idx, paths, lambda_inv_i, kmat_i, metric_i, mol_i, target_vec)
+    lambda_inv_i, k_nm_i, metric_i, mol_i = molecule_lambda_inv_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit)
+    do_work_gram_pitc(lambda_inv_i, k_nm_i, gram_mat)
+    do_work_target_pitc(mol_idx, paths, lambda_inv_i, k_nm_i, metric_i, mol_i, target_vec)
 
 
 def _l_mm_for_pitc(basis, ref_elem, paths, o):
@@ -211,7 +213,7 @@ def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices,
         l_mm (np.ndarray | None): PITC K_MM Cholesky factor (None unless o.full_gpr).
         o (SimpleNamespace): Configured options (reads o.full_gpr, o.reg, o.jit).
         gram_mat (np.ndarray): Packed lower-triangular matrix accumulator, updated in place.
-        target_vec (np.ndarray | None): Dense (totsize,) target-vector accumulator, updated in place
+        target_vec (np.ndarray | None): Dense (nao_ref,) target-vector accumulator, updated in place
             (None unless o.full_gpr; unused by the SoR path -- get_target_vector() builds the SoR
             target vector separately, since it's a genuinely independent computation there, unlike
             for PITC).
@@ -251,9 +253,9 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
         mol_idx = training_idx[imol]
         _accumulate_gram(basis, ref_elem, mol_idx, atomic_numbers[mol_idx], paths, idx, ref_indices, l_mm, o, gram_mat, target_vec)
 
-    totsize = basis.nao_for_mol(ref_elem)
-    gram_mat = np.zeros(matsize := symsize(totsize))
-    target_vec = np.zeros(totsize) if o.full_gpr else None
+    nao_ref = basis.nao_for_mol(ref_elem)
+    gram_mat = np.zeros(matsize := symsize(nao_ref))
+    target_vec = np.zeros(nao_ref) if o.full_gpr else None
     idx = basis.sparse_indices(ref_elem)
     ref_indices = _build_ref_indices(ref_elem)
     l_mm = _l_mm_for_pitc(basis, ref_elem, paths, o)
@@ -265,7 +267,7 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
         print_nodes(Nproc, nproc, MPI.COMM_WORLD)
         t = 0.0
         if nproc==0:
-            print_mem(totsize, ntrains[-1][1])
+            print_mem(nao_ref, ntrains[-1][1])
             t = MPI.Wtime()
         MPI.COMM_WORLD.barrier()
     else:
@@ -298,7 +300,7 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
         if nproc==0:
             GRAM_MAT = np.zeros(bufsize)
         if o.full_gpr and nproc==0:
-            TARGET_VEC = np.zeros(totsize)
+            TARGET_VEC = np.zeros(nao_ref)
 
         for ifrac, (frac, ntrain) in enumerate(zip(fracs, ntrains, strict=True)):
             scatter_jobs(Nproc, nproc, MPI.COMM_WORLD, ntrain[0], ntrain[1], do_mol)

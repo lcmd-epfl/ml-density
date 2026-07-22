@@ -29,7 +29,7 @@ def compute_molecule_sigma(basis, atoms_star, mol_idx, ref_elem, l_factor, l_mm,
         atoms_star (np.ndarray[int]): Atomic numbers of the query molecule.
         mol_idx (int): Dataset index of the query molecule.
         ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
-        l_factor (np.ndarray): Persisted lower PITC Cholesky factor of Sigma_M (totsize, totsize).
+        l_factor (np.ndarray): Persisted lower PITC Cholesky factor of Sigma_M (nao_ref, nao_ref).
         l_mm (np.ndarray): Lower Cholesky factor of the jittered K_MM, from pitc_lib.kmm_cholesky.
         path_kern (str): Template path to K_{query,M} kernel files.
         path_ps (str): Template path to the query molecule's own power spectrum.

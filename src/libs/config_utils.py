@@ -10,7 +10,7 @@ import numpy as np
 logger = logging.getLogger('__main__')
 
 
-defaults = SimpleNamespace(config='config.txt', mpi=True, loglevel=logging.DEBUG)
+defaults = SimpleNamespace(config='config.txt', mpi=True, loglevel=logging.INFO)
 
 
 class WhenMissing(Enum):

@@ -40,7 +40,7 @@ def main():  # noqa: D103
     alnum, annum = basis_info(basis)
 
     # problem dimensionality
-    totsize = basis.nao_for_mol(ref_elements)
+    nao_ref = basis.nao_for_mol(ref_elements)
 
     # C arguments
     outputfiles = (ctypes.c_char_p * nfrac)()
@@ -57,7 +57,7 @@ def main():  # noqa: D103
     array_2d_int = np.ctypeslib.ndpointer(dtype=np.uint32,  ndim=2, flags='CONTIGUOUS')
 
     arguments, argtypes = zip(
-            (totsize                           ,  ctypes.c_int,                  ),
+            (nao_ref                           ,  ctypes.c_int,                  ),
             (len(elements)                     ,  ctypes.c_int,                  ),
             (o.M                               ,  ctypes.c_int,                  ),
             (ntrain                            ,  ctypes.c_int,                  ),
