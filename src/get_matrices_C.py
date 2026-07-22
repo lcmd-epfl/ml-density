@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Assemble the regression Gram matrix and target vector (C backend)."""
+"""Assemble the regression Gram matrix and target vector (C backend, SoR only).
+
+full_gpr (PITC) is not implemented here -- run the Python get_matrices.py for it. See the guard
+in main() for the rationale.
+"""
 
 import sys
 import os
@@ -16,6 +20,19 @@ logger = setup_logger(__name__, __file__)
 
 def main():  # noqa: D103
     args, o, p = get_settings(return_args=['get_gram_matrix'])
+
+    if o.full_gpr:
+        # The C backend (get_a/get_b) implements only the SoR formulation. full_gpr (PITC) is
+        # deliberately Python-only and has no C counterpart: its per-molecule work is a few large dense
+        # LAPACK/BLAS operations (the Cholesky/inverse of Lambda_i and the K^T Lambda^-1 K products), so
+        # it is already BLAS-bound -- a C port would call the same libraries for no speedup, while forcing
+        # us to duplicate and keep in sync the memory-chunked, MPI-parallel reference implementation in
+        # libs/gram_matrix.py. Fail fast rather than silently producing a SoR Gram matrix, which is the
+        # wrong operator for full_gpr (regression.py's PITC branch expects K^T Lambda^-1 K, not K^T M K).
+        msg = ('get_matrices_C.py (C backend) does not support full_gpr -- it implements only the SoR '
+               'formulation. Run get_matrices.py -b instead, which builds the PITC target vector and '
+               'Gram matrix together in Python.')
+        raise RuntimeError(msg)
 
     # load molecules
     atomic_numbers = moldata_read(p.xyzfilename)

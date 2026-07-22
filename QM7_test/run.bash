@@ -85,14 +85,14 @@ print_timing_summary() {
 }
 
 # --- training pipeline (full GPR) ---
-run_step "preprocess"                    "$src/preprocess.py --config=$cfg"                       # baseline coeffs, process metric, projections
-run_step "training_selection"            "$src/training_selection.py --config=$cfg"                # random train/test split (seed, train_size)
-run_step "power_spectra"                 "$MPI $src/power_spectra.py --config=$cfg"                # lambda-SOAP descriptors             (MPI)
+run_step "preprocess"                    "$src/preprocess.py --config=$cfg"                         # baseline coeffs, process metric, projections
+run_step "training_selection"            "$src/training_selection.py --config=$cfg"                 # random train/test split (seed, train_size)
+run_step "power_spectra"                 "$MPI $src/power_spectra.py --config=$cfg"                 # lambda-SOAP descriptors (MPI)
 run_step "select_reference_environments" "$src/select_reference_environments.py --config=$cfg"      # FPS sparse set of M references
 run_step "power_spectra_reference"       "$src/power_spectra_reference.py --config=$cfg"            # reference power spectra
 run_step "kernel_mm"                     "$src/kernel_mm.py --config=$cfg"                          # K_MM
-run_step "kernel_nm"                     "$MPI $src/kernel_nm.py --config=$cfg"                     # K_NM                                (MPI)
-run_step "get_matrices_C"                "mpirun -np 1 -genv OMP_NUM_THREADS 48 $src/get_matrices_C.py -b --config=$cfg" # full GPR: -b builds A and B (MPI)
+run_step "kernel_nm"                     "$MPI $src/kernel_nm.py --config=$cfg"                     # K_NM (MPI)
+run_step "get_matrices"                  "$MPI $src/get_matrices.py -b --config=$cfg"               # full GPR: -b builds A and B (MPI)
 run_step "regression"                    "$src/regression.py --config=$cfg"                         # solve -> weights (+ PITC Cholesky)
 run_step "prediction"                    "$src/prediction.py --config=$cfg"                         # predict test-set coefficients
 run_step "variance"                      "$src/variance.py --config=$cfg"                           # PITC predictive variance
