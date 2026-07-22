@@ -6,7 +6,6 @@ import scipy.linalg as spl
 import metatensor
 from qstack.io.metatensor import tensormap_to_array
 from libs.tmap import vector2tmap, tmap2vector
-from libs.functions import make_dummy_mol
 
 logger = logging.getLogger('__main__')
 
@@ -84,12 +83,11 @@ def get_target_vector(basis, ref_elem, fracs, ntrains, training_idx, paths):
     print_batches(fracs, ntrains, paths.target_vec)
 
     totsize = basis.nao_for_mol(ref_elem)
-    mol = make_dummy_mol(ref_elem, basis=basis.basisname, ignore=True)
-    target_tmap = vector2tmap(mol, np.zeros(totsize))
+    target_tmap = vector2tmap(ref_elem, basis.llist, np.zeros(totsize))
 
     for frac, ntrain in zip(fracs, ntrains, strict=True):
         for imol in range(ntrain[0], ntrain[1]):
             logger.info(f'{0:4d}: {imol:4d}', extra={'flush': True})
             do_work_target(training_idx[imol], paths.projection, paths.kernel_nm, target_tmap)
-        target_vec = tmap2vector(mol, target_tmap)
+        target_vec = tmap2vector(ref_elem, basis.llist, target_tmap)
         np.savetxt(paths.target_vec.format(train_frac=frac), target_vec)

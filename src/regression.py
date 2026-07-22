@@ -9,7 +9,7 @@ from numba import jit
 import metatensor
 from libs.tmap import vector2tmap
 from libs.config import get_settings
-from libs.functions import Basis, make_dummy_mol
+from libs.functions import Basis
 from libs.pitc_lib import kmm_cholesky, robust_cholesky
 from libs.logger_setup import setup_logger
 
@@ -24,7 +24,6 @@ def main():  # noqa: D103
     totsize = basis.nao_for_mol(ref_elements)
 
     mat  = np.ndarray((totsize,totsize))
-    mol = make_dummy_mol(ref_elements, basis=o.basisname, ignore=True)
 
     logger.debug(f'problem dimensionality = {totsize}')
 
@@ -42,7 +41,7 @@ def main():  # noqa: D103
                 logger.warning(f'PITC system needed jitter {used_jit} (bigger than o.jit={o.jit}) to be positive definite')
             x = spl.cho_solve((L, True), target_vec)
             np.save(p.cholesky_pitc.format(train_frac=frac), L)
-            weights = vector2tmap(mol, x)
+            weights = vector2tmap(ref_elements, basis.llist, x)
             metatensor.save(p.weights.format(train_frac=frac), weights)
     else:
         k_MM = metatensor.load(p.kernel_mm)
@@ -53,7 +52,7 @@ def main():  # noqa: D103
             mat[:] = 0
             fill_matrix(mat, k_MM, p.gram_mat.format(train_frac=frac), idx, basis.nmax, o.jit, o.reg)
             weights = spl.solve(mat, target_vec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
-            weights = vector2tmap(mol, weights)
+            weights = vector2tmap(ref_elements, basis.llist, weights)
             metatensor.save(p.weights.format(train_frac=frac), weights)
 
 

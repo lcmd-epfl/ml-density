@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 import pyscf.tools
 from qstack import reorder
-from qstack.io.metatensor import split
+from qstack.io.metatensor import split, tensormap_to_array
 from libs.config import read_config
 from libs.functions import Basis, Subset, make_pyscf_mol
-from libs.tmap import tmap2vector, tmap_add
+from libs.tmap import tmap_add
 from libs.logger_setup import setup_logger
 from libs.pitc_lib import kmm_cholesky
 from libs.variance_lib import compute_molecule_sigma
@@ -137,7 +137,7 @@ def main():  # noqa: D103
         # add it back to get the actual density coefficients
         averages = metatensor.load(p.spherical_averages)
         tmap_add(pred, averages)
-        coeffs = tmap2vector(mol, pred)
+        coeffs = tensormap_to_array(mol, pred, dest='gpr', fast=True)
         if args.diff:
             c0 = np.load(p.clean_coefficients.format(xyz_index))
             if c0.shape!=coeffs.shape:
