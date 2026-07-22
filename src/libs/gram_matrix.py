@@ -199,6 +199,45 @@ def _l_mm_for_pitc(basis, ref_elem, paths, o):
     return l_mm
 
 
+def _l_mm_shared(basis, ref_elem, paths, o, comm):
+    """Build the K_MM Cholesky factor once per node in MPI shared memory.
+
+    Unlike _l_mm_for_pitc (one private copy per rank), this allocates a single (nao_ref, nao_ref)
+    array per shared-memory node via MPI.Win.Allocate_shared, builds l_mm on that node's rank 0, and
+    returns a view every rank on the node shares. molecule_lambda_inv_knm only reads l_mm (through
+    cho_solve), so concurrent access is safe with no locking. Cuts the resident l_mm footprint from
+    ~nao_ref^2 per rank to ~nao_ref^2 per node, and loads/factorizes K_MM once per node instead of
+    once per rank.
+
+    Args:
+        basis (.functions.Basis): Basis used for AO indexing.
+        ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
+        paths (SimpleNamespace): Configured paths and path templates.
+        o (SimpleNamespace): Configured options (reads o.full_gpr, o.jit).
+        comm (mpi4py.MPI.Comm): Communicator to split into shared-memory nodes.
+
+    Returns:
+        tuple[np.ndarray | None, mpi4py.MPI.Win | None]: the shared l_mm view and its window (both
+        None unless o.full_gpr). Keep the window referenced while l_mm is in use and Free() it after.
+    """
+    if not o.full_gpr:
+        return None, None
+    from mpi4py import MPI  # noqa: PLC0415
+    node_comm = comm.Split_type(MPI.COMM_TYPE_SHARED)
+    nao_ref = basis.nao_for_mol(ref_elem)
+    itemsize = np.dtype(np.float64).itemsize
+    nbytes = nao_ref * nao_ref * itemsize if node_comm.Get_rank() == 0 else 0
+    win = MPI.Win.Allocate_shared(nbytes, itemsize, comm=node_comm)
+    buf, _ = win.Shared_query(0)
+    l_mm = np.ndarray(buffer=buf, dtype=np.float64, shape=(nao_ref, nao_ref))
+    if node_comm.Get_rank() == 0:
+        k_MM = metatensor.load(paths.kernel_mm)
+        _, l_mm_local = kmm_cholesky(basis, ref_elem, k_MM, o.jit)
+        l_mm[:] = l_mm_local  # publish into the shared segment
+    node_comm.Barrier()  # ensure the factor is visible to every rank before it is read
+    return l_mm, win
+
+
 def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices, l_mm, o, gram_mat, target_vec):
     """Dispatch to the PITC (Gram and target together) or SoR (Gram only) accumulation for one training molecule.
 
@@ -258,13 +297,15 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
     target_vec = np.zeros(nao_ref) if o.full_gpr else None
     idx = basis.sparse_indices(ref_elem)
     ref_indices = _build_ref_indices(ref_elem)
-    l_mm = _l_mm_for_pitc(basis, ref_elem, paths, o)
+    l_mm_win = None
 
     if use_mpi:
         from mpi4py import MPI  # noqa: PLC0415
         Nproc = MPI.COMM_WORLD.Get_size()
         nproc = MPI.COMM_WORLD.Get_rank()
         print_nodes(Nproc, nproc, MPI.COMM_WORLD)
+        # One K_MM Cholesky factor per node in shared memory (see _l_mm_shared), not one per rank.
+        l_mm, l_mm_win = _l_mm_shared(basis, ref_elem, paths, o, MPI.COMM_WORLD)
         t = 0.0
         if nproc==0:
             print_mem(nao_ref, ntrains[-1][1])
@@ -273,6 +314,7 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
     else:
         nproc = 0
         Nproc = 1
+        l_mm = _l_mm_for_pitc(basis, ref_elem, paths, o)
 
     if nproc==0:
         print_batches(fracs, ntrains, paths.gram_mat)
@@ -322,3 +364,6 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
                     logger.info(f'chunk #{i+1}/{div+1 if rem else div} written', extra={'flush': True})
                     with open(paths.gram_mat.format(train_frac=frac), 'a' if i else 'w') as f:
                         GRAM_MAT[:size].tofile(f)
+
+    if l_mm_win is not None:  # release the shared K_MM window (collective over each node)
+        l_mm_win.Free()

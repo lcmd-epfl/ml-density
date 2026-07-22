@@ -185,14 +185,16 @@ as a **full dense $P \times P$ matrix**, but is now scattered in column chunks
 the main excess over SoR — which assembles the same dense Gram from small block updates with no large
 temporaries (see the [contrast section](./training_complexity.md#contrast-sor-training-full_gpr--false)).
 
-Each MPI rank holds the packed Gram accumulator ($\tfrac{P^2}{2}\cdot 8$ B) and the dense
-$\mathbf{K}_{MM}$ behind $\mathbf{L}_{MM}$ ($P^2\cdot 8$ B). The per-molecule
-$\mathbf{G}_i = \mathbf{K}_{I_iM}^{\top}\mathbf{\Lambda}_i^{-1}\mathbf{K}_{I_iM}$ used to add a
-*third* dense $P\times P$ array, but is now accumulated in column chunks bounded by `chunk_bytes`
-([`gram_matrix.py:154`](../src/libs/gram_matrix.py)), so the per-rank peak is ~$1.5\,P^2$ (down
-from ~$2.5\,P^2$). This is still $O(P^2)$ per rank and the practical limiter; ranks must be capped
-so total memory fits the node. A further drop to ~$0.5\,P^2$ is possible by node-sharing the
-read-only $\mathbf{L}_{MM}$ (see the contrast section).
+After chunking and $\mathbf{K}_{MM}$ sharing, each MPI rank holds essentially just the packed Gram
+accumulator ($\tfrac{P^2}{2}\cdot 8$ B). The per-molecule
+$\mathbf{G}_i = \mathbf{K}_{I_iM}^{\top}\mathbf{\Lambda}_i^{-1}\mathbf{K}_{I_iM}$ is accumulated in
+column chunks bounded by `chunk_bytes` ([`gram_matrix.py:154`](../src/libs/gram_matrix.py)) rather
+than as a full $P\times P$ temporary, and the dense $\mathbf{K}_{MM}$ Cholesky factor $\mathbf{L}_{MM}$
+($P^2\cdot 8$ B) is shared **one copy per node** through MPI shared memory
+([`_l_mm_shared`, gram_matrix.py](../src/libs/gram_matrix.py)) instead of built per rank. Together
+these took the per-rank peak from ~$2.5\,P^2$ down to ~$0.5\,P^2$ (dz/512-ref: ~18.5 → ~4 GiB/rank).
+The packed Gram accumulator is now the per-rank floor; capping ranks so $\text{ranks}\times 0.5\,P^2$
+fits the node is the remaining constraint.
 
 **In short:** the $O(P^3)$ Cholesky is the textbook GPR "cubic-in-inducing-points"
 cost, but in this pipeline the **assembly of the dense PITC Gram matrix (Stage A) is the
@@ -215,19 +217,22 @@ What actually makes SoR lighter:
   $\mathbf{B}$ from *small* per-reference-pair block updates (`einsum`s) scattered straight into the
   packed accumulator, and **never holds a dense $\mathbf{K}_{MM}$**. PITC's `do_work_gram_pitc`
   ([`gram_matrix.py:154`](../src/libs/gram_matrix.py)) now *also* scatters its contribution in column
-  chunks (bounded by `chunk_bytes`), but still keeps the dense $\mathbf{K}_{MM}$ factor resident.
-  Counting the $P^2$-sized arrays each rank holds:
+  chunks (bounded by `chunk_bytes`), and its dense $\mathbf{K}_{MM}$ factor is shared one copy per
+  node ([`_l_mm_shared`](../src/libs/gram_matrix.py)) rather than held per rank. Counting the
+  $P^2$-sized arrays each rank holds:
 
   | | packed Gram | dense $\mathbf{K}_{MM}$ | per-mol dense $P{\times}P$ | total |
   |---|---|---|---|---|
-  | SoR            | $0.5\,P^2$ | —          | —                  | $0.5\,P^2$ |
-  | PITC (before)  | $0.5\,P^2$ | $1.0\,P^2$ | $1.0\,P^2$         | $2.5\,P^2$ |
-  | PITC (chunked) | $0.5\,P^2$ | $1.0\,P^2$ | bounded by chunk   | $1.5\,P^2$ |
+  | SoR                        | $0.5\,P^2$ | —                | —                | $0.5\,P^2$ |
+  | PITC (before)             | $0.5\,P^2$ | $1.0\,P^2$       | $1.0\,P^2$       | $2.5\,P^2$ |
+  | PITC (chunked)            | $0.5\,P^2$ | $1.0\,P^2$       | bounded by chunk | $1.5\,P^2$ |
+  | PITC (chunked + shared K) | $0.5\,P^2$ | shared, ~0/rank  | bounded by chunk | $0.5\,P^2$ |
 
-  Chunking the per-molecule product removed a full $P\times P$ temporary, cutting PITC's peak from
-  ~$2.5\,P^2$ to ~$1.5\,P^2$ (~3× SoR) — this is what the ~20 GiB/rank requirement was about.
-  Node-sharing the read-only $\mathbf{K}_{MM}$ factor across ranks would drop it further to
-  ~$0.5\,P^2$, matching SoR.
+  Chunking the per-molecule product removed a full $P\times P$ temporary (~$2.5\,P^2 \to 1.5\,P^2$),
+  and node-sharing the read-only $\mathbf{K}_{MM}$ factor removed the last per-rank dense array
+  (~$1.5\,P^2 \to 0.5\,P^2$), so PITC now matches SoR's per-rank footprint — down from the
+  ~20 GiB/rank that OOM-killed jobs. The packed Gram accumulator ($0.5\,P^2$) is the remaining
+  per-rank floor.
 
 - **Compute (a smaller, constant-factor win).** SoR uses $\mathbf{M}_i$ directly, so it needs **no
   inversions**: no $\mathbf{S}_i^{-1}$, no $\mathbf{\Lambda}_i^{-1}$, no Nyström residual $\mathbf{D}_i$
