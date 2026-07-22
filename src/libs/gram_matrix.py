@@ -4,6 +4,7 @@ The Gram matrix of the reference-environment kernel columns under the metric-wei
 product: sum_i K_{I_i,M}^T M_i K_{I_i,M} (SoR) or sum_i K_{I_i,M}^T Lambda_i^-1 K_{I_i,M} (PITC).
 """
 
+import functools
 import logging
 import numpy as np
 import metatensor
@@ -16,6 +17,8 @@ DEFAULT_MAX_CHUNK = 1<<30  # 1 GiB
 # Cap on the transient per-molecule d_gram block in do_work_gram_pitc (assembly phase, every rank;
 # smaller keeps the per-rank memory peak low).
 DEFAULT_GRAM_CHUNK_BYTES = 256<<20  # 256 MiB
+# See _gram_chunk_cols() for explanations.
+MIN_EFFICIENT_GRAM_CHUNK_COLS = 128
 
 logger = logging.getLogger('__main__')
 
@@ -129,6 +132,34 @@ def do_work_gram(idx, nmax, conf, ref_indices, path_metric, path_kern, gram_mat)
                             gram_mat[i12a:i12b] += d_gram[n2,im2,n2,:im2+1]
 
 
+@functools.lru_cache(maxsize=None)
+def _gram_chunk_cols(nao_ref, chunk_bytes, itemsize):
+    """Column-chunk width for do_work_gram_pitc, capped so the (nao_ref, c) temporary stays under chunk_bytes.
+
+    Cached so the small-chunk efficiency warning below is emitted at most once per
+    (nao_ref, chunk_bytes) rather than once per molecule (do_work_gram_pitc is called N times).
+
+    Args:
+        nao_ref (int): Problem dimensionality (Gram-matrix side length).
+        chunk_bytes (int): Upper bound on the per-chunk dense temporary.
+        itemsize (int): Bytes per matrix element (8 for float64).
+
+    Returns:
+        int: Number of columns c per chunk, in [1, nao_ref].
+    """
+    c = max(1, min(nao_ref, chunk_bytes // (nao_ref * itemsize)))
+    if c < MIN_EFFICIENT_GRAM_CHUNK_COLS:
+        logger.warning(
+            f'PITC Gram chunk width is {c} columns (< {MIN_EFFICIENT_GRAM_CHUNK_COLS}) for nao_ref={nao_ref}, '
+            f'chunk_bytes={chunk_bytes} ({chunk_bytes>>20} MiB). At this width the per-molecule chunk matmul '
+            f'(nao_ref, nao_i) @ (nao_i, c) is narrow and memory-bound (arithmetic intensity ~ c), so BLAS runs '
+            f'well below peak, and the chunk count (nao_ref/c) and its Python scatter overhead grow -- Gram '
+            f'assembly gets slow. Raise DEFAULT_GRAM_CHUNK_BYTES to widen the chunk (trades more peak memory).',
+            extra={'flush': True},
+        )
+    return c
+
+
 def do_work_gram_pitc(lambda_inv_i, k_nm_i, gram_mat, chunk_bytes=DEFAULT_GRAM_CHUNK_BYTES):
     """Accumulate the PITC-weighted Gram-matrix contribution for one training molecule.
 
@@ -145,8 +176,9 @@ def do_work_gram_pitc(lambda_inv_i, k_nm_i, gram_mat, chunk_bytes=DEFAULT_GRAM_C
     nao_ref = k_nm_i.shape[1]
     z = lambda_inv_i @ k_nm_i          # (nao_i, nao_ref)
     k_nm_i_t = k_nm_i.T                  # (nao_ref, nao_i)
-    # Column-chunk width so the worst-case (nao_ref, c) temporary stays under chunk_bytes.
-    c = max(1, min(nao_ref, chunk_bytes // (nao_ref * z.itemsize)))
+    # Column-chunk width so the worst-case (nao_ref, c) temporary stays under chunk_bytes
+    # (warns once if too narrow to keep the chunk GEMM BLAS-efficient).
+    c = _gram_chunk_cols(nao_ref, chunk_bytes, z.itemsize)
     for j0 in range(0, nao_ref, c):
         j1 = min(j0 + c, nao_ref)
         block = k_nm_i_t[:j1] @ z[:, j0:j1]   # (j1, j1-j0); rows > j are discarded on scatter
