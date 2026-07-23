@@ -6,7 +6,7 @@ seed = 1
 train_size = 2048
 train_fractions = 1.0
 regularisation = 1e-6
-jitter = 1e-8
+jitter = 1e-10
 full_gpr = true
 
 [options.soap]

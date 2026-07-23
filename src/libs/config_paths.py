@@ -34,7 +34,7 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     'train'              : OptSpecs('train_size', 1000, int, 'Number of molecules to assign to the training subset.'),
                     'fracs'              : OptSpecs('train_fractions', np.array([1.0]), Floats(), 'Comma-separated training fractions for learning curve.'),
                     'reg'                : OptSpecs('regularisation', 1e-6, float, 'Ridge regularization strength for regression.'),
-                    'jit'                : OptSpecs('jitter', 1e-10, float, 'Diagonal regularization strength for regression.'),
+                    'jit'                : OptSpecs('jitter', 1e-10, float, 'Diagonal regularization for regression, relative to each matrix mean diagonal (so one value suits K_MM, the metric and Sigma_M alike).'),
                     'full_gpr'           : OptSpecs('full_gpr', default=False, dtype=Bool(), help='Enable full/exact GPR via PITC sparcification, unlocking access to the variance.'),
                     },
                 'options.soap': {

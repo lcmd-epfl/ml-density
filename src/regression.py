@@ -38,7 +38,7 @@ def main():  # noqa: D103
             mat += k_mm_dense
             L, used_jit = robust_cholesky(mat, o.jit)
             if used_jit!=o.jit:
-                logger.warning(f'PITC system needed jitter {used_jit} (bigger than o.jit={o.jit}) to be positive definite')
+                logger.warning(f'PITC system needed relative jitter {used_jit} (bigger than o.jit={o.jit}) to be positive definite')
             x = spl.cho_solve((L, True), target_vec)
             np.save(p.cholesky_pitc.format(train_frac=frac), L)
             
