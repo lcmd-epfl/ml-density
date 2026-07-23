@@ -6,6 +6,7 @@ D_i = K_{I_i,I_i} - K_{I_i,M} K_MM^-1 K_{M,I_i} (all three matrices are block-di
 and the shared K_MM Cholesky factor both target_vector.py and gram_matrix.py need.
 """
 
+import logging
 import numpy as np
 import scipy.linalg as spl
 import metatensor
@@ -14,6 +15,7 @@ from libs.kernels_lib import kernel_block_to_dense_rect, kernel_block_to_dense_s
 from libs.tmap import merge_ref_ps
 from libs.functions import make_dummy_mol
 
+logger = logging.getLogger('__main__')
 
 def fit_sigma_f2(quad, t_dot_x, n_ao):
     """Closed-form maximum-likelihood estimate of the kernel amplitude sigma_f^2.
@@ -50,6 +52,28 @@ def fit_sigma_f2(quad, t_dot_x, n_ao):
     return y_c_inv_y / n_ao
 
 
+def jitter_scale(mat):
+    """Reference magnitude a relative jitter is measured against: the mean diagonal entry.
+
+    `o.jit` is a *relative* jitter. The matrices it regularizes here span many orders of magnitude, 
+    therefore the absolute jitter must scale with the matrix. The mean diagonal entry is a simple
+    and robust measure of the matrix's scale, and it is guaranteed to be positive for a 
+    positive-definite matrix.
+
+    Args:
+        mat (np.ndarray): Symmetric matrix whose diagonal sets the scale.
+
+    Returns:
+        float: Mean diagonal entry, or 1.0 if that is not a usable positive scale (which would
+        make the relative jitter meaningless, so it degrades to an absolute one).
+    """
+    scale = float(np.trace(mat)) / mat.shape[0]
+    if not np.isfinite(scale) or scale <= 0.0:
+        logger.error('jitter_scale: mean diagonal is not positive finite, using 1.0 instead')
+        scale = 1.0
+    return scale
+
+
 def kmm_cholesky(basis, ref_elem, k_mm_tmap, jit):
     """Build the dense K_MM matrix and its lower Cholesky factor.
 
@@ -57,45 +81,57 @@ def kmm_cholesky(basis, ref_elem, k_mm_tmap, jit):
         basis (.functions.Basis): Basis used for AO indexing.
         ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
         k_mm_tmap (metatensor.TensorMap): Reference-reference kernel, as loaded from p.kernel_mm.
-        jit (float): Diagonal jitter added for numerical stability before the Cholesky factorization.
+        jit (float): Relative diagonal jitter added for numerical stability
+            before the Cholesky factorization.
 
     Returns:
         tuple[np.ndarray, np.ndarray]: Dense, jittered K_MM (nao_ref, nao_ref), and its lower
         Cholesky factor.
     """
     k_mm_dense = kernel_block_to_dense_self(basis, ref_elem, k_mm_tmap)
-    k_mm_dense[np.diag_indices_from(k_mm_dense)] += jit
+    k_mm_dense[np.diag_indices_from(k_mm_dense)] += jit * jitter_scale(k_mm_dense)
     l_mm = spl.cholesky(k_mm_dense, lower=True)
     return k_mm_dense, l_mm
 
 
 def robust_cholesky(mat, jit, max_tries=10):
-    """Cholesky-factorize a symmetric matrix, growing a diagonal jitter until it succeeds.
-
-    PITC's Lambda_i^-1-weighted accumulation can be extremely ill-conditioned (eigenvalues
-    spanning many orders of magnitude across training molecules), so a single small fixed jitter
-    is not robust across datasets/configs. Doubles the jitter each retry, starting from `jit`.
+    """Cholesky-factorize a symmetric matrix, growing a relative diagonal jitter until it succeeds.
 
     Args:
-        mat (np.ndarray): Symmetric matrix (only the lower triangle is read), not modified in place.
-        jit (float): Initial diagonal jitter to try.
-        max_tries (int): Maximum number of doublings before giving up.
+        mat (np.ndarray): Symmetric matrix (only the lower triangle contributes; the whole array
+            must be finite), restored on exit.
+        jit (float): Relative diagonal jitter added for numerical stability
+        max_tries (int): Maximum number of ×10 escalations of the jitter before giving up.
 
     Returns:
-        tuple[np.ndarray, float]: Lower Cholesky factor, and the jitter value that succeeded.
+        tuple[np.ndarray, float]: Lower Cholesky factor, and the *relative* jitter that succeeded.
+
+    Raises:
+        scipy.linalg.LinAlgError: Still indefinite after max_tries escalations.
     """
+    diag = np.diag_indices_from(mat)
+    scale = jitter_scale(mat)
+    saved = mat[diag].copy()
     cur_jit = jit
-    eye = np.eye(mat.shape[0])
-    for _ in range(max_tries):
-        try:
-            return spl.cholesky(mat + cur_jit*eye, lower=True), cur_jit
-        except spl.LinAlgError:
-            cur_jit *= 10
-    return spl.cholesky(mat + cur_jit*eye, lower=True), cur_jit
+    try:
+        for i in range(max_tries):
+            mat[diag] = saved + cur_jit * scale
+            try:
+                return spl.cholesky(mat, lower=True), cur_jit
+            except spl.LinAlgError:
+                if i == max_tries - 1:
+                    raise
+                # A zero starting jitter has nothing to escalate from: step to the roundoff floor.
+                cur_jit = cur_jit * 10 if cur_jit > 0.0 else np.finfo(float).eps
+    finally:
+        mat[diag] = saved
 
 
-def molecule_lambda_inv_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit):
-    """Compute Lambda_i^-1, K_{I_i,M} and metric_i for one training molecule.
+def molecule_lambda_chol_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit):
+    """Compute the Cholesky factor of Lambda_i, plus K_{I_i,M} and metric_i, for one training molecule.
+
+    Handing out L_i lets the callers accumulate (L_i^-1 K_{I_i,M})^T (L_i^-1 K_{I_i,M}), an outer
+    product that is *exactly* symmetric and PSD in floating point, contrary to the direct inverse approach
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
@@ -107,19 +143,16 @@ def molecule_lambda_inv_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta,
         eta (float): Noise scale (the theory document's eta; callers pass o.reg -- eta and the
             SoR path's regularization coefficient are the same symbol in the theory, see
             regression.py's PITC branch).
-        jit (float): Diagonal jitter added to metric_i before inverting it. metric_i is often severely
-            ill-conditioned for redundant density-fitting auxiliary bases (e.g. cc-pvqz-jkfit,
-            condition numbers ~1e7 observed), so its raw inverse amplifies floating-point noise by
-            a comparable factor; jittering caps this the same way kmm_cholesky() does for K_MM.
+        jit (float): Relative diagonal jitter added for numerical stability
 
     Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray, pyscf.gto.Mole]: Lambda_i^-1 (nao_i, nao_i),
-        K_{I_i,M} (nao_i, nao_ref), the jittered metric_i (nao_i, nao_i), and a dummy mol matching
-        molecule i's AO layout.
+        tuple[np.ndarray, np.ndarray, np.ndarray, pyscf.gto.Mole]: lower Cholesky factor of
+        Lambda_i (nao_i, nao_i), K_{I_i,M} (nao_i, nao_ref), the jittered metric_i (nao_i, nao_i),
+        and a dummy mol matching molecule i's AO layout.
     """
     mol_i = make_dummy_mol(atoms_i, basis=basis.basisname, ignore=True)
     metric_i = tensormap_to_array(mol_i, metatensor.load(paths.metric_matrix.format(mol_idx)), dest='gpr', fast=True)
-    metric_i[np.diag_indices_from(metric_i)] += jit
+    metric_i[np.diag_indices_from(metric_i)] += jit * jitter_scale(metric_i)
 
     k_nm_i = kernel_block_to_dense_rect(basis, atoms_i, ref_elem, metatensor.load(paths.kernel_nm.format(mol_idx)))
 
@@ -131,11 +164,14 @@ def molecule_lambda_inv_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta,
     power_i = merge_ref_ps(lmax_i, idx_i, paths.power_spectrum)
     kself_i = kernel_block_to_dense_self(basis, atoms_i, kernel_mm(lmax_i, power_i))
 
-    y_i = spl.cho_solve((l_mm, True), k_nm_i.T)              # K_MM^-1 K_{M,I_i}
-    d_i = kself_i - k_nm_i @ y_i
+    # L_MM^-1 K_{M,I_i}
+    u_i = spl.solve_triangular(l_mm, k_nm_i.T, lower=True)
 
+    # d_i = K_i - K_{M,I_i}^T K_MM^-1 K_{M,I_i} = K_i - (L_MM^-1 K_{M,I_i})^T L_MM^-1 K_{M,I_i}. Exactly symmetric
+    d_i = kself_i - u_i.T @ u_i
     metric_inv_i = spl.cho_solve(spl.cho_factor(metric_i), np.eye(metric_i.shape[0]))
-    lambda_i = d_i + eta * metric_inv_i
-    lambda_inv_i = np.linalg.inv(lambda_i)
+    # 0.5*(metric_inv_i + metric_inv_i.T) ensure the symmetry of lambda. 
+    lambda_i = d_i + eta * 0.5*(metric_inv_i + metric_inv_i.T)
+    l_lambda_i, _ = robust_cholesky(lambda_i, jit)
 
-    return lambda_inv_i, k_nm_i, metric_i, mol_i
+    return l_lambda_i, k_nm_i, metric_i, mol_i

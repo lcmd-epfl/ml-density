@@ -7,10 +7,11 @@ product: sum_i K_{I_i,M}^T M_i K_{I_i,M} (SoR) or sum_i K_{I_i,M}^T Lambda_i^-1 
 import functools
 import logging
 import numpy as np
+import scipy.linalg as spl
 import metatensor
 from libs.target_vector import print_batches, do_work_target_pitc
 from libs.multi import print_nodes, scatter_jobs
-from libs.pitc_lib import kmm_cholesky, molecule_lambda_inv_knm
+from libs.pitc_lib import kmm_cholesky, molecule_lambda_chol_knm
 
 # Buffer for the final MPI Reduce of the packed Gram onto rank 0 (communication phase, rank 0 only; larger just means fewer messages).
 DEFAULT_MAX_CHUNK = 1<<30  # 1 GiB
@@ -160,28 +161,27 @@ def _gram_chunk_cols(nao_ref, chunk_bytes, itemsize):
     return c
 
 
-def do_work_gram_pitc(lambda_inv_i, k_nm_i, gram_mat, chunk_bytes=DEFAULT_GRAM_CHUNK_BYTES):
+def do_work_gram_pitc(v_i, gram_mat, chunk_bytes=DEFAULT_GRAM_CHUNK_BYTES):
     """Accumulate the PITC-weighted Gram-matrix contribution for one training molecule.
 
     Adds d_gram = K_{I_i,M}^T Lambda_i^-1 K_{I_i,M} into the packed lower-triangular accumulator
     without forming the full nao_ref^2 matrix: the per-chunk temporary is bounded by chunk_bytes
     (independent of nao_ref). See docs/training_complexity.md.
 
+    v_i^T v_i ensure symmetry by construction on the contrary of other methods.
+
     Args:
-        lambda_inv_i (np.ndarray): Lambda_i^-1 (nao_i, nao_i), from molecule_lambda_inv_knm().
-        k_nm_i (np.ndarray): K_{I_i,M} (nao_i, nao_ref), from molecule_lambda_inv_knm().
+        v_i (np.ndarray): L_i^-1 K_{I_i,M} (nao_i, nao_ref), with L_i L_i^T = Lambda_i.
         gram_mat (np.ndarray): Packed lower-triangular matrix accumulator, updated in place.
         chunk_bytes (int): Upper bound on the per-chunk dense temporary (default DEFAULT_GRAM_CHUNK_BYTES).
     """
-    nao_ref = k_nm_i.shape[1]
-    z = lambda_inv_i @ k_nm_i          # (nao_i, nao_ref)
-    k_nm_i_t = k_nm_i.T                  # (nao_ref, nao_i)
+    nao_ref = v_i.shape[1]
+    v_i_t = v_i.T # (nao_ref, nao_i)
     # Column-chunk width so the worst-case (nao_ref, c) temporary stays under chunk_bytes
-    # (warns once if too narrow to keep the chunk GEMM BLAS-efficient).
-    c = _gram_chunk_cols(nao_ref, chunk_bytes, z.itemsize)
+    c = _gram_chunk_cols(nao_ref, chunk_bytes, v_i.itemsize)
     for j0 in range(0, nao_ref, c):
         j1 = min(j0 + c, nao_ref)
-        block = k_nm_i_t[:j1] @ z[:, j0:j1]   # (j1, j1-j0); rows > j are discarded on scatter
+        block = v_i_t[:j1] @ v_i[:, j0:j1]   # (j1, j1-j0); rows > j are discarded on scatter
         for j in range(j0, j1):
             start = mpos(0, j)
             gram_mat[start:start+j+1] += block[:j+1, j-j0]
@@ -190,10 +190,11 @@ def do_work_gram_pitc(lambda_inv_i, k_nm_i, gram_mat, chunk_bytes=DEFAULT_GRAM_C
 def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, gram_mat, target_vec, ml_terms):
     """Accumulate both the Gram-matrix and target-vector PITC contributions for one training molecule.
 
-    Lambda_i^-1/K_{I_i,M} are the expensive part of PITC per molecule (a dense Cholesky
-    factorization/inversion each). Computing them once here for both accumulations avoids paying
-    for them twice, which running get_target_vector() and get_gram_matrix() as separate passes
-    used to require.
+    Lambda_i/K_{I_i,M} are the expensive part of PITC per molecule (a dense Cholesky factorization
+    each). Computing them once here for both accumulations avoids paying for them twice, which
+    running get_target_vector() and get_gram_matrix() as separate passes used to require. The
+    half-solve v_i = L_i^-1 K_{I_i,M} is shared for the same reason: the Gram needs v_i^T v_i and
+    the target vector needs v_i^T (L_i^-1 y_i), so one triangular solve serves both.
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
@@ -203,15 +204,16 @@ def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, g
         paths (SimpleNamespace): Configured paths and path templates.
         l_mm (np.ndarray): Lower Cholesky factor of the (jittered) dense K_MM.
         eta (float): PITC noise scale.
-        jit (float): Diagonal jitter added to metric_i before inverting it (see molecule_lambda_inv_knm).
+        jit (float): Relative diagonal jitter (see molecule_lambda_chol_knm).
         gram_mat (np.ndarray): Packed lower-triangular Gram-matrix accumulator, updated in place.
         target_vec (np.ndarray): Dense (nao_ref,) target-vector accumulator, updated in place.
         ml_terms (np.ndarray): Dense (2,) marginal-likelihood accumulator, updated in place
             (see do_work_target_pitc).
     """
-    lambda_inv_i, k_nm_i, metric_i, mol_i = molecule_lambda_inv_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit)
-    do_work_gram_pitc(lambda_inv_i, k_nm_i, gram_mat)
-    do_work_target_pitc(mol_idx, paths, lambda_inv_i, k_nm_i, metric_i, mol_i, target_vec, ml_terms)
+    l_lambda_i, k_nm_i, metric_i, mol_i = molecule_lambda_chol_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit)
+    v_i = spl.solve_triangular(l_lambda_i, k_nm_i, lower=True)   # L_i^-1 K_{I_i,M}
+    do_work_gram_pitc(v_i, gram_mat)
+    do_work_target_pitc(mol_idx, paths, l_lambda_i, v_i, metric_i, mol_i, target_vec, ml_terms)
 
 
 def _l_mm_for_pitc(basis, ref_elem, paths, o):
@@ -238,8 +240,8 @@ def _l_mm_shared(basis, ref_elem, paths, o, comm):
 
     Unlike _l_mm_for_pitc (one private copy per rank), this allocates a single (nao_ref, nao_ref)
     array per shared-memory node via MPI.Win.Allocate_shared, builds l_mm on that node's rank 0, and
-    returns a view every rank on the node shares. molecule_lambda_inv_knm only reads l_mm (through
-    cho_solve), so concurrent access is safe with no locking. Cuts the resident l_mm footprint from
+    returns a view every rank on the node shares. molecule_lambda_chol_knm only reads l_mm (through
+    solve_triangular), so concurrent access is safe with no locking. Cuts the resident l_mm footprint from
     ~nao_ref^2 per rank to ~nao_ref^2 per node, and loads/factorizes K_MM once per node instead of
     once per rank.
 
