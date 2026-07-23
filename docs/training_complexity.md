@@ -62,7 +62,9 @@ These are read from disk during training, not recomputed, but they define the op
   `kernel_nm.py` ([`kernels_lib.py:9`](../src/libs/kernels_lib.py)).
 - $\mathbf{K}_{I_i I_i}$ — molecule self-kernel, $(n_i \times n_i)$.
 - $\mathbf{S}_i$ — per-molecule Coulomb **metric** (overlap) matrix, $(n_i \times n_i)$,
-  often ill-conditioned (κ ≈ 10⁷), hence diagonal jitter ([`pitc_lib.py:76`](../src/libs/pitc_lib.py)).
+  often ill-conditioned (κ ≈ 10⁷), hence diagonal jitter ([`pitc_lib.py`](../src/libs/pitc_lib.py)).
+  The jitter is **relative** to each matrix's mean diagonal (`jitter_scale`): $\mathbf{\Sigma}_M$'s
+  diagonal reaches ~10⁹ while $\mathbf{K}_{MM}$'s is $O(1)$, so one absolute value cannot serve both.
 - $\mathbf{w}_i$ — metric-projected density-fitting coefficients (the fit target),
   $(n_i,)$.
 
@@ -104,21 +106,21 @@ $$
 
 | # | Operation | Kind | Shape | Complexity | Code |
 |---|-----------|------|-------|-----------|------|
-| A0 | $\mathbf{L}_{MM} = \operatorname{chol}(\mathbf{K}_{MM} + \text{jit}\cdot\mathbf{I})$ | Cholesky | $P \times P$ | $O(P^3)$ | [`pitc_lib.py:33`](../src/libs/pitc_lib.py) |
+| A0 | $\mathbf{L}_{MM} = \operatorname{chol}(\mathbf{K}_{MM} + \text{jit}\cdot\bar{d}\,\mathbf{I})$ | Cholesky | $P \times P$ | $O(P^3)$ | [`pitc_lib.py`](../src/libs/pitc_lib.py) |
 
-**Per training molecule $i$** (`molecule_lambda_inv_knm`, [`pitc_lib.py:62`](../src/libs/pitc_lib.py)):
+**Per training molecule $i$** (`molecule_lambda_chol_knm`, [`pitc_lib.py`](../src/libs/pitc_lib.py)):
 
 | # | Operation | Kind | Shape | Complexity | Code |
 |---|-----------|------|-------|-----------|------|
-| A1 | $\mathbf{y}_i = \mathbf{K}_{MM}^{-1}\mathbf{K}_{M I_i}$ = `cho_solve((L_MM), k_nm_i.T)` | triangular solve, $n_i$ RHS | $P \times n_i$ | $O(P^2 n_i)$ | [`pitc_lib.py:98`](../src/libs/pitc_lib.py) |
-| A2 | $\mathbf{D}_i = \mathbf{K}_{I_i I_i} - \mathbf{K}_{I_i M}\mathbf{y}_i$ | matrix–matrix | $n_i \times n_i$ | $O(n_i^2 P)$ | [`pitc_lib.py:99`](../src/libs/pitc_lib.py) |
-| A3 | $\mathbf{S}_i^{-1}$ = `cho_factor` + `cho_solve(I)` | Cholesky + solve → explicit inverse | $n_i \times n_i$ | $O(n_i^3)$ | [`pitc_lib.py:101`](../src/libs/pitc_lib.py) |
-| A4 | $\mathbf{\Lambda}_i = \mathbf{D}_i + \eta\,\mathbf{S}_i^{-1}$ | add | $n_i \times n_i$ | $O(n_i^2)$ | [`pitc_lib.py:102`](../src/libs/pitc_lib.py) |
-| A5 | $\mathbf{\Lambda}_i^{-1}$ = `np.linalg.inv` | dense inverse (LU) | $n_i \times n_i$ | $O(n_i^3)$ | [`pitc_lib.py:103`](../src/libs/pitc_lib.py) |
-| A6 | $\mathbf{G}_i = \mathbf{K}_{I_i M}^{\top}\,\mathbf{\Lambda}_i^{-1}\,\mathbf{K}_{I_i M}$ | matrix products in **column chunks** (no full $P\times P$ temporary) | temp $\le$ `chunk_bytes` | $O(n_i^2 P) + O(P^2 n_i)$ | [`gram_matrix.py:154`](../src/libs/gram_matrix.py) |
-| A7 | scatter each chunk's columns into packed Gram | accumulate | $P(P{+}1)/2$ | $O(P^2)$ | [`gram_matrix.py:157`](../src/libs/gram_matrix.py) |
-| A8 | $\mathbf{S}_i^{-1}\mathbf{w}_i$ = `cho_solve` | triangular solve, matrix–vector | $n_i$ | $O(n_i^2)$ | [`target_vector.py:66`](../src/libs/target_vector.py) |
-| A9 | $\mathbf{t}_i = \mathbf{K}_{I_i M}^{\top}(\mathbf{\Lambda}_i^{-1}\mathbf{S}_i^{-1}\mathbf{w}_i)$ | matrix–vector | $P$ | $O(P n_i)$ | [`target_vector.py:67`](../src/libs/target_vector.py) |
+| A1 | $\mathbf{U}_i = \mathbf{L}_{MM}^{-1}\mathbf{K}_{M I_i}$ = `solve_triangular` | triangular solve, $n_i$ RHS | $P \times n_i$ | $O(P^2 n_i)$ | [`pitc_lib.py`](../src/libs/pitc_lib.py) |
+| A2 | $\mathbf{D}_i = \mathbf{K}_{I_i I_i} - \mathbf{U}_i^{\top}\mathbf{U}_i$ (exactly symmetric) | matrix–matrix | $n_i \times n_i$ | $O(n_i^2 P)$ | [`pitc_lib.py`](../src/libs/pitc_lib.py) |
+| A3 | $\mathbf{S}_i^{-1}$ = `cho_factor` + `cho_solve(I)` | Cholesky + solve → explicit inverse | $n_i \times n_i$ | $O(n_i^3)$ | [`pitc_lib.py`](../src/libs/pitc_lib.py) |
+| A4 | $\mathbf{\Lambda}_i = \mathbf{D}_i + \eta\,\mathbf{S}_i^{-1}$ | add + symmetrize | $n_i \times n_i$ | $O(n_i^2)$ | [`pitc_lib.py`](../src/libs/pitc_lib.py) |
+| A5 | $\mathbf{L}_i = \operatorname{chol}(\mathbf{\Lambda}_i)$ = `robust_cholesky` | Cholesky ($n_i^3/3$, vs $2n_i^3$ for the LU inverse it replaced) | $n_i \times n_i$ | $O(n_i^3)$ | [`pitc_lib.py`](../src/libs/pitc_lib.py) |
+| A6 | $\mathbf{V}_i = \mathbf{L}_i^{-1}\mathbf{K}_{I_i M}$, then $\mathbf{G}_i = \mathbf{V}_i^{\top}\mathbf{V}_i$ | triangular solve + products in **column chunks** (no full $P\times P$ temporary) | temp $\le$ `chunk_bytes` | $O(n_i^2 P) + O(P^2 n_i)$ | [`gram_matrix.py`](../src/libs/gram_matrix.py) |
+| A7 | scatter each chunk's columns into packed Gram | accumulate | $P(P{+}1)/2$ | $O(P^2)$ | [`gram_matrix.py`](../src/libs/gram_matrix.py) |
+| A8 | $\mathbf{y}_i = \mathbf{S}_i^{-1}\mathbf{w}_i$ = `cho_solve`, then $\mathbf{z}_i = \mathbf{L}_i^{-1}\mathbf{y}_i$ | triangular solves, matrix–vector | $n_i$ | $O(n_i^2)$ | [`target_vector.py`](../src/libs/target_vector.py) |
+| A9 | $\mathbf{t}_i = \mathbf{V}_i^{\top}\mathbf{z}_i$ | matrix–vector | $P$ | $O(P n_i)$ | [`target_vector.py`](../src/libs/target_vector.py) |
 
 Because $P \gg n_i$ (the references span all $M$ atoms; $n_i$ is a single molecule), the
 **per-molecule cost is dominated by A1 and A6, both $O(P^2 n_i)$**. Summed over the loop
@@ -140,7 +142,7 @@ MPI ranks each accumulate a partial Gram/target and are summed with `Reduce`
 | B0 | densify $\mathbf{K}_{MM}$ (`kmm_cholesky`) | densify | $P \times P$ | $O(P^2)$ | [`regression.py:33`](../src/regression.py) |
 | B1 | `unravel_tril` — unpack packed Gram → dense | unpack | $P \times P$ | $O(P^2)$ | [`regression.py:38`](../src/regression.py) |
 | B2 | $\mathbf{\Sigma}_M = \text{Gram} + \mathbf{K}_{MM}$ | add | $P \times P$ | $O(P^2)$ | [`regression.py:39`](../src/regression.py) |
-| B3 | $\mathbf{L} = \operatorname{chol}(\mathbf{\Sigma}_M)$ (`robust_cholesky`, retries with ×10 jitter) | **Cholesky** | $P \times P$ | $O(P^3)$ | [`regression.py:40`](../src/regression.py) |
+| B3 | $\mathbf{L} = \operatorname{chol}(\mathbf{\Sigma}_M)$ (`robust_cholesky`, ×10 escalation from `jit`·mean-diagonal) | **Cholesky** | $P \times P$ | $O(P^3)$ | [`regression.py`](../src/regression.py) |
 | B4 | $\mathbf{c} = \mathbf{\Sigma}_M^{-1}\mathbf{t}$ = `cho_solve((L), target_vec)` | triangular solve | $P$ | $O(P^2)$ | [`regression.py:43`](../src/regression.py) |
 
 $$
