@@ -55,7 +55,7 @@ def get_number_of_electrons(use_charges, atomic_numbers, df):
 
 class Error:
     """Prediction errors."""
-    fields = ('abs', 'rel', 'rel_bl', 'N')
+    fields = ('abs', 'rel', 'rel_bl', 'rel_bl_N', 'N')
 
     def __init__(self):
         """Initialize an Error instance with 0."""
@@ -197,11 +197,10 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
     N_c0 = qvec @ c0
     N_pred = qvec @ c
     dN = N_pred - N_c0  # signed, so the printed row reads exactly as nel_pred - nel_ref = ΔN
-    errorn_rel_bl = None
     if o.use_charges:
         error.N = abs(dN)
         dcn = correct_number_of_electrons(c, metric, qvec, N) - c0
-        errorn_rel_bl = (dcn @ metric @ dcn) / norm_bl * 100.0
+        error.rel_bl_N = (dcn @ metric @ dcn) / norm_bl * 100.0
 
     fields = [
         f'mol # {itest:{len(str(npred))}} ({imol:{len(str(len(atomic_numbers)))}}):',
@@ -213,7 +212,7 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
         fields.append(f'{pred_var:.2e} %')
     fields += [f'{N_pred:.4f}', f'{N_c0:.4f}', f'{dN:+.4f}']
     if o.use_charges:
-        fields.append(f'{errorn_rel_bl:.2e} %')
+        fields.append(f'{error.rel_bl_N:.2e} %')
     fields.append(p.xyz.format(mol_name=df['id'][imol]))
     return error, fields
 
@@ -240,7 +239,8 @@ def summary_line(label, err, headers, widths, separators, *, use_charges, var_va
 
     Args:
         label (str): Line label, e.g. 'MAE' or 'MAX'.
-        err (Error): Aggregated (mean- or max-reduced) error for baselined, relative and absolute error.
+        err (Error): Aggregated (mean- or max-reduced) baselined, relative, absolute and
+            electron-number-corrected baselined error.
         headers (list[str]): Table column headers, from main().
         widths (list[int]): Table column widths, from main().
         separators (list[str]): Table column separators, from main().
@@ -260,6 +260,7 @@ def summary_line(label, err, headers, widths, separators, *, use_charges, var_va
         fields[headers.index('pred var')] = f'{var_value:.2e} %'
     if use_charges:
         fields[headers.index('ΔN')] = f'{err.N:+.4f}'
+        fields[headers.index('corr N')] = f'{err.rel_bl_N:.2e} %'
     blanks = [' ' * len(sep) for sep in separators]
     return format_row(fields, widths, blanks).rstrip()
 
