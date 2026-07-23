@@ -5,7 +5,7 @@
 #SBATCH --ntasks=48
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=350G
-#SBATCH --time=1-00:00:00
+#SBATCH --time=5-00:00:00
 #SBATCH --output=logs/qm7-%j.out
 #
 # Full SA-GPR / lambda-SOAP pipeline for the QM7 set, full_gpr=true.
@@ -25,6 +25,24 @@
 #   (2) metric matrices unpacked to square:  python3 convert_metric.py --basis <basis>
 #       -> metric/ (dz), metric_tz/ (tz), metric_aqz/ (aqz)
 
+echo ""
+echo "===== SLURM JOB INFORMATION ====="
+echo "Job ID: $SLURM_JOB_ID"
+echo "Job Name: $SLURM_JOB_NAME"
+echo "Node List: $SLURM_JOB_NODELIST"
+echo "Number of Nodes: $SLURM_JOB_NUM_NODES"
+echo "Number of Tasks: $SLURM_NTASKS"
+echo "Number of CPUs per Task: $SLURM_CPUS_PER_TASK"
+echo "Memory Requested per Node: $SLURM_MEM_PER_NODE"
+echo "Memory Requested per CPU: $SLURM_MEM_PER_CPU"
+echo "Partition: $SLURM_JOB_PARTITION"
+echo "Submit Directory: $SLURM_SUBMIT_DIR"
+echo "Submit Host: $SLURM_SUBMIT_HOST"
+echo "Vasp path: $vasp_path"
+echo "Allocated GPUs: $SLURM_GPUS"
+echo "================================="
+echo ""
+
 # --- environment (this cluster hides conda behind a loader; module/conda not on default PATH) ---
 source /etc/profile.d/software.sh    # defines the cluster condald loader
 condald                              # put `conda` on PATH
@@ -34,6 +52,15 @@ conda activate ml-density
 # Return to the directory sbatch was invoked from (must be QM7_test) so ../src and the
 # relative data paths (compounds/, metric*/, INNER*/, logs/) in the config resolve.
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
+
+# numpy/scipy here are OpenBLAS-backed, and OpenBLAS sizes its thread pool from the affinity mask
+# at import time. Hydra's mpirun does NOT bind ranks, so every rank sees the whole node: without
+# this, `mpirun -np 48` on a 48-core node runs 48 ranks x 48 BLAS threads (~2300 threads on 48
+# cores). The resulting thrash is what left jobs 999986/999991 unkillable and drained node13/node18
+# ("Kill task failed"). One BLAS thread per rank is the right setting for a pure-MPI job.
+export OPENBLAS_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
 
 src=../src
 cfg=$1
