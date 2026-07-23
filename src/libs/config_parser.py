@@ -80,6 +80,11 @@ class Config:
         parser = configparser.RawConfigParser()
         parser.read(config_path)
         self.configuration = dict(parser.items())
+        # A section absent from the file is equivalent to an empty one: each of its entries then
+        # falls back to its declared default / when_missing policy. Sections whose entries are all
+        # defaulted (e.g. [paths.internal]) are documented as optional, so the lookups below must
+        # not raise KeyError on them.
+        self.configuration.update({group: {} for group in self.groups if group not in self.configuration})
 
         return {group : self.parse_group(group, options) for group, options in self.groups.items()}
 
