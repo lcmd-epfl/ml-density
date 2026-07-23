@@ -93,19 +93,20 @@ def table_legend(use_charges, *, has_variance):
     return '\n'.join([
         '',
         'TABLE LEGEND',
-        'mol # i (j)  : molecule i within this test set (dataset index j)',
-        'baselined    : (c - c0)^T M (c - c0) / (c0 - c_av)^T M (c0 - c_av) * 100',
-        'relative     : (c - c0)^T M (c - c0) / c0^T M c0 * 100',
-        'absolute     : (c - c0)^T M (c - c0)',
-        *(['pred var     : Tr(Sigma_c* M) / (c - c_av)^T M (c - c_av) * 100'] if has_variance else []),
-        'nel_pred     : predicted number of electrons, q^T c',
-        'nel_ref      : reference number of electrons, q^T c0',
-        'ΔN           : nel_pred - nel_ref for this molecule',
-        *(['corr N       : baselined relative error after projecting the prediction onto q^T c = N.'] if use_charges else []),
-        'MAE          : mean of the above over all molecules in the fraction',
-        'MAX          : max of the above over all molecules in the fraction',
-        'frac         : fraction of the training set actually used to fit the model being evaluated',
-        *(['corr(baselined, pred var): Pearson correlation between "baselined" and "pred var" across the fraction\'s molecules'] if has_variance else []),
+        'mol # i (j) : molecule i within this test set (dataset index j)',
+        'baselined   : (c - c0)^T M (c - c0) / (c0 - c_av)^T M (c0 - c_av) * 100',
+        'relative    : (c - c0)^T M (c - c0) / c0^T M c0 * 100',
+        'absolute    : (c - c0)^T M (c - c0)',
+        *(['pred var    : Tr(Sigma_c* M) / (c - c_av)^T M (c - c_av) * 100'] if has_variance else []),
+        'nel_pred    : predicted number of electrons, q^T c',
+        'nel_ref     : reference number of electrons, q^T c0',
+        'ΔN          : nel_pred - nel_ref for this molecule',
+        *(['corr N      : baselined relative error after projecting the prediction onto q^T c = N.'] if use_charges else []),
+        'MAE         : mean of the above over all molecules in the fraction',
+        'MAX         : max of the above over all molecules in the fraction',
+        'frac        : fraction of the training set actually used to fit the model being evaluated',
+        *(['correlation : Pearson correlation between "baselined" and "pred var" across the fraction\'s molecules'] if has_variance else []),
+        *(['calibration : mean[(c - c0)^T M (c - c0)] / mean[Tr(Sigma_c* M)]'] if has_variance else []),
         'where',
         'c    = predicted coefficients',
         'c0   = reference (ab initio) coefficients',
@@ -118,11 +119,8 @@ def table_legend(use_charges, *, has_variance):
         'The baselined error isolates the ML-predicted part (c - c_av) from the trivial part (c_av),',
         'making it the most meaningful measure of model error.',
         *(['',
-           'pred var is the a priori counterpart of the baselined error: Sigma_c* is the GPR predictive covariance',
-           'over c - c0, so Tr(Sigma_c* M) = E[(c - c0)^T M (c - c0)] estimates "absolute" before c0 is known.',
-           'Its magnitude is NOT calibrated: the kernel carries no amplitude hyperparameter, so the prior sits far',
-           'above the true scale of the density and pred var reads orders of magnitude high. Rank molecules by it',
-           '-- which is what corr(baselined, pred var) measures -- but do not read its absolute value.'] if has_variance else []),
+           'Calibration is a diagnostic of the model\'s uncertainty quantification: 1.0 is perfect, < 1 means the model',
+           'reports more uncertainty than it needs, > 1 that it reports too little.'] if has_variance else []),
         '',
         ])
 
@@ -137,18 +135,23 @@ def load_variances(o, p, training, frac):
         frac (float): Training fraction.
 
     Returns:
-        dict[int, float] | None: Mapping from dataset molecule index to the dimensionless
-        predicted variance relative to the baselined density, as a percentage, or None if
-        full_gpr is disabled or variance.py hasn't been run yet for this subset/fraction.
+        tuple[dict[int, float] | None, dict[int, float] | None]: Mappings from dataset molecule index
+        to (a) the dimensionless predicted variance relative to the baselined density, as a
+        percentage, and (b) the raw Tr(Sigma_c* M) in Hartree, used for the calibration check. Both
+        are None if full_gpr is disabled or variance.py hasn't been run yet for this subset/fraction;
+        the second alone is None for CSVs written before var_absolute was recorded.
     """
     if not o.full_gpr:
-        return None
+        return None, None
     path = p.var_trace.format(subset='training' if training else 'test', train_frac=frac)
     if not os.path.exists(path):
         logger.info(f'full_gpr=True but {path} does not exist -- run variance.py to include predicted variance here')
-        return None
+        return None, None
     var_df = pd.read_csv(path)
-    return dict(zip(var_df['mol_idx'], var_df['var_relative'], strict=True))
+    relative = dict(zip(var_df['mol_idx'], var_df['var_relative'], strict=True))
+    absolute = (dict(zip(var_df['mol_idx'], var_df['var_absolute'], strict=True))
+                if 'var_absolute' in var_df.columns else None)
+    return relative, absolute
 
 
 def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, imol, itest, npred, pred_var):
@@ -282,6 +285,30 @@ def get_settings_quiet(return_args):
         logging.disable(logging.NOTSET)
 
 
+def variance_diagnostics(bl_errors, pred_vars, obs_abs, pred_abs, npred):
+    """Format the predictive-variance diagnostics appended to the `frac=` line.
+
+    Args:
+        bl_errors (list[float]): Per-molecule baselined errors, empty when no variance is available.
+        pred_vars (list[float]): Per-molecule relative predicted variances, paired with bl_errors.
+        obs_abs (list[float]): Per-molecule observed (c - c0)^T M (c - c0), empty when var_absolute
+            is not in the CSV.
+        pred_abs (list[float]): Per-molecule predicted Tr(Sigma_c* M), paired with obs_abs.
+        npred (int): Number of molecules in this fraction.
+
+    Returns:
+        str: The formatted diagnostics, each prefixed by three spaces, or '' when unavailable.
+    """
+    parts = []
+    if pred_vars:
+        corr = np.corrcoef(bl_errors, pred_vars)[0, 1] if npred > 1 else float('nan')
+        parts.append(f'correlation = {corr:.2f}')
+    if pred_abs:
+        # observed / predicted error on molecules the amplitude fit never saw; 1.0 is perfect
+        parts.append(f'calibration = {np.mean(obs_abs)/np.mean(pred_abs):.2e}')
+    return ''.join(f'   {part}' for part in parts)
+
+
 def main():  # noqa: D103
     args, o, p = get_settings_quiet(return_args=['training'])
 
@@ -297,7 +324,7 @@ def main():  # noqa: D103
         pred_configs, pred_path = subsets.get_pred_idx(args.training, p.predictions, frac)
         predictions = split(metatensor.load(pred_path))
         npred = len(pred_configs)
-        variances = load_variances(o, p, args.training, frac)
+        variances, variances_abs = load_variances(o, p, args.training, frac)
         any_variance |= variances is not None
 
         headers = ['', 'baselined', 'relative', 'absolute']
@@ -318,6 +345,7 @@ def main():  # noqa: D103
         # is its like-for-like partner: this correlation is a calibration check, not a comparison
         # across metrics.
         bl_errors, pred_vars, rows = [], [], []
+        obs_abs, pred_abs = [], []
         for itest, imol in enumerate(pred_configs):
             pred_var = variances[imol] if variances is not None else None
             error, fields = evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all,
@@ -328,6 +356,9 @@ def main():  # noqa: D103
             if pred_var is not None:
                 bl_errors.append(error.rel_bl)
                 pred_vars.append(pred_var)
+            if variances_abs is not None:
+                obs_abs.append(error.abs)
+                pred_abs.append(variances_abs[imol])
             rows.append(fields)
 
         widths = [max(len(headers[i]), max(len(row[i]) for row in rows)) for i in range(len(headers))]
@@ -338,10 +369,7 @@ def main():  # noqa: D103
         total /= npred
         mean_var = np.mean(pred_vars) if variances is not None else None
         max_var = max(pred_vars) if variances is not None else None
-        corr_extra = ''
-        if variances is not None:
-            corr = np.corrcoef(bl_errors, pred_vars)[0, 1] if npred > 1 else float('nan')
-            corr_extra = f'   corr(baselined, pred var) = {corr:.2f}'
+        corr_extra = variance_diagnostics(bl_errors, pred_vars, obs_abs, pred_abs, npred)
         print()
         print(summary_line('MAE', total, headers, widths, separators, use_charges=o.use_charges, var_value=mean_var))
         print(summary_line('MAX', max_error, headers, widths, separators, use_charges=o.use_charges, var_value=max_var))

@@ -187,7 +187,7 @@ def do_work_gram_pitc(lambda_inv_i, k_nm_i, gram_mat, chunk_bytes=DEFAULT_GRAM_C
             gram_mat[start:start+j+1] += block[:j+1, j-j0]
 
 
-def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, gram_mat, target_vec):
+def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, gram_mat, target_vec, ml_terms):
     """Accumulate both the Gram-matrix and target-vector PITC contributions for one training molecule.
 
     Lambda_i^-1/K_{I_i,M} are the expensive part of PITC per molecule (a dense Cholesky
@@ -206,10 +206,12 @@ def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, g
         jit (float): Diagonal jitter added to metric_i before inverting it (see molecule_lambda_inv_knm).
         gram_mat (np.ndarray): Packed lower-triangular Gram-matrix accumulator, updated in place.
         target_vec (np.ndarray): Dense (nao_ref,) target-vector accumulator, updated in place.
+        ml_terms (np.ndarray): Dense (2,) marginal-likelihood accumulator, updated in place
+            (see do_work_target_pitc).
     """
     lambda_inv_i, k_nm_i, metric_i, mol_i = molecule_lambda_inv_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit)
     do_work_gram_pitc(lambda_inv_i, k_nm_i, gram_mat)
-    do_work_target_pitc(mol_idx, paths, lambda_inv_i, k_nm_i, metric_i, mol_i, target_vec)
+    do_work_target_pitc(mol_idx, paths, lambda_inv_i, k_nm_i, metric_i, mol_i, target_vec, ml_terms)
 
 
 def _l_mm_for_pitc(basis, ref_elem, paths, o):
@@ -270,7 +272,7 @@ def _l_mm_shared(basis, ref_elem, paths, o, comm):
     return l_mm, win
 
 
-def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices, l_mm, o, gram_mat, target_vec):
+def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices, l_mm, o, gram_mat, target_vec, ml_terms):
     """Dispatch to the PITC (Gram and target together) or SoR (Gram only) accumulation for one training molecule.
 
     Args:
@@ -288,11 +290,13 @@ def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices,
             (None unless o.full_gpr; unused by the SoR path -- get_target_vector() builds the SoR
             target vector separately, since it's a genuinely independent computation there, unlike
             for PITC).
+        ml_terms (np.ndarray | None): Dense (2,) marginal-likelihood accumulator, updated in place
+            (None unless o.full_gpr; see do_work_target_pitc).
     """
     if o.full_gpr:
         # o.reg plays the role of eta here -- see regression.py's PITC branch for why they're
         # the same symbol in the theory, not two separate regularization knobs.
-        _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, o.reg, o.jit, gram_mat, target_vec)
+        _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, o.reg, o.jit, gram_mat, target_vec, ml_terms)
     else:
         do_work_gram(idx, basis.nmax, mol_idx, ref_indices, paths.metric_matrix, paths.kernel_nm, gram_mat)
 
@@ -300,8 +304,8 @@ def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices,
 def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, atomic_numbers, *, use_mpi):
     """Build and save packed Gram matrices for all requested training fractions.
 
-    When o.full_gpr, also builds and saves the target vector alongside the Gram matrix in the same
-    per-molecule pass (see _accumulate_pitc())
+    When o.full_gpr, also builds and saves the target vector and the marginal-likelihood
+    accumulators alongside the Gram matrix in the same per-molecule pass (see _accumulate_pitc())
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
@@ -322,11 +326,12 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
             imol (int): Index in training_idx identifying the molecule.
         """
         mol_idx = training_idx[imol]
-        _accumulate_gram(basis, ref_elem, mol_idx, atomic_numbers[mol_idx], paths, idx, ref_indices, l_mm, o, gram_mat, target_vec)
+        _accumulate_gram(basis, ref_elem, mol_idx, atomic_numbers[mol_idx], paths, idx, ref_indices, l_mm, o, gram_mat, target_vec, ml_terms)
 
     nao_ref = basis.nao_for_mol(ref_elem)
     gram_mat = np.zeros(matsize := symsize(nao_ref))
     target_vec = np.zeros(nao_ref) if o.full_gpr else None
+    ml_terms = np.zeros(2) if o.full_gpr else None
     idx = basis.sparse_indices(ref_elem)
     ref_indices = _build_ref_indices(ref_elem)
     l_mm_win = None
@@ -363,6 +368,7 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
             gram_mat.tofile(paths.gram_mat.format(train_frac=frac))
             if o.full_gpr:
                 np.savetxt(paths.target_vec.format(train_frac=frac), target_vec)
+                np.savetxt(paths.ml_terms.format(train_frac=frac), ml_terms)
         if use_mpi:
             t = MPI.Wtime () - t
             logger.info(f'{t=:4.2f}', extra={'flush': True})
@@ -375,6 +381,7 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
             GRAM_MAT = np.zeros(bufsize)
         if o.full_gpr and nproc==0:
             TARGET_VEC = np.zeros(nao_ref)
+            ML_TERMS = np.zeros(2)
 
         for ifrac, (frac, ntrain) in enumerate(zip(fracs, ntrains, strict=True)):
             scatter_jobs(Nproc, nproc, MPI.COMM_WORLD, ntrain[0], ntrain[1], do_mol)
@@ -386,8 +393,10 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
                 t = tt
             if o.full_gpr:
                 MPI.COMM_WORLD.Reduce(target_vec, TARGET_VEC if nproc==0 else None, MPI.SUM, 0)
+                MPI.COMM_WORLD.Reduce(ml_terms, ML_TERMS if nproc==0 else None, MPI.SUM, 0)
                 if nproc==0:
                     np.savetxt(paths.target_vec.format(train_frac=frac), TARGET_VEC)
+                    np.savetxt(paths.ml_terms.format(train_frac=frac), ML_TERMS)
             for i in range(div+1):
                 if (size := bufsize if i<div else rem)==0:
                     break

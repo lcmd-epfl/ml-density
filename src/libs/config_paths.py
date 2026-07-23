@@ -94,6 +94,7 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     'coef_norms'         : PathSpecs('coef_norms', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/norms.npy', 'Path for coefficient norms wrt the metric matrices.'),
                     '_targetvecfilebase' : PathSpecs('target_vector_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/target_vec', 'Base path for target-vector outputs.'),
                     '_grammatfilebase'   : PathSpecs('gram_matrix_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/gram_mat', 'Base path for Gram-matrix outputs.'),
+                    '_mltermsfilebase'   : PathSpecs('ml_terms_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/ml_terms', 'Base path for PITC marginal-likelihood accumulator outputs.'),
                     },
                 }
 
@@ -140,6 +141,10 @@ def read_config(config_path=defaults.config, *, print_help=False):
         paths.predictions             = f'{p['_predictfilebase']}_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
         paths.predicted_coeff         = f'{p['_outfilebase']}_tf{{train_frac}}_{{order}}_{{imol}}.dat'
         # PITC-only outputs
+        # ml_terms is written next to the Gram matrix / target vector, so it follows their naming
+        # (no reg suffix); sigma_f2 is written next to the weights, so it follows theirs.
+        paths.ml_terms                = f'{p['_mltermsfilebase']}_M{o.M}_trainfrac{{train_frac}}.txt'
+        paths.sigma_f2                = f'{p['_weightsfilebase']}_sigma_f2_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.txt'
         paths.cholesky_pitc           = f'{p['_weightsfilebase']}_cholesky_pitc_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.npy'
         paths.var_trace               = f'{p['_predictfilebase']}_vartrace_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.csv'
 

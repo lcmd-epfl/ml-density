@@ -23,7 +23,8 @@ from libs.config import get_settings
 from libs.functions import Basis, Subset, get_dataset_paths, make_dummy_mol, remove_averages
 from libs.pitc_lib import kmm_cholesky
 from libs.tmap import tmap2averages
-from libs.variance_lib import compute_molecule_sigma, molecule_variance_trace, compute_coulomb_metric, density_self_repulsion
+from libs.variance_lib import (compute_molecule_sigma, molecule_variance_trace, compute_coulomb_metric,
+                               density_self_repulsion, load_sigma_f2)
 from libs.logger_setup import setup_logger
 
 logger = setup_logger(__name__, __file__)
@@ -104,6 +105,7 @@ def main():  # noqa: D103
 
     for frac in frac_list:
         l_factor = np.load(p.cholesky_pitc.format(train_frac=frac))
+        sigma_f2 = load_sigma_f2(p.sigma_f2.format(train_frac=frac))
 
         if not args.extra:
             test_configs = subsets.get_training(frac) if args.training else subsets.get_test()
@@ -117,13 +119,15 @@ def main():  # noqa: D103
             atoms = atomic_numbers[imol]
             metric = compute_coulomb_metric(atoms, positions[imol], o.basisname)
             sigma_star = compute_molecule_sigma(basis, atoms, imol, ref_elements, l_factor, l_mm,
-                                                 dataset_paths.kernel, dataset_paths.power)
+                                                 dataset_paths.kernel, dataset_paths.power, sigma_f2)
             var_coul = molecule_variance_trace(sigma_star, metric)
             coeffs = load_predicted_coeffs(c_fmter, o, atoms, imol)
             rho_bl_coul = density_self_repulsion(remove_averages(basis.index(atoms), coeffs, av_coefs), metric)
-            traces.append((imol, var_coul/rho_bl_coul * 100.0))
+            # var_absolute is kept alongside the normalised column so compute_error.py can compare it
+            # against the observed (c - c0)^T M (c - c0) on held-out molecules (the calibration check).
+            traces.append((imol, var_coul/rho_bl_coul * 100.0, var_coul))
 
-        pd.DataFrame(traces, columns=['mol_idx', 'var_relative']).to_csv(
+        pd.DataFrame(traces, columns=['mol_idx', 'var_relative', 'var_absolute']).to_csv(
             p.var_trace.format(subset=subset, train_frac=frac), index=False)
 
 

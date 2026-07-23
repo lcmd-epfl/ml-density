@@ -1,31 +1,32 @@
                 baselined     relative    absolute    pred var    nel pred  -  nel ref  =    ΔN        corr N           xyz file          
-mol # 0 ( 0):   6.53e+01 %   4.98e-02 %   7.58e-01   2.64e+06 %   80.9152   -  79.9988  =  +0.9164   5.73e+01 %   dataset/dimer0001.xyz   
-mol # 1 ( 5):   6.18e+01 %   2.51e-02 %   4.20e-01   5.62e+06 %   84.7800   -  83.9995  =  +0.7805   5.19e+01 %   dataset/dimer0008.xyz   
-mol # 2 ( 8):   3.61e+01 %   3.89e-02 %   1.53e-01   2.75e+06 %   35.6118   -  35.9995  =  -0.3877   3.16e+01 %   dataset/dimer0011.xyz   
-mol # 3 ( 9):   7.78e+01 %   7.49e-02 %   6.29e-01   6.23e+06 %   51.4465   -  50.0000  =  +1.4465   4.28e+01 %   dataset/dimer0012.xyz   
-mol # 4 (11):   4.17e+01 %   3.95e-02 %   2.21e-01   3.41e+06 %   43.4756   -  43.9995  =  -0.5239   3.51e+01 %   dataset/dimer0014.xyz   
-mol # 5 (12):   5.67e+01 %   4.39e-02 %   4.14e-01   2.79e+06 %   56.9420   -  57.9981  =  -1.0561   3.75e+01 %   dataset/dimer0019.xyz   
-mol # 6 (14):   3.58e+01 %   3.78e-02 %   1.50e-01   2.67e+06 %   35.6085   -  35.9996  =  -0.3912   3.10e+01 %   dataset/dimer0021.xyz   
-mol # 7 (15):   6.61e+01 %   4.97e-02 %   6.72e-01   2.32e+06 %   73.0086   -  71.9991  =  +1.0095   5.43e+01 %   dataset/dimer0022.xyz   
+mol # 0 ( 0):   6.53e+01 %   4.98e-02 %   7.58e-01   2.45e+07 %   80.9152   -  79.9988  =  +0.9164   5.73e+01 %   dataset/dimer0001.xyz   
+mol # 1 ( 5):   6.18e+01 %   2.51e-02 %   4.20e-01   5.21e+07 %   84.7800   -  83.9995  =  +0.7805   5.19e+01 %   dataset/dimer0008.xyz   
+mol # 2 ( 8):   3.61e+01 %   3.89e-02 %   1.53e-01   2.54e+07 %   35.6118   -  35.9995  =  -0.3877   3.16e+01 %   dataset/dimer0011.xyz   
+mol # 3 ( 9):   7.78e+01 %   7.49e-02 %   6.29e-01   5.77e+07 %   51.4465   -  50.0000  =  +1.4465   4.28e+01 %   dataset/dimer0012.xyz   
+mol # 4 (11):   4.17e+01 %   3.95e-02 %   2.21e-01   3.16e+07 %   43.4756   -  43.9995  =  -0.5239   3.51e+01 %   dataset/dimer0014.xyz   
+mol # 5 (12):   5.67e+01 %   4.39e-02 %   4.14e-01   2.59e+07 %   56.9420   -  57.9981  =  -1.0561   3.75e+01 %   dataset/dimer0019.xyz   
+mol # 6 (14):   3.58e+01 %   3.78e-02 %   1.50e-01   2.47e+07 %   35.6084   -  35.9996  =  -0.3912   3.10e+01 %   dataset/dimer0021.xyz   
+mol # 7 (15):   6.61e+01 %   4.97e-02 %   6.72e-01   2.15e+07 %   73.0086   -  71.9991  =  +1.0095   5.43e+01 %   dataset/dimer0022.xyz   
 
-        MAE =   5.52e+01 %   4.50e-02 %   4.27e-01   3.55e+06 %                            +0.8140
-        MAX =   7.78e+01 %   7.49e-02 %   7.58e-01   6.23e+06 %                            +1.4465
-frac=1.0    corr(baselined, pred var) = 0.52
+        MAE =   5.52e+01 %   4.50e-02 %   4.27e-01   3.29e+07 %                            +0.8140
+        MAX =   7.78e+01 %   7.49e-02 %   7.58e-01   5.77e+07 %                            +1.4465
+frac=1.0    correlation = 0.52   calibration = 2.34e-05
 
 TABLE LEGEND
-mol # i (j)  : molecule i within this test set (dataset index j)
-baselined    : (c - c0)^T M (c - c0) / (c0 - c_av)^T M (c0 - c_av) * 100
-relative     : (c - c0)^T M (c - c0) / c0^T J c0 * 100
-absolute     : (c - c0)^T M (c - c0)
-pred var     : Tr(Sigma_c* M) / (c - c_av)^T M (c - c_av) * 100
-nel_pred     : predicted number of electrons, q^T c
-nel_ref      : reference number of electrons, q^T c0
-ΔN           : nel_pred - nel_ref for this molecule
-corr N       : baselined relative error after projecting the prediction onto q^T c = N.
-MAE          : mean of the above over all molecules in the fraction
-MAX          : max of the above over all molecules in the fraction
-frac         : fraction of the training set actually used to fit the model being evaluated
-corr(baselined, pred var): Pearson correlation between "baselined" and "pred var" across the fraction's molecules
+mol # i (j) : molecule i within this test set (dataset index j)
+baselined   : (c - c0)^T M (c - c0) / (c0 - c_av)^T M (c0 - c_av) * 100
+relative    : (c - c0)^T M (c - c0) / c0^T M c0 * 100
+absolute    : (c - c0)^T M (c - c0)
+pred var    : Tr(Sigma_c* M) / (c - c_av)^T M (c - c_av) * 100
+nel_pred    : predicted number of electrons, q^T c
+nel_ref     : reference number of electrons, q^T c0
+ΔN          : nel_pred - nel_ref for this molecule
+corr N      : baselined relative error after projecting the prediction onto q^T c = N.
+MAE         : mean of the above over all molecules in the fraction
+MAX         : max of the above over all molecules in the fraction
+frac        : fraction of the training set actually used to fit the model being evaluated
+correlation : Pearson correlation between "baselined" and "pred var" across the fraction's molecules
+calibration : mean[(c - c0)^T M (c - c0)] / mean[Tr(Sigma_c* M)]
 where
 c    = predicted coefficients
 c0   = reference (ab initio) coefficients
@@ -37,8 +38,5 @@ Notes:
 The baselined error isolates the ML-predicted part (c - c_av) from the trivial part (c_av),
 making it the most meaningful measure of model error.
 
-pred var is the a priori counterpart of the baselined error: Sigma_c* is the GPR predictive covariance
-over c - c0, so Tr(Sigma_c* M) = E[(c - c0)^T M (c - c0)] estimates "absolute" before c0 is known.
-Its magnitude is NOT calibrated: the kernel carries no amplitude hyperparameter, so the prior sits far
-above the true scale of the density and pred var reads orders of magnitude high. Rank molecules by it
--- which is what corr(baselined, pred var) measures -- but do not read its absolute value.
+Calibration is a diagnostic of the model's uncertainty quantification: 1.0 is perfect, < 1 means the model
+reports more uncertainty than it needs, > 1 that it reports too little.

@@ -46,11 +46,16 @@ def do_work_target(conf, path_proj, path_kern, target_tmap):
         tblock.values[...] += np.einsum('kmMr,kmn->rMn', kblock.values, pblock.values)
 
 
-def do_work_target_pitc(mol_idx, paths, lambda_inv_i, k_nm_i, metric_i, mol_i, target_vec):
-    """Accumulate the PITC target-vector contribution for one training molecule.
+def do_work_target_pitc(mol_idx, paths, lambda_inv_i, k_nm_i, metric_i, mol_i, target_vec, ml_terms):
+    """Accumulate the PITC target-vector and marginal-likelihood contributions for one training molecule.
 
-    Computes t_i = K_{I_i,M}^T Lambda_i^-1 metric_i^-1 w_i, where w_i is molecule i's AO-basis
-    projection (p.projection).
+    Computes t_i = K_{I_i,M}^T Lambda_i^-1 y_i, where y_i = metric_i^-1 w_i is molecule i's baselined
+    coefficient vector and w_i its AO-basis projection (p.projection).
+
+    Also accumulates the two terms needed for the closed-form kernel-amplitude estimate
+    sigma_f^2 = (sum_i y_i^T Lambda_i^-1 y_i - t.x) / N, finished in regression.py once the solve
+    x = Sigma_M^-1 t is available. Lambda_i^-1 y_i is already needed for the target vector, so the
+    quadratic form costs one extra dot product per molecule.
 
     Args:
         mol_idx (int): Molecule index.
@@ -60,10 +65,15 @@ def do_work_target_pitc(mol_idx, paths, lambda_inv_i, k_nm_i, metric_i, mol_i, t
         metric_i (np.ndarray): Jittered metric matrix of molecule i, from molecule_lambda_inv_knm().
         mol_i (pyscf.gto.Mole): Dummy mol matching molecule i's AO layout, from molecule_lambda_inv_knm().
         target_vec (np.ndarray): Dense (nao_ref,) accumulator, updated in place.
+        ml_terms (np.ndarray): Dense (2,) accumulator, updated in place: [sum_i y_i^T Lambda_i^-1 y_i,
+            N = sum_i nao_i].
     """
     proj_i = tensormap_to_array(mol_i, metatensor.load(paths.projection.format(mol_idx)), dest='gpr', fast=True)
-    metric_inv_w_i = spl.cho_solve(spl.cho_factor(metric_i), proj_i)
-    target_vec += k_nm_i.T @ (lambda_inv_i @ metric_inv_w_i)
+    metric_inv_w_i = spl.cho_solve(spl.cho_factor(metric_i), proj_i)  # y_i
+    lambda_inv_y_i = lambda_inv_i @ metric_inv_w_i
+    target_vec += k_nm_i.T @ lambda_inv_y_i
+    ml_terms[0] += metric_inv_w_i @ lambda_inv_y_i
+    ml_terms[1] += len(metric_inv_w_i)
 
 
 def get_target_vector(basis, ref_elem, fracs, ntrains, training_idx, paths):

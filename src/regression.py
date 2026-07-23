@@ -10,7 +10,7 @@ import metatensor
 from libs.tmap import vector2tmap
 from libs.config import get_settings
 from libs.functions import Basis
-from libs.pitc_lib import kmm_cholesky, robust_cholesky
+from libs.pitc_lib import kmm_cholesky, robust_cholesky, fit_sigma_f2
 from libs.logger_setup import setup_logger
 
 logger = setup_logger(__name__, __file__)
@@ -41,6 +41,12 @@ def main():  # noqa: D103
                 logger.warning(f'PITC system needed jitter {used_jit} (bigger than o.jit={o.jit}) to be positive definite')
             x = spl.cho_solve((L, True), target_vec)
             np.save(p.cholesky_pitc.format(train_frac=frac), L)
+            
+            quad, n_ao = np.loadtxt(p.ml_terms.format(train_frac=frac))
+            sigma_f2 = fit_sigma_f2(quad, target_vec @ x, n_ao)
+            logger.info(f'fitted kernel amplitude sigma_f^2 = {sigma_f2:.6e} (from {int(n_ao)} training AO coefficients)')
+            np.savetxt(p.sigma_f2.format(train_frac=frac), [sigma_f2])
+
             weights = vector2tmap(ref_elements, basis.llist, x)
             metatensor.save(p.weights.format(train_frac=frac), weights)
     else:

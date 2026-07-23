@@ -7,6 +7,8 @@ for extract_cube.py --std.
 The quantity of interest is the predictive variance relative to a metric: V(A*) = Tr(Sigma_c* @ metric)
 """
 
+import os
+import logging
 import numpy as np
 import scipy.linalg as spl
 import metatensor
@@ -15,14 +17,37 @@ from libs.kernels_lib import kernel_block_to_dense_rect, kernel_block_to_dense_s
 from libs.tmap import merge_ref_ps
 from libs.functions import make_pyscf_mol
 
+logger = logging.getLogger('__main__')
 
-def compute_molecule_sigma(basis, atoms_star, mol_idx, ref_elem, l_factor, l_mm, path_kern, path_ps):
+
+def load_sigma_f2(path):
+    """Load the kernel amplitude fitted by regression.py.
+
+    Args:
+        path (str): Formatted path to the amplitude file (p.sigma_f2).
+
+    Returns:
+        float: The fitted sigma_f^2, or 1.0 when the file is absent -- which is the uncalibrated
+        amplitude implied by the normalized kernel, i.e. the behaviour of runs predating the fit.
+    """
+    if not os.path.exists(path):
+        logger.error(f'{path} does not exist -- falling back to the unfitted sigma_f^2 = 1, the amplitude '
+                       'implied by the normalized kernel. Re-run regression.py to fit it.')
+        return 1.0
+    return float(np.loadtxt(path))
+
+
+def compute_molecule_sigma(basis, atoms_star, mol_idx, ref_elem, l_factor, l_mm, path_kern, path_ps, sigma_f2=1.0):
     """Reconstruct one query molecule's dense PITC predictive AO covariance Sigma_c*.
 
-    Sigma_c* = (K_{N*,N*} - Q_{N*,N*}) + K_{N*,M} (L L^T)^-1 K_{N*,M}^T, with L the persisted
-    PITC Cholesky factor of Sigma_M = (K_NM^T Lambda^-1 K_NM + K_MM) and
+    Sigma_c* = sigma_f^2 [(K_{N*,N*} - Q_{N*,N*}) + K_{N*,M} (L L^T)^-1 K_{N*,M}^T], with L the
+    persisted PITC Cholesky factor of Sigma_M = (K_NM^T Lambda^-1 K_NM + K_MM) and
     Q_{N*,N*} = K_{N*,M} K_MM^-1 K_{N*,M}^T the inducing-point approximation of the
     prior.
+
+    The kernel amplitude enters as a single multiplicative factor (see pitc_lib.fit_sigma_f2), so it
+    is applied here, once, rather than in each caller -- that keeps the scalar trace computed by
+    variance.py and the spatial std field computed by extract_cube.py --std consistently calibrated.
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
@@ -33,6 +58,8 @@ def compute_molecule_sigma(basis, atoms_star, mol_idx, ref_elem, l_factor, l_mm,
         l_mm (np.ndarray): Lower Cholesky factor of the jittered K_MM, from pitc_lib.kmm_cholesky.
         path_kern (str): Template path to K_{query,M} kernel files.
         path_ps (str): Template path to the query molecule's own power spectrum.
+        sigma_f2 (float): Fitted kernel amplitude, from load_sigma_f2(). Defaults to 1.0, the
+            uncalibrated prior amplitude implied by the normalized kernel.
 
     Returns:
         np.ndarray: Dense (nao_star, nao_star) predictive covariance matrix, GPR AO order.
@@ -46,7 +73,7 @@ def compute_molecule_sigma(basis, atoms_star, mol_idx, ref_elem, l_factor, l_mm,
 
     u = spl.solve_triangular(l_mm, kmat_star.T, lower=True)      # U^T U = Q_{N*,N*}
     v = spl.solve_triangular(l_factor, kmat_star.T, lower=True)  # V^T V = K_*M Sigma_M^-1 K_M*
-    return kself_star - u.T @ u + v.T @ v
+    return sigma_f2 * (kself_star - u.T @ u + v.T @ v)
 
 
 def molecule_variance_trace(sigma_star, metric_star):

@@ -1,35 +1,36 @@
-2026-07-15 02:33:56 compute_error.py [config_parser.py:77] INFO: Configuration file: config.txt
-2026-07-15 02:33:56 compute_error.py [compute_error.py:127] INFO: fraction = 1.0
+                baselined     relative    absolute   nel pred  -  nel ref  =    ΔN        corr N           xyz file          
+mol # 0 ( 0):   9.15e+00 %   6.98e-03 %   1.06e-01   79.9043   -  79.9988  =  -0.0945   9.06e+00 %   dataset/dimer0001.xyz   
+mol # 1 ( 5):   7.62e+02 %   3.10e-01 %   5.17e+00   86.9642   -  83.9995  =  +2.9647   6.19e+02 %   dataset/dimer0008.xyz   
+mol # 2 ( 8):   1.38e-01 %   1.49e-04 %   5.85e-04   35.9846   -  35.9995  =  -0.0149   1.32e-01 %   dataset/dimer0011.xyz   
+mol # 3 ( 9):   4.10e+02 %   3.95e-01 %   3.31e+00   47.5636   -  50.0000  =  -2.4364   3.11e+02 %   dataset/dimer0012.xyz   
+mol # 4 (11):   5.09e-01 %   4.83e-04 %   2.70e-03   43.9615   -  43.9995  =  -0.0380   4.74e-01 %   dataset/dimer0014.xyz   
+mol # 5 (12):   1.09e+00 %   8.48e-04 %   8.00e-03   57.9006   -  57.9981  =  -0.0975   9.31e-01 %   dataset/dimer0019.xyz   
+mol # 6 (14):   9.38e-02 %   9.92e-05 %   3.94e-04   35.9961   -  35.9996  =  -0.0035   9.34e-02 %   dataset/dimer0021.xyz   
+mol # 7 (15):   4.99e+00 %   3.75e-03 %   5.08e-02   72.2583   -  71.9991  =  +0.2593   4.21e+00 %   dataset/dimer0022.xyz   
 
-              baselined     relative    ( absolute )   nel_pred /  nel_ref (  N  )
-mol # 0 ( 0):   9.15e+00 %  6.98e-03 %  ( 1.06e-01 )    79.9043 /  79.9988 (  80 )   (corr N: 9.06e+00 %)   dataset/dimer0001.xyz
-mol # 1 ( 5):   7.62e+02 %  3.10e-01 %  ( 5.17e+00 )    86.9642 /  83.9995 (  84 )   (corr N: 6.19e+02 %)   dataset/dimer0008.xyz
-mol # 2 ( 8):   1.38e-01 %  1.49e-04 %  ( 5.85e-04 )    35.9846 /  35.9995 (  36 )   (corr N: 1.32e-01 %)   dataset/dimer0011.xyz
-mol # 3 ( 9):   4.10e+02 %  3.95e-01 %  ( 3.31e+00 )    47.5636 /  50.0000 (  50 )   (corr N: 3.11e+02 %)   dataset/dimer0012.xyz
-mol # 4 (11):   5.09e-01 %  4.83e-04 %  ( 2.70e-03 )    43.9615 /  43.9995 (  44 )   (corr N: 4.74e-01 %)   dataset/dimer0014.xyz
-mol # 5 (12):   1.09e+00 %  8.48e-04 %  ( 8.00e-03 )    57.9006 /  57.9981 (  58 )   (corr N: 9.31e-01 %)   dataset/dimer0019.xyz
-mol # 6 (14):   9.38e-02 %  9.92e-05 %  ( 3.94e-04 )    35.9961 /  35.9996 (  36 )   (corr N: 9.34e-02 %)   dataset/dimer0021.xyz
-mol # 7 (15):   4.99e+00 %  3.75e-03 %  ( 5.08e-02 )    72.2583 /  71.9991 (  72 )   (corr N: 4.21e+00 %)   dataset/dimer0022.xyz
-
-frac=1.0  MAE = 1.49e+02 %  8.96e-02 %  ( 1.08e+00 )   ΔN: 7.39e-01
+        MAE =   1.49e+02 %   8.96e-02 %   1.08e+00                            +0.7386
+        MAX =   7.62e+02 %   3.95e-01 %   5.17e+00                            +2.9647
+frac=1.0 
 
 TABLE LEGEND
 mol # i (j)  : molecule i within this test set (dataset index j)
-baselined    : (c - c0)^T S (c - c0) / (c0 - c_av)^T S (c0 - c_av) * 100
-relative     : (c - c0)^T S (c - c0) / c0^T S c0 * 100
-absolute     : (c - c0)^T S (c - c0)
+baselined    : (c - c0)^T M (c - c0) / (c0 - c_av)^T M (c0 - c_av) * 100
+relative     : (c - c0)^T M (c - c0) / c0^T M c0 * 100
+absolute     : (c - c0)^T M (c - c0)
 nel_pred     : predicted number of electrons, q^T c
 nel_ref      : reference number of electrons, q^T c0
-N            : expected number of electrons (nuclear charge, or from the dataset charge/N column)
+ΔN           : nel_pred - nel_ref for this molecule
 corr N       : baselined relative error after projecting the prediction onto q^T c = N.
-MAE          : mean of the above errors over all molecules in the fraction
-ΔN           : mean |nel_pred - N| over all molecules
+MAE          : mean of the above over all molecules in the fraction
+MAX          : max of the above over all molecules in the fraction
+frac         : fraction of the training set actually used to fit the model being evaluated
 where
 c    = predicted coefficients
 c0   = reference (ab initio) coefficients
 c_av = per-element average coefficients, subtracted before training and added back at prediction time
-S    = metric (overlap) matrix
+M    = Metric used. Currently it is the 2-center Coulomb (RI) metric, int int phi_i(r) phi_j(r')/|r-r'| dr dr' based on Briling, K. R., Fabrizio, A. & Corminboeuf, C. Impact of quantum-chemical metrics on the machine learning prediction of electron density. J. Chem. Phys. 155, 024107 (2021).
 q    = number of electrons per atomic orbital
 
+Notes:
 The baselined error isolates the ML-predicted part (c - c_av) from the trivial part (c_av),
-making it the more meaningful measure of model error.
+making it the most meaningful measure of model error.

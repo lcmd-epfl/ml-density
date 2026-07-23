@@ -15,7 +15,7 @@ from libs.functions import Basis, Subset, make_pyscf_mol
 from libs.tmap import tmap_add
 from libs.logger_setup import setup_logger
 from libs.pitc_lib import kmm_cholesky
-from libs.variance_lib import compute_molecule_sigma
+from libs.variance_lib import compute_molecule_sigma, load_sigma_f2
 
 logger = setup_logger(__name__, __file__)
 
@@ -119,7 +119,8 @@ def main():  # noqa: D103
         _, l_mm = kmm_cholesky(basis, ref_elements, metatensor.load(p.kernel_mm), o.jit)
 
         sigma_star = compute_molecule_sigma(basis, atomic_numbers, xyz_index, ref_elements,
-                                             l_factor, l_mm, p.kernel_nm, p.power_spectrum)
+                                             l_factor, l_mm, p.kernel_nm, p.power_spectrum,
+                                             load_sigma_f2(p.sigma_f2.format(train_frac=frac)))
         sigma_star = reorder.reorder_ao(mol, sigma_star, src='gpr', dest='pyscf')
         if sigma_star.shape[0]!=mol.nao_nr():
             msg = f'Covariance dimension {sigma_star.shape[0]} does not match PySCF AO count {mol.nao_nr()}'

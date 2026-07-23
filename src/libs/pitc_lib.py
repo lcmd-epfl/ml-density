@@ -15,6 +15,41 @@ from libs.tmap import merge_ref_ps
 from libs.functions import make_dummy_mol
 
 
+def fit_sigma_f2(quad, t_dot_x, n_ao):
+    """Closed-form maximum-likelihood estimate of the kernel amplitude sigma_f^2.
+
+    A GP kernel factors as k(x,x') = sigma_f^2 r(x,x') with r(x,x) = 1. kernels_lib builds the
+    normalized r (lambda-SOAP).
+
+        log p(y) = -1/2 sigma_f^-2 y^T C_1^-1 y - N/2 log sigma_f^2 - 1/2 log|C_1| - N/2 log 2pi
+
+    log p(y) reaches a unique maximum at sigma_f^2 = y^T C_1^-1 y / N. Woodbury on 
+    C_1 = Lambda + K_NM K_MM^-1 K_MN reduces the quadratic form to 
+    y^T C_1^-1 y = sum_i y_i^T Lambda_i^-1 y_i - t^T Sigma_M^-1 t, which t the target vector and 
+    Sigma_M the PITC marginal covariance that are already solved.
+
+    Args:
+        quad (float): sum_i y_i^T Lambda_i^-1 y_i, accumulated by do_work_target_pitc.
+        t_dot_x (float): t^T Sigma_M^-1 t, i.e. the target vector dotted with the solved weights.
+        n_ao (float): N, the total number of training AO coefficients.
+
+    Returns:
+        float: The fitted sigma_f^2.
+
+    Raises:
+        RuntimeError: The quadratic form came out non-positive, which is impossible for a positive
+            definite C_1 and therefore signals numerical trouble upstream.
+    """
+    y_c_inv_y = quad - t_dot_x
+    if y_c_inv_y <= 0.0:
+        msg = (f'Marginal-likelihood quadratic form y^T C^-1 y = {y_c_inv_y:.6e} is not positive '
+               f'(sum_i y_i^T Lambda_i^-1 y_i = {quad:.6e}, t^T Sigma_M^-1 t = {t_dot_x:.6e}). '
+               'C is positive definite by construction, so this indicates loss of precision in the '
+               'PITC assembly or the solve -- try raising jit.')
+        raise RuntimeError(msg)
+    return y_c_inv_y / n_ao
+
+
 def kmm_cholesky(basis, ref_elem, k_mm_tmap, jit):
     """Build the dense K_MM matrix and its lower Cholesky factor.
 
@@ -79,7 +114,8 @@ def molecule_lambda_inv_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta,
 
     Returns:
         tuple[np.ndarray, np.ndarray, np.ndarray, pyscf.gto.Mole]: Lambda_i^-1 (nao_i, nao_i),
-        K_{I_i,M} (nao_i, nao_ref), the jittered metric_i (nao_i, nao_i)
+        K_{I_i,M} (nao_i, nao_ref), the jittered metric_i (nao_i, nao_i), and a dummy mol matching
+        molecule i's AO layout.
     """
     mol_i = make_dummy_mol(atoms_i, basis=basis.basisname, ignore=True)
     metric_i = tensormap_to_array(mol_i, metatensor.load(paths.metric_matrix.format(mol_idx)), dest='gpr', fast=True)
