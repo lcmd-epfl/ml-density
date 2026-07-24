@@ -73,22 +73,23 @@ def parse_args():
     Returns:
         argparse.Namespace: Parsed CLI arguments.
     """
-    parser = argparse.ArgumentParser(description='Export a predicted density, a prediction-minus-reference difference, or a full-covariance PITC predictive standard-deviation field as a .cube file.')
+    parser = argparse.ArgumentParser(description='Export a predicted density, a reference, a prediction-minus-reference difference, or a PITC predictive standard-deviation field as a .cube file.')
     parser.add_argument('-c', '--config', default='config.txt', help='Path to config.txt used by the project. Relative paths inside it are resolved from the working directory, so run this script from the directory holding config.txt.')
-    parser.add_argument('--mts', help='Input metatensor file containing predicted density coefficients. Defaults to the prediction file the config points to for this --training subset and the last training fraction of the config. Ignored with --std.')
-    parser.add_argument('-m', '--mol', type=int, default=0, help='Local molecule index inside the test/training set (position in the set, not the row in the xyz file).')
+    parser.add_argument('-r', '--ref', action='store_true', help='Output the ab-initio density rho_ref(r).')
+    parser.add_argument('-d', '--diff', action='store_true', help='Output the error field rho_pred(r) - rho_ref(r).')
+    parser.add_argument('-s', '--std', action='store_true', help='Output the predictive standard-deviation field sigma[rho(r)] = sqrt(phi(r)^T Sigma_c* phi(r)) instead of the mean density. Carries the same units as the density (e/bohr^3). Requires full_gpr=True in the config and ignores --mts.')
+    parser.add_argument('-o', '--output', help='Output .cube file path. Defaults to CUBE/<field>_<mol>.cube, where <field> is ref, pred, diff or std depending on the flags.')
+    parser.add_argument('-m', '--mol', type=int, default=0, help='Local molecule index inside the test/training set (position in the set, not the row in the xyz file) (default: 0).')
     parser.add_argument('-t', '--training', action='store_true', help='--mol indexes the training set instead of the test set.')
-    parser.add_argument('-o', '--output', help='Output .cube file path. Defaults to <field>_<mol>.cube, where <field> is density, diff or std depending on the flags.')
-    parser.add_argument('-g', '--grid', type=int, default=80, help='Cube grid size in each dimension.')
-    parser.add_argument('-s', '--std', action='store_true', help='Output the predictive standard-deviation field sigma[rho(r)] = sqrt(phi(r)^T Sigma_c* phi(r)) instead of the mean density. Carries the same units as the density (e/bohr^3), so it can be read against rho(r) on a shared scale, unlike the variance (e^2/bohr^6). Requires full_gpr=True in the config and ignores --mts.')
-    parser.add_argument('-d', '--diff', action='store_true', help='Output the error field rho_pred(r) - rho_ref(r) instead of the predicted mean density, using the ab initio coefficients stored by preprocess.py.')
-    parser.add_argument('--chunk', type=int, default=4096, help='Grid points processed per chunk in --std mode, to bound memory (the ao_values @ Sigma_c* intermediate is O(chunk * nao^2)).')
+    parser.add_argument('--mts', help='Input metatensor file containing predicted density coefficients. Defaults to the prediction file the config points to for this --training subset and the last training fraction of the config. Ignored with --std.')
+    parser.add_argument('-g', '--grid', type=int, default=80, help='Cube grid size in each dimension (default: 80).')
+    parser.add_argument('--chunk', type=int, default=4096, help='Grid points processed per chunk in --std mode, to bound memory (the ao_values @ Sigma_c* intermediate is O(chunk * nao^2)) (default: 4096).')
     args = parser.parse_args()
-    if args.std and args.diff:
-        parser.error('--diff and --std are mutually exclusive')
+    if args.std and args.diff or args.std and args.ref or args.diff and args.ref:
+        parser.error('--ref, --diff, and --std are mutually exclusive')
     if not args.output:
-        field = 'std' if args.std else 'diff' if args.diff else 'density'
-        args.output = f'{field}_{args.mol}.cube'
+        field = 'std' if args.std else 'diff' if args.diff else 'ref' if args.ref else 'pred'
+        args.output = f'CUBE/{field}_{args.mol}.cube'
     return args
 
 
@@ -127,6 +128,14 @@ def main():  # noqa: D103
             raise ValueError(msg)
 
         field_values = evaluate_std_field(mol, coords, sigma_star, args.chunk)
+    elif args.ref:
+        coeffs = np.load(p.clean_coefficients.format(xyz_index))
+        coeffs = reorder.reorder_ao(mol, coeffs, src='gpr', dest='pyscf')
+        if coeffs.shape[0]!=mol.nao_nr():
+            msg = f'Coefficient vector length {coeffs.shape[0]} does not match PySCF AO count {mol.nao_nr()}'
+            raise ValueError(msg)
+
+        field_values = mol.eval_ao('GTOval_sph', coords) @ coeffs
     else:
         mts_path = args.mts or pred_path
         if not os.path.exists(mts_path):
@@ -152,6 +161,8 @@ def main():  # noqa: D103
 
         field_values = mol.eval_ao('GTOval_sph', coords) @ coeffs
 
+    if not os.path.exists(os.path.dirname(args.output)):
+        os.makedirs(os.path.dirname(args.output))
     cube.write(field_values.reshape(args.grid, args.grid, args.grid), args.output)
 
 
