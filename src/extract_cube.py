@@ -134,7 +134,7 @@ def main():  # noqa: D103
                 raise ValueError(msg)
 
             field_values_std = evaluate_std_field(mol, coords, sigma_star, args.chunk)
-            cube.write(field_values_std.reshape(args.grid, args.grid, args.grid), args.output + '_std.cube')
+            cube.write(field_values_std.reshape(args.grid, args.grid, args.grid), args.output + f'std_{args.mol}.cube')
 
     # Load the good coefficients for reference, predicted or both (diff).
     if args.ref or args.diff:
@@ -162,13 +162,13 @@ def main():  # noqa: D103
 
     if args.ref:
         field_values_ref = mol.eval_ao('GTOval_sph', coords) @ coeffs_ref
-        cube.write(field_values_ref.reshape(args.grid, args.grid, args.grid), args.output + '_ref.cube')
+        cube.write(field_values_ref.reshape(args.grid, args.grid, args.grid), args.output + f'ref_{args.mol}.cube')
     if args.pred:
         field_values_pred = mol.eval_ao('GTOval_sph', coords) @ coeffs_pred
-        cube.write(field_values_pred.reshape(args.grid, args.grid, args.grid), args.output + '_pred.cube')
+        cube.write(field_values_pred.reshape(args.grid, args.grid, args.grid), args.output + f'pred_{args.mol}.cube')
     if args.diff:
         field_values_diff = mol.eval_ao('GTOval_sph', coords) @ (coeffs_pred - coeffs_ref)
-        cube.write(field_values_diff.reshape(args.grid, args.grid, args.grid), args.output + '_diff.cube')
+        cube.write(field_values_diff.reshape(args.grid, args.grid, args.grid), args.output + f'diff_{args.mol}.cube')
 
 if __name__=='__main__':
     main()
