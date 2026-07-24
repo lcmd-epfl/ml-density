@@ -25,7 +25,6 @@
 #   (2) metric matrices unpacked to square:  python3 convert_metric.py --basis <basis>
 #       -> metric/ (dz), metric_tz/ (tz), metric_aqz/ (aqz)
 
-echo ""
 echo "===== SLURM JOB INFORMATION ====="
 echo "Job ID: $SLURM_JOB_ID"
 echo "Job Name: $SLURM_JOB_NAME"
@@ -38,7 +37,6 @@ echo "Memory Requested per CPU: $SLURM_MEM_PER_CPU"
 echo "Partition: $SLURM_JOB_PARTITION"
 echo "Submit Directory: $SLURM_SUBMIT_DIR"
 echo "Submit Host: $SLURM_SUBMIT_HOST"
-echo "Vasp path: $vasp_path"
 echo "Allocated GPUs: $SLURM_GPUS"
 echo "================================="
 echo ""
