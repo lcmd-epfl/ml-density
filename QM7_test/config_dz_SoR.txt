@@ -7,7 +7,7 @@ train_size = 2048
 train_fractions = 1.0
 regularisation = 1e-6
 jitter = 1e-10
-full_gpr = true
+full_gpr = false
 
 [options.soap]
 soap_sigma = 0.3
@@ -18,7 +18,7 @@ power_spectra_min_norm = 1e-20
 power_spectra_normalize = true
 
 [options.rho]
-basis = aug-cc-pvqz-jkfit
+basis = cc-pvdz-jkfit
 number_of_electrons = none
 coeff_order = pyscf
 metric_order = pyscf
@@ -26,13 +26,13 @@ output_coeff_order = gpr
 process_metric = true
 
 [paths]
-default_dir = INNER_aqz/
+default_dir = INNER_SoR/
 
 [paths.input]
 dataset          = dataset.csv
 xyz              = compounds/{mol_name}.xyz
-metrics          = metric_aqz/{mol_name}.npy
-coeffs           = computed/coeffsCCSDccpvdz-augccpvqzjkfit-{mol_name}.npy
+metrics          = metric/{mol_name}.npy
+coeffs           = computed/coeffsCCSDccpvdz-ccpvdzjkfit-{mol_name}.npy
 
 [paths.extrapolation]
 xyz              = extra/qm7_extra.xyz

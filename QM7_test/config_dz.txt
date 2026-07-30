@@ -26,6 +26,7 @@ output_coeff_order = gpr
 process_metric = true
 
 [paths]
+default_dir = INNER/
 
 [paths.input]
 dataset          = dataset.csv
@@ -33,30 +34,5 @@ xyz              = compounds/{mol_name}.xyz
 metrics          = metric/{mol_name}.npy
 coeffs           = computed/coeffsCCSDccpvdz-ccpvdzjkfit-{mol_name}.npy
 
-[paths.output]
-weights_base     = INNER/weights
-predict_base     = INNER/prediction
-output_base      = INNER/predicted/rho
-
 [paths.extrapolation]
-xyz                       = extra/qm7_extra.xyz
-power_spectra_base        = INNER/extra/PS
-kernel_base               = INNER/extra/kernel
-output_base               = INNER/extra/rho
-
-# this section is optional and can be safely removed
-[paths.internal]
-xyz                           = INNER/dataset.xyz
-power_spectra_split_base      = INNER/PS/PS
-power_spectra_reference_base  = INNER/PS
-reference_selection_base      = INNER/SELECTIONS/refs_selection
-training_selection            = INNER/SELECTIONS/training_selection.csv
-kmm_base                      = INNER/KMM
-kernel_nm_base                = INNER/KERNELS/kernel_conf
-metric_matrix_base            = INNER/metric/mol
-gram_matrix_base              = INNER/gram_mat
-coeffs_base                   = INNER/coeff/mol
-averages                      = INNER/AVERAGES.mts
-baselined_weights_base        = INNER/BASELINED_PROJECTIONS/projections_conf
-target_vector_base            = INNER/target_vec
-coef_norms                    = INNER/coef_norms.npy
+xyz              = extra/qm7_extra.xyz

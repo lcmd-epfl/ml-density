@@ -6,7 +6,8 @@ from collections import ChainMap
 import logging
 import numpy as np
 from .config_parser import Config
-from .config_utils import CheckFile, WhenMissing, PathSpecs, OptSpecs, defaults, Floats, Bool, Choice
+from .config_utils import (CheckFile, WhenMissing, PathSpecs, OptSpecs, defaults, Floats, Bool, Choice,
+                           DEFAULT_DIR_GROUP, DEFAULT_DIR_KEY, DEFAULT_DIR_PLACEHOLDER)
 
 logger = logging.getLogger('__main__')
 
@@ -58,10 +59,23 @@ def read_config(config_path=defaults.config, *, print_help=False):
     def set_paths():
         """Build path specifications by configuration section.
 
+        Derived-data path defaults are written as `{default_dir}<relative>`, with no separator after
+        the placeholder: the resolved prefix always ends with one, so an absolute `default_dir` works
+        too. The parser substitutes the placeholder in configured values as well, so an override may
+        reuse the prefix (`kmm_base = {default_dir}KMM_v2`) or escape it entirely (`kmm_base = ../shared/KMM`).
+
+        Because every relocatable path has a default, `when_missing` follows the declared default:
+        ERROR/WARN where it is None (missing entry means the feature is unavailable), IGNORE where a
+        default exists.
+
         Returns:
-            dict[str, dict[str, PathSpecs]]: Specification of path groups and entries.
+            dict[str, dict[str, PathSpecs | OptSpecs]]: Specification of path groups and entries.
         """
         return {
+                DEFAULT_DIR_GROUP: {
+                    DEFAULT_DIR_KEY      : OptSpecs(DEFAULT_DIR_KEY, defaults.default_dir, str, f'Directory prefix substituted for every "{DEFAULT_DIR_PLACEHOLDER}" in the paths below, so that one line relocates the whole derived-data tree. A missing trailing separator is added; leave empty to write into the working directory.'),
+                    },
+                # Inputs are read-only and shared between runs, so they are never relocated.
                 'paths.input': {
                     'dataset'            : PathSpecs('dataset', WhenMissing.ERROR, CheckFile.ERROR_FILE, None, 'CSV dataset with molecule IDs and optional charge columns.'),
                     'xyz'                : PathSpecs('xyz', WhenMissing.ERROR, CheckFile.ERROR_DIR, None, 'Template path to input XYZ files (uses {mol_name}).'),
@@ -69,32 +83,32 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     'input_coeffs'       : PathSpecs('coeffs', WhenMissing.ERROR, CheckFile.ERROR_DIR, None, 'Template path to input coefficient files.'),
                     },
                 'paths.output': {
-                    '_weightsfilebase'   : PathSpecs('weights_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/weights', 'Base path for trained model weights.'),
-                    '_predictfilebase'   : PathSpecs('predict_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/prediction', 'Base path for predicted TensorMap coefficients.'),
-                    '_outfilebase'       : PathSpecs('output_base', WhenMissing.WARN, CheckFile.MAKE_DIR, 'INNER/predicted/rho', 'Base path for exported coefficient text files.'),
+                    '_weightsfilebase'   : PathSpecs('weights_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}weights', 'Base path for trained model weights.'),
+                    '_predictfilebase'   : PathSpecs('predict_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}prediction', 'Base path for predicted TensorMap coefficients.'),
+                    '_outfilebase'       : PathSpecs('output_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}predicted/rho', 'Base path for exported coefficient text files.'),
                     },
                 'paths.extrapolation': {
                     'extra_xyzfilename'  : PathSpecs('xyz', WhenMissing.WARN, CheckFile.ERROR_FILE, None, 'XYZ file for extrapolation/out-of-sample molecules.'),
-                    '_powerexbase'       : PathSpecs('power_spectra_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/extra/PS', 'Base path for extrapolation/OOS power spectra.'),
-                    '_kernelexbase'      : PathSpecs('kernel_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/extra/kernel', 'Base path for extrapolation/OOS kernels.'),
-                    '_outexfilebase'     : PathSpecs('output_base', WhenMissing.WARN, CheckFile.MAKE_DIR, 'INNER/extra/rho', 'Base path for extrapolation/OOS exported coefficients.'),
+                    '_powerexbase'       : PathSpecs('power_spectra_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}extra/PS', 'Base path for extrapolation/OOS power spectra.'),
+                    '_kernelexbase'      : PathSpecs('kernel_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}extra/kernel', 'Base path for extrapolation/OOS kernels.'),
+                    '_outexfilebase'     : PathSpecs('output_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}extra/rho', 'Base path for extrapolation/OOS exported coefficients.'),
                     },
                 'paths.internal': {
-                    'xyzfilename'        : PathSpecs('xyz', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/dataset.xyz', 'Combined XYZ file written from all molecules.'),
-                    '_splitpsfilebase'   : PathSpecs('power_spectra_split_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/PS/PS', 'Base path for per-molecule power spectra.'),
-                    '_refsselfilebase'   : PathSpecs('reference_selection_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/SELECTIONS/refs_selection', 'Base path for selected reference environments.'),
-                    '_powerrefbase'      : PathSpecs('power_spectra_reference_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/PS', 'Base path for merged reference power spectra.'),
-                    '_kmmbase'           : PathSpecs('kmm_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/KMM', 'Base path for reference-reference kernels.'),
-                    '_kernelconfbase'    : PathSpecs('kernel_nm_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/KERNELS/kernel_conf', 'Base path for per-molecule kernels.'),
-                    '_goodcoeffilebase'  : PathSpecs('coeffs_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/coeff/mol', 'Base path for cleaned/reordered coefficients.'),
-                    '_goodmetricfilebase': PathSpecs('metric_matrix_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/metric/mol', 'Base path for processed metric matrices.'),
-                    '_baselinedwbase'    : PathSpecs('baselined_weights_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/BASELINED_PROJECTIONS/projections_conf', 'Base path for projected coefficients.'),
-                    'spherical_averages' : PathSpecs('averages', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/AVERAGES.mts', 'File to store spherical averages.'),
-                    'train_test_sets'    : PathSpecs('training_selection', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/SELECTIONS/training_selection.csv', 'CSV file to store train/test molecule indices.'),
-                    'coef_norms'         : PathSpecs('coef_norms', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/norms.npy', 'Path for coefficient norms wrt the metric matrices.'),
-                    '_targetvecfilebase' : PathSpecs('target_vector_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/target_vec', 'Base path for target-vector outputs.'),
-                    '_grammatfilebase'   : PathSpecs('gram_matrix_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/gram_mat', 'Base path for Gram-matrix outputs.'),
-                    '_mltermsfilebase'   : PathSpecs('ml_terms_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, 'INNER/ml_terms', 'Base path for PITC marginal-likelihood accumulator outputs.'),
+                    'xyzfilename'        : PathSpecs('xyz', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}dataset.xyz', 'Combined XYZ file written from all molecules.'),
+                    '_splitpsfilebase'   : PathSpecs('power_spectra_split_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}PS/PS', 'Base path for per-molecule power spectra.'),
+                    '_refsselfilebase'   : PathSpecs('reference_selection_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}SELECTIONS/refs_selection', 'Base path for selected reference environments.'),
+                    '_powerrefbase'      : PathSpecs('power_spectra_reference_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}PS', 'Base path for merged reference power spectra.'),
+                    '_kmmbase'           : PathSpecs('kmm_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}KMM', 'Base path for reference-reference kernels.'),
+                    '_kernelconfbase'    : PathSpecs('kernel_nm_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}KERNELS/kernel_conf', 'Base path for per-molecule kernels.'),
+                    '_goodcoeffilebase'  : PathSpecs('coeffs_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}coeff/mol', 'Base path for cleaned/reordered coefficients.'),
+                    '_goodmetricfilebase': PathSpecs('metric_matrix_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}metric/mol', 'Base path for processed metric matrices.'),
+                    '_baselinedwbase'    : PathSpecs('baselined_weights_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}BASELINED_PROJECTIONS/projections_conf', 'Base path for projected coefficients.'),
+                    'spherical_averages' : PathSpecs('averages', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}AVERAGES.mts', 'File to store spherical averages.'),
+                    'train_test_sets'    : PathSpecs('training_selection', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}SELECTIONS/training_selection.csv', 'CSV file to store train/test molecule indices.'),
+                    'coef_norms'         : PathSpecs('coef_norms', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}coef_norms.npy', 'Path for coefficient norms wrt the metric matrices.'),
+                    '_targetvecfilebase' : PathSpecs('target_vector_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}target_vec', 'Base path for target-vector outputs.'),
+                    '_grammatfilebase'   : PathSpecs('gram_matrix_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}gram_mat', 'Base path for Gram-matrix outputs.'),
+                    '_mltermsfilebase'   : PathSpecs('ml_terms_base', WhenMissing.IGNORE, CheckFile.MAKE_DIR, '{default_dir}ml_terms', 'Base path for PITC marginal-likelihood accumulator outputs.'),
                     },
                 }
 

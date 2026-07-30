@@ -11,7 +11,11 @@ import numpy as np
 logger = logging.getLogger('__main__')
 
 
-defaults = SimpleNamespace(config='config.txt', mpi=True, loglevel=logging.INFO)
+defaults = SimpleNamespace(config='config.txt', mpi=True, loglevel=logging.INFO, default_dir='INNER/')
+
+DEFAULT_DIR_GROUP = 'paths'
+DEFAULT_DIR_KEY = 'default_dir'
+DEFAULT_DIR_PLACEHOLDER = f'{{{DEFAULT_DIR_KEY}}}'  # '{default_dir}'
 
 
 def mpi_rank():

@@ -26,6 +26,7 @@ output_coeff_order = gpr
 process_metric = true
 
 [paths]
+default_dir = INNER_tz/
 
 [paths.input]
 dataset          = dataset.csv
@@ -33,29 +34,5 @@ xyz              = compounds/{mol_name}.xyz
 metrics          = metric_tz/{mol_name}.npy
 coeffs           = computed/coeffsCCSDccpvdz-ccpvtzjkfit-{mol_name}.npy
 
-[paths.output]
-weights_base     = INNER_tz/weights
-predict_base     = INNER_tz/prediction
-output_base      = INNER_tz/predicted/rho
-
 [paths.extrapolation]
-xyz                       = extra/qm7_extra.xyz
-power_spectra_base        = INNER_tz/extra/PS
-kernel_base               = INNER_tz/extra/kernel
-output_base               = INNER_tz/extra/rho
-
-[paths.internal]
-xyz                           = INNER_tz/dataset.xyz
-power_spectra_split_base      = INNER_tz/PS/PS
-power_spectra_reference_base  = INNER_tz/PS
-reference_selection_base      = INNER_tz/SELECTIONS/refs_selection
-training_selection            = INNER_tz/SELECTIONS/training_selection.csv
-kmm_base                      = INNER_tz/KMM
-kernel_nm_base                = INNER_tz/KERNELS/kernel_conf
-metric_matrix_base            = INNER_tz/metric/mol
-gram_matrix_base              = INNER_tz/gram_mat
-coeffs_base                   = INNER_tz/coeff/mol
-averages                      = INNER_tz/AVERAGES.mts
-baselined_weights_base        = INNER_tz/BASELINED_PROJECTIONS/projections_conf
-target_vector_base            = INNER_tz/target_vec
-coef_norms                    = INNER_tz/coef_norms.npy
+xyz              = extra/qm7_extra.xyz

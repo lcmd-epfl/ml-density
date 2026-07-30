@@ -11,12 +11,14 @@
 # Full SA-GPR / lambda-SOAP pipeline for the QM7 set, full_gpr=true.
 # Runs training -> prediction -> extrapolation for the src/*.py pipeline.
 #
-# One config file per basis selects everything (basis name, metric input dir, coeffs
-# filename tag, and the INNER_<basis>/ output prefix); the shared inputs (compounds/,
-# computed/, dataset.csv, extra/) are read-only and common to all three:
-#     config_dz.txt   -> cc-pvdz-jkfit      -> metric/      -> INNER/
-#     config_tz.txt   -> cc-pvtz-jkfit      -> metric_tz/   -> INNER_tz/
-#     config_aqz.txt  -> aug-cc-pvqz-jkfit  -> metric_aqz/  -> INNER_aqz/
+# One config file per basis selects everything (basis name, metric input dir, coeffs filename
+# tag, and `default_dir`: the single line under [paths] that prefixes every derived output /
+# internal / extrapolation path, all of which are left at their `{default_dir}...` defaults).
+# The shared inputs (compounds/, computed/, dataset.csv, extra/) are read-only and common to all:
+#     config_dz.txt      -> cc-pvdz-jkfit      -> metric/      -> default_dir = INNER/
+#     config_tz.txt      -> cc-pvtz-jkfit      -> metric_tz/   -> default_dir = INNER_tz/
+#     config_aqz.txt     -> aug-cc-pvqz-jkfit  -> metric_aqz/  -> default_dir = INNER_aqz/
+#     config_dz_SoR.txt  -> cc-pvdz-jkfit      -> metric/      -> default_dir = INNER_SoR/  (full_gpr=false, see run_SoR.bash)
 #
 # Submit from THIS directory (QM7_test) so the relative paths in the config resolve.
 #
@@ -48,7 +50,7 @@ conda activate ml-density
 
 # The `#!/bin/bash -l` login shell sources ~/.profile, which does `cd $HOME`.
 # Return to the directory sbatch was invoked from (must be QM7_test) so ../src and the
-# relative data paths (compounds/, metric*/, INNER*/, logs/) in the config resolve.
+# relative data paths (compounds/, metric*/, the default_dir tree, logs/) in the config resolve.
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
 
 # numpy/scipy here are OpenBLAS-backed, and OpenBLAS sizes its thread pool from the affinity mask

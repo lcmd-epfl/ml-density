@@ -3,7 +3,8 @@
 import os
 import configparser
 import logging
-from libs.config_utils import WhenMissing, CheckFile, OptSpecs, PathSpecs, Choice, mpi_rank
+from libs.config_utils import (WhenMissing, CheckFile, OptSpecs, PathSpecs, Choice, mpi_rank, defaults,
+                               DEFAULT_DIR_GROUP, DEFAULT_DIR_KEY, DEFAULT_DIR_PLACEHOLDER)
 
 logger = logging.getLogger('__main__')
 
@@ -18,6 +19,8 @@ class Config:
             config_groups(dict[str, dict[str, OptSpecs | PathSpecs]]): Specification of option/path groups and entries.
         """
         self.groups = {}
+        self.configuration = {}
+        self.default_dir = os.path.join(defaults.default_dir, '')
         if config_groups is not None:
             for group, entries in config_groups.items():
                 self.add_group(group)
@@ -86,6 +89,10 @@ class Config:
         # not raise KeyError on them.
         self.configuration.update({group: {} for group in self.groups if group not in self.configuration})
 
+        self.default_dir = self._resolve_default_dir()
+        if mpi_rank() == 0:
+            logger.info(f'Derived-data directory: {self.default_dir or os.curdir}')
+
         return {group : self.parse_group(group, options) for group, options in self.groups.items()}
 
     def print_help(self):
@@ -103,7 +110,9 @@ class Config:
                 descr += (f' {'Permitted' if dtype.strict else 'Recommended'} values: {dtype.options}.')
             return f'  # {descr.strip()}' if descr else ''
 
-        lines = ['# Example configuration file with default values.\n']
+        lines = ['# Example configuration file with default values.',
+                 f'# "{DEFAULT_DIR_PLACEHOLDER}" in any path below is replaced by '
+                 f'[{DEFAULT_DIR_GROUP}] {DEFAULT_DIR_KEY} (default "{defaults.default_dir}").\n']
         for group, entries in self.groups.items():
             lines.append(f'[{group}]')
             lines_group = []
@@ -148,6 +157,26 @@ class Config:
             object: Parsed value, or the default when missing.
         """
         return spec.dtype(val) if (val := self.configuration[group].get(spec.key, None)) is not None else spec.default
+
+    def _resolve_default_dir(self):
+        """Resolve the directory prefix substituted into every configured path.
+
+        Returns:
+            str: The configured prefix, normalized to end with a separator ('' when set empty).
+
+        Raises:
+            RuntimeError: The prefix contains a brace, which would corrupt the path templates.
+        """
+        spec = self.groups.get(DEFAULT_DIR_GROUP, {}).get(DEFAULT_DIR_KEY)
+        default_dir = self._get_option(DEFAULT_DIR_GROUP, spec) if spec else defaults.default_dir
+        if any(brace in default_dir for brace in '{}'):
+            # A brace would either self-reference ("{default_dir}sub/") or survive into the derived
+            # templates and break the .format() calls their consumers make.
+            msg = f'`{DEFAULT_DIR_KEY}` must not contain braces: "{default_dir}"'
+            raise RuntimeError(msg)
+        # "INNER" and "INNER/" alike -> "INNER/"; "" stays "" (write into the working directory).
+        # Not normpath(): it resolves ".." textually, which is wrong across symlinks.
+        return os.path.join(default_dir, '')
 
     def check_for_unrecognized_entries(self, group, entries):
         """Check for unrecognized entries in the config file.
@@ -205,6 +234,8 @@ class Config:
 
         if path is None:  # neither configured nor defaulted: nothing to validate
             return None
+
+        path = path.replace(DEFAULT_DIR_PLACEHOLDER, self.default_dir)
 
         if spec.check_file==CheckFile.ERROR_FILE:
             if not os.path.isfile(path):
