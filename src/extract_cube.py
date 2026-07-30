@@ -132,18 +132,20 @@ def parse_args():
     parser.add_argument('-g', '--grid', type=int, default=80, help='Cube grid size in each dimension (default: 80).')
     parser.add_argument('--chunk', type=int, default=4096, help='Grid points processed per chunk in --std mode, to bound memory (the ao_values @ Sigma_c* intermediate is O(chunk * nao^2)) (default: 4096).')
     args = parser.parse_args()
-    if not (args.std or args.diff or args.ref or args.pred):
-        args.std = True
-        args.ref = True
-        args.pred = True
-        args.diff = True
-        logger.info('All output fields will be written.')
     return args
 
 
 def main():  # noqa: D103
     args = parse_args()
     o, p = read_config(config_path=args.config)
+    if not (args.std or args.diff or args.ref or args.pred):
+        args.ref = True
+        args.pred = True
+        args.diff = True
+        if o.full_gpr:
+            args.std = True
+        logger.info(f'All output fields ({", ".join([f for f in ["std", "ref", "pred", "diff"] if getattr(args, f)])}) will be written.')
+
     frac = o.fracs[-1]
 
     subsets = Subset(p.train_test_sets)
