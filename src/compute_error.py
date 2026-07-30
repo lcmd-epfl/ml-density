@@ -88,7 +88,7 @@ def table_legend(use_charges, *, has_variance):
         has_variance (bool): Whether predicted-variance columns were printed for at least one fraction.
 
     Returns:
-        str: Legend text; the electron-number-correction and variance lines are included only when relevant.
+        str: Legend text; the variance lines are included only when relevant.
     """
     return '\n'.join([
         '',
@@ -101,7 +101,8 @@ def table_legend(use_charges, *, has_variance):
         'nel_pred    : predicted number of electrons, q^T c',
         'nel_ref     : reference number of electrons, q^T c0',
         'ΔN          : nel_pred - nel_ref for this molecule',
-        *(['corr N      : baselined relative error after projecting the prediction onto q^T c = N.'] if use_charges else []),
+        'corr N      : baselined relative error after projecting the prediction onto q^T c = N,',
+        '              where N is the target electron count (see the note below).',
         'MAE         : mean of the above over all molecules in the fraction',
         'MAX         : max of the above over all molecules in the fraction',
         'frac        : fraction of the training set actually used to fit the model being evaluated',
@@ -174,7 +175,7 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
     Returns:
         tuple[Error, list[str]]: The molecule's Error, and its formatted column values in table
         order (mol label, baselined, relative, absolute, [pred var], nel_pred, nel_ref, ΔN,
-        [corr N], xyz file). Column widths aren't decided here -- that needs every molecule's
+        corr N, xyz file). Column widths aren't decided here -- that needs every molecule's
         fields first, so it's the caller's job (see format_row).
     """
     atoms  = atomic_numbers[imol]
@@ -197,10 +198,9 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
     N_c0 = qvec @ c0
     N_pred = qvec @ c
     dN = N_pred - N_c0  # signed, so the printed row reads exactly as nel_pred - nel_ref = ΔN
-    if o.use_charges:
-        error.N = abs(dN)
-        dcn = correct_number_of_electrons(c, metric, qvec, N) - c0
-        error.rel_bl_N = (dcn @ metric @ dcn) / norm_bl * 100.0
+    error.N = abs(dN)
+    dcn = correct_number_of_electrons(c, metric, qvec, N) - c0
+    error.rel_bl_N = (dcn @ metric @ dcn) / norm_bl * 100.0
 
     fields = [
         f'mol # {itest:{len(str(npred))}} ({imol:{len(str(len(atomic_numbers)))}}):',
@@ -210,9 +210,7 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
         ]
     if pred_var is not None:
         fields.append(f'{pred_var:.2e} %')
-    fields += [f'{N_pred:.4f}', f'{N_c0:.4f}', f'{dN:+.4f}']
-    if o.use_charges:
-        fields.append(f'{error.rel_bl_N:.2e} %')
+    fields += [f'{N_pred:.4f}', f'{N_c0:.4f}', f'{dN:+.4f}', f'{error.rel_bl_N:.2e} %']
     fields.append(p.xyz.format(mol_name=df['id'][imol]))
     return error, fields
 
@@ -234,7 +232,7 @@ def format_row(fields, widths, separators):
     return ''.join(f'{field}{sep}' for field, sep in zip(padded, separators, strict=True))
 
 
-def summary_line(label, err, headers, widths, separators, *, use_charges, var_value=None):
+def summary_line(label, err, headers, widths, separators, *, var_value=None):
     """Format one MAE/MAX-style summary line, aligned to the table columns above it.
 
     Args:
@@ -244,7 +242,6 @@ def summary_line(label, err, headers, widths, separators, *, use_charges, var_va
         headers (list[str]): Table column headers, from main().
         widths (list[int]): Table column widths, from main().
         separators (list[str]): Table column separators, from main().
-        use_charges (str | None): Mode controlling which dataset column is used (None, "charge", or "N").
         var_value (float | None): Aggregated predicted variance to report, if available.
 
     Returns:
@@ -258,9 +255,8 @@ def summary_line(label, err, headers, widths, separators, *, use_charges, var_va
     fields[headers.index('absolute')] = f'{err.abs:.2e}'
     if var_value is not None:
         fields[headers.index('pred var')] = f'{var_value:.2e} %'
-    if use_charges:
-        fields[headers.index('ΔN')] = f'{err.N:+.4f}'
-        fields[headers.index('corr N')] = f'{err.rel_bl_N:.2e} %'
+    fields[headers.index('ΔN')] = f'{err.N:+.4f}'
+    fields[headers.index('corr N')] = f'{err.rel_bl_N:.2e} %'
     blanks = [' ' * len(sep) for sep in separators]
     return format_row(fields, widths, blanks).rstrip()
 
@@ -305,7 +301,6 @@ def variance_diagnostics(bl_errors, pred_vars, obs_abs, pred_abs, npred):
         corr = np.corrcoef(bl_errors, pred_vars)[0, 1] if npred > 1 else float('nan')
         parts.append(f'correlation = {corr:.2f}')
     if pred_abs:
-        # observed / predicted error on molecules the amplitude fit never saw; 1.0 is perfect
         parts.append(f'calibration = {np.mean(obs_abs)/np.mean(pred_abs):.2e}')
     return ''.join(f'   {part}' for part in parts)
 
@@ -331,10 +326,7 @@ def main():  # noqa: D103
         headers = ['', 'baselined', 'relative', 'absolute']
         if variances is not None:
             headers.append('pred var')
-        headers += ['nel pred', 'nel ref', 'ΔN']
-        if o.use_charges:
-            headers.append('corr N')
-        headers.append('xyz file')
+        headers += ['nel pred', 'nel ref', 'ΔN', 'corr N', 'xyz file']
 
         # nel_pred - nel_ref = ΔN, spelled out with real operators instead of the usual 3-space gap
         gap_after = {'nel pred': '  -  ', 'nel ref': '  =  '}
@@ -372,8 +364,8 @@ def main():  # noqa: D103
         max_var = max(pred_vars) if variances is not None else None
         corr_extra = variance_diagnostics(bl_errors, pred_vars, obs_abs, pred_abs, npred)
         print()
-        print(summary_line('MAE', total, headers, widths, separators, use_charges=o.use_charges, var_value=mean_var))
-        print(summary_line('MAX', max_error, headers, widths, separators, use_charges=o.use_charges, var_value=max_var))
+        print(summary_line('MAE', total, headers, widths, separators, var_value=mean_var))
+        print(summary_line('MAX', max_error, headers, widths, separators, var_value=max_var))
         print(f"frac={frac}", corr_extra)
 
     print(table_legend(o.use_charges, has_variance=any_variance), end='')
