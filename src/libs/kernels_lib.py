@@ -57,10 +57,14 @@ def kernel_for_mol(atoms, power_ref, power_file, kernel_file):
 def kernel_block_to_dense_rect(basis, atoms_left, elem_right, k_tmap):
     """Expand a K_NM-style kernel TensorMap into a dense (nao_left, nao_right) matrix.
 
-    A kernel value depends only on (l, q), not on the radial channel n, so it is broadcast
-    identically across every (n_left, n_right) radial-channel pair within a given (atom, l) AO
-    block. This differs from regression.fill_matrix()'s diagonal-in-n placement, which is only
-    correct there because it builds an ad hoc regularizer, not a literal kernel value.
+    A kernel value depends only on (l, q), not on the radial channel n. Each radial channel carries
+    its own weight, so the model contracts channels *diagonally*: predicted coeff (atom, n, l, m) =
+    sum_{ref, m'} k_l(atom, ref)[m, m'] w(ref, n, l, m'), with output n equal to the weight's n.
+    The dense block is therefore block-diagonal in n (np.kron(eye(nsize), dk)), matching both the
+    prediction einsum ('mMr,rMn->mn') and regression.fill_matrix()'s diagonal-in-n placement. A full
+    np.tile(dk, (nsize, nsize)) broadcast would instead couple every (n_left, n_right) pair, which is
+    a different, rank-deficient operator (rank msize per block, ~nsize too large) inconsistent with
+    prediction -- the cause of the earlier full_gpr fit failure.
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
@@ -84,7 +88,7 @@ def kernel_block_to_dense_rect(basis, atoms_left, elem_right, k_tmap):
             for iiref, iref in enumerate(np.where(elem_right==q)[0]):
                 i2 = idx_right[iref, l]
                 dk = kblock.values[iiat, :, :, iiref]
-                dense[i1:i1+nsize*msize, i2:i2+nsize*msize] = np.tile(dk, (nsize, nsize))
+                dense[i1:i1+nsize*msize, i2:i2+nsize*msize] = np.kron(np.eye(nsize), dk)
     return dense
 
 
@@ -99,7 +103,7 @@ def kernel_block_to_dense_self(basis, elem, k_mm_tmap):
         k_mm_tmap (metatensor.TensorMap): TensorMap produced by kernel_mm().
 
     Returns:
-        np.ndarray: Dense symmetric (nao, nao) kernel matrix, full (n1, n2) broadcast.
+        np.ndarray: Dense symmetric (nao, nao) block-diagonal kernel matrix, full (n1, n2) broadcast.
     """
     idx = basis.sparse_indices(elem)
     dense = np.zeros((basis.nao_for_mol(elem), basis.nao_for_mol(elem)))
@@ -114,7 +118,7 @@ def kernel_block_to_dense_self(basis, elem, k_mm_tmap):
             for iib, ib in enumerate(atoms_of_q):
                 i2 = idx[ib, l]
                 dk = values[iia, iib]
-                dense[i1:i1+nsize*msize, i2:i2+nsize*msize] = np.tile(dk, (nsize, nsize))
+                dense[i1:i1+nsize*msize, i2:i2+nsize*msize] = np.kron(np.eye(nsize), dk)
     return dense
 
 
