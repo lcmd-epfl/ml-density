@@ -96,11 +96,97 @@ def azimuthal_type(value):
     return l
 
 
-def cube_path(args, field):
-    """Build the output .cube path for one field, encoding any (l, n) selection.
+def atom_type(value):
+    """Parse one --atom value: a chemical symbol or a 1-based atom index.
 
-    Layout: <output><mol>[_l<l>-<l>...][_n<n>-<n>...]_<field>.cube, which reduces to the
-    historical <output><mol>_<field>.cube when neither quantum-number flag is set.
+    Args:
+        value (str): Command-line token, e.g. 'C', 'o' or '15'.
+
+    Returns:
+        tuple[str, int]: ('q', atomic number) for a symbol, ('iat', 0-based index) for an index.
+
+    Raises:
+        argparse.ArgumentTypeError: The token is neither a known element symbol nor a positive integer.
+    """
+    try:
+        index = int(value)
+    except ValueError:
+        symbol = value.capitalize()
+        if symbol not in chemical_symbols[1:]:
+            msg = f'{value!r} is neither an element symbol nor a positive atom index'
+            raise argparse.ArgumentTypeError(msg) from None
+        return ('q', chemical_symbols.index(symbol))
+    if index < 1:
+        msg = f'atom indices follow the xyz file and start at one, got {index}'
+        raise argparse.ArgumentTypeError(msg)
+    return ('iat', index-1)
+
+
+def atom_label(entry):
+    """Render one --atom entry the way it was written on the command line.
+
+    Args:
+        entry (tuple[str, int]): An ('q', atomic number) or ('iat', 0-based index) pair.
+
+    Returns:
+        str: Element symbol, or the 1-based atom index.
+    """
+    kind, value = entry
+    return chemical_symbols[value] if kind=='q' else str(value+1)
+
+
+def resolve_atoms(atomic_numbers, selection):
+    """Resolve --atom entries into the 0-based indices of the atoms they select.
+
+    Symbols and indices combine as a union: "-a O 15" is every oxygen plus atom 15.
+
+    Args:
+        atomic_numbers (np.ndarray[int]): Atomic numbers of the molecule, in xyz order.
+        selection (list[tuple[str, int]] | None): Parsed --atom entries, None to keep every atom.
+
+    Returns:
+        np.ndarray[int] | None: Selected atom indices, None when no atom filter is set.
+
+    Raises:
+        ValueError: An index exceeds the number of atoms in this molecule.
+    """
+    if selection is None:
+        return None
+    keep = np.zeros(len(atomic_numbers), dtype=bool)
+    for entry in selection:
+        kind, value = entry
+        if kind=='q':
+            matched = atomic_numbers==value
+            if not matched.any():
+                logger.warning(f'This molecule ({make_formula(atomic_numbers)}) has no {atom_label(entry)} atom, '
+                               'so that part of --atom selects nothing.')
+            keep |= matched
+        elif value >= len(atomic_numbers):
+            msg = (f'--atom {atom_label(entry)} is out of range: this molecule ({make_formula(atomic_numbers)}) '
+                   f'has {len(atomic_numbers)} atoms, indexed 1 to {len(atomic_numbers)} in xyz order')
+            raise ValueError(msg)
+        else:
+            keep[value] = True
+    return np.where(keep)[0]
+
+
+def make_formula(atomic_numbers):
+    """Build the chemical formula of a molecule, for error and log messages.
+
+    Args:
+        atomic_numbers (np.ndarray[int]): Atomic numbers of the molecule.
+
+    Returns:
+        str: Hill-ordered formula, e.g. 'C5H7NO'.
+    """
+    return ase.Atoms(numbers=atomic_numbers).get_chemical_formula()
+
+
+def cube_path(args, field):
+    """Build the output .cube path for one field, encoding any (atom, l, n) selection.
+
+    Layout: <output><mol>[_a<atom>-<atom>...][_l<l>-<l>...][_n<n>-<n>...]_<field>.cube, which
+    reduces to the historical <output><mol>_<field>.cube when no selection flag is set.
 
     Args:
         args (argparse.Namespace): Parsed CLI arguments, with args.mol already resolved.
@@ -110,6 +196,8 @@ def cube_path(args, field):
         str: Path of the .cube file holding that field.
     """
     tag = ''
+    if args.atom is not None:
+        tag += '_a' + '-'.join(map(atom_label, args.atom))
     if args.azimuthal is not None:
         tag += '_l' + '-'.join(map(str, args.azimuthal))
     if args.radial_channel is not None:
@@ -118,32 +206,38 @@ def cube_path(args, field):
 
 
 def select_ao_mask(basis, atomic_numbers, args):
-    """Build the boolean AO mask selecting the requested (l, n) channels, in GPR AO order.
+    """Build the boolean AO mask selecting the requested atoms and (l, n) channels, in GPR AO order.
 
+    The three filters intersect: an AO survives when its atom, its l and its n are all selected.
     The mask is constant over the 2l+1 magnetic components of each shell, so it commutes with the
-    gpr->pyscf reordering; it is nevertheless applied in GPR order, where the (l, n) labels live.
+    gpr->pyscf reordering; it is nevertheless applied in GPR order, where the labels live.
 
     Args:
         basis (Basis): Basis covering the molecule's elements.
-        atomic_numbers (np.ndarray[int]): Atomic numbers of the molecule.
-        args (argparse.Namespace): Parsed CLI arguments (args.azimuthal, args.radial_channel).
+        atomic_numbers (np.ndarray[int]): Atomic numbers of the molecule, in xyz order.
+        args (argparse.Namespace): Parsed CLI arguments (args.atom, args.azimuthal, args.radial_channel).
 
     Returns:
-        np.ndarray[bool]: Mask of length nao, all True when neither flag is set.
+        np.ndarray[bool]: Mask of length nao, all True when no selection flag is set.
 
     Raises:
-        ValueError: The requested quantum numbers match no basis function at all.
+        ValueError: The requested selection matches no basis function at all.
     """
     ao_index = basis.index(atomic_numbers)
+    iats = resolve_atoms(atomic_numbers, args.atom)
     keep = np.zeros(ao_index.nao, dtype=bool)
-    keep[ao_index.find(l=args.azimuthal, n=args.radial_channel)] = True
+    keep[ao_index.find(iat=iats, l=args.azimuthal, n=args.radial_channel)] = True
     if not keep.any():
         available = ', '.join(f'{chemical_symbols[q]}: nmax={basis.nmax[q].tolist()}' for q in basis.elements.tolist())
-        msg = (f'No basis function of {basis.basisname} matches l={args.azimuthal}, n={args.radial_channel}. '
-               f'Available radial channels per angular momentum -- {available}')
+        requested = ', '.join(f'{name}={value}' for name, value in
+                              (('atoms', args.atom and list(map(atom_label, args.atom))),
+                               ('l', args.azimuthal), ('n', args.radial_channel)) if value is not None)
+        msg = (f'No basis function of {basis.basisname} matches the requested selection ({requested}). '
+               f'The molecule is {make_formula(atomic_numbers)} and its radial channels per angular '
+               f'momentum are -- {available}')
         raise ValueError(msg)
-    if args.azimuthal is not None or args.radial_channel is not None:
-        log_selection(basis, args)
+    if any(value is not None for value in (args.atom, args.azimuthal, args.radial_channel)):
+        log_selection(basis, ao_index, iats, args, keep)
     return keep
 
 
@@ -175,24 +269,37 @@ def shell_exponents(basisname, q, nmax):
     return {(l, n): exponent for l, exponents in shells.items() for n, exponent in enumerate(exponents)}
 
 
-def log_selection(basis, args):
-    """Report which shells the (l, n) selection keeps, with their Gaussian exponents.
+def log_selection(basis, ao_index, iats, args, keep):
+    """Report which atoms and which shells the selection keeps, with their Gaussian exponents.
+
+    The per-shell detail is only printed when an l or n filter is active: listing every shell of
+    every element would otherwise bury the atom selection under a full dump of the basis.
 
     Args:
         basis (Basis): Basis covering the molecule's elements.
+        ao_index (AOIndex): AO index of the molecule.
+        iats (np.ndarray[int] | None): Selected atom indices, None when every atom is kept.
         args (argparse.Namespace): Parsed CLI arguments (args.azimuthal, args.radial_channel).
+        keep (np.ndarray[bool]): The AO mask being reported.
     """
-    for q in basis.elements.tolist():
-        exponents = shell_exponents(basis.basisname, q, basis.nmax[q])
-        shells = [(l, n) for l, nmax_l in enumerate(basis.nmax[q]) for n in range(nmax_l)
-                  if (args.azimuthal is None or l in args.azimuthal)
-                  and (args.radial_channel is None or n in args.radial_channel)]
-        kept = sum(2*l+1 for l, _ in shells)
-        selection = ', '.join(f'l={l} n={n}' + (f' (alpha={exponents[l, n]:.4g})' if exponents else '')
-                              for l, n in shells) or 'none'
-        logger.info(f'Restricting the exported field to {kept}/{basis.nao_atom[q]} AOs per '
-                    f'{chemical_symbols[q]} atom: {selection}')
-    logger.info('This is a partial density: it does not integrate to the electron count, and is signed for l>0.')
+    atoms = ao_index.atoms
+    if iats is not None:
+        listed = ', '.join(f'{iat+1} ({chemical_symbols[atoms[iat]]})' for iat in iats)
+        logger.info(f'Restricting the exported field to {len(iats)}/{len(atoms)} atoms of '
+                    f'{make_formula(atoms)}, numbered as in the xyz file: {listed}')
+    if args.azimuthal is not None or args.radial_channel is not None:
+        for q in sorted({atoms[iat] for iat in (range(len(atoms)) if iats is None else iats)}):
+            exponents = shell_exponents(basis.basisname, q, basis.nmax[q])
+            shells = [(l, n) for l, nmax_l in enumerate(basis.nmax[q]) for n in range(nmax_l)
+                      if (args.azimuthal is None or l in args.azimuthal)
+                      and (args.radial_channel is None or n in args.radial_channel)]
+            kept = sum(2*l+1 for l, _ in shells)
+            selection = ', '.join(f'l={l} n={n}' + (f' (alpha={exponents[l, n]:.4g})' if exponents else '')
+                                  for l, n in shells) or 'none'
+            logger.info(f'Restricting the exported field to {kept}/{basis.nao_atom[q]} AOs per '
+                        f'{chemical_symbols[q]} atom: {selection}')
+    logger.info(f'Keeping {keep.sum()}/{keep.size} AOs of the molecule. This is a partial density: '
+                'it does not integrate to the electron count, and is signed for l>0.')
 
 
 def select_molecule_index(configs: list, args: argparse.Namespace) -> int:
@@ -249,7 +356,8 @@ def parse_args():
     parser.add_argument('-r', '--ref', action='store_true', help='Output only the ab-initio density rho_ref(r).')
     parser.add_argument('-d', '--diff', action='store_true', help='Output only the error field rho_pred(r) - rho_ref(r).')
     parser.add_argument('-s', '--std', action='store_true', help='Output only the predictive standard-deviation field sigma[rho(r)] = sqrt(phi(r)^T Sigma_c* phi(r)) instead of the mean density. Carries the same units as the density (e/bohr^3). Requires full_gpr=True in the config and ignores --mts.')
-    parser.add_argument('-o', '--output', default="CUBE/",help='Prefix for output .cube files. File name constructed by <prefix><mol>[_l<l>...][_n<n>...]_<field>.cube, where <field> is ref, pred, diff or std depending on the flags and the optional l/n parts record an --azimuthal/--radial-channel selection (<prefix> default is CUBE/).')
+    parser.add_argument('-o', '--output', default="CUBE/",help='Prefix for output .cube files. File name constructed by <prefix><mol>[_a<atom>...][_l<l>...][_n<n>...]_<field>.cube, where <field> is ref, pred, diff or std depending on the flags and the optional a/l/n parts record an --atom/--azimuthal/--radial-channel selection (<prefix> default is CUBE/).')
+    parser.add_argument('-a', '--atom', type=atom_type, nargs='+', help='Restrict the exported field to these atoms, given as element symbols (every atom of that element) or as 1-based indices into the molecule\'s block of the xyz file (that one atom). Symbols and indices may be mixed and are combined as a union, so "-a O 15" keeps every oxygen plus atom 15. Default: every atom.')
     parser.add_argument('-l', '--azimuthal', type=azimuthal_type, nargs='+', help='Restrict the exported field to these angular momenta, given as integers or spectroscopic letters (e.g. "-l 0 1" or "-l s p"). Default: every l of the basis.')
     parser.add_argument('-n', '--radial-channel', type=int, nargs='+', help='Restrict the exported field to these radial channels within each selected l. 0-based, ordered from the tightest to the most diffuse primitive -- the JKFIT auxiliary basis is uncontracted and has no principal quantum number. The number of channels differs per element and per l (cc-pvdz-jkfit: 10 s channels on C, 4 on H). Default: every radial channel.')
     parser.add_argument('-m', '--mol', type=int, help='Local molecule index inside the test/training set (position in the set, not the row in the xyz file) (default: a random density-unextracted molecule).')
@@ -263,6 +371,8 @@ def parse_args():
         values = getattr(args, attr)
         if values is not None:
             setattr(args, attr, sorted(set(values)))
+    if args.atom is not None:  # elements first, by atomic number, then the individual atoms
+        args.atom = sorted(set(args.atom), key=lambda entry: (entry[0]!='q', entry[1]))
     if args.config != "config.txt" and args.output == "CUBE/":
         logger.warning("Config file is not default but output name is. Are you sure you will not overwrite important files?")
     return args
