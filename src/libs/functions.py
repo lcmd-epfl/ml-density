@@ -258,18 +258,20 @@ class AOIndex:
     def find(self, *, iat=None, q=None, l=None, n=None, m=None):
         """Find AO row indices matching the given metadata filters.
 
+        Each filter accepts either a single value or a collection of accepted values.
+
         Args:
-            iat (int | None): Optional atom index filter.
-            q (int | None): Optional atomic-number filter.
-            l (int | None): Optional angular momentum filter.
-            n (int | None): Optional radial channel filter.
-            m (int | None): Optional magnetic quantum number filter.
+            iat (int | Sequence[int] | None): Optional atom index filter.
+            q (int | Sequence[int] | None): Optional atomic-number filter.
+            l (int | Sequence[int] | None): Optional angular momentum filter.
+            n (int | Sequence[int] | None): Optional radial channel filter.
+            m (int | Sequence[int] | None): Optional magnetic quantum number filter.
 
         Returns:
             np.ndarray[int]: Indices of AO rows satisfying all specified filters.
         """
         column_order = [iat, q, l, n, m]
-        conditions = [self.ao[:,i]==query for i, query in enumerate(column_order) if query is not None]
+        conditions = [np.isin(self.ao[:,i], query) for i, query in enumerate(column_order) if query is not None]
         return np.where(np.prod(conditions, axis=0))[0] if conditions else np.arange(len(self.ao))
 
     def __repr__(self):
