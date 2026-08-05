@@ -128,7 +128,7 @@ def robust_cholesky(mat, jit, max_tries=10):
 
 
 def molecule_lambda_chol_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit):
-    """Compute the Cholesky factor of Lambda_i, plus K_{I_i,M} and metric_i, for one training molecule.
+    """Compute the Cholesky factor of Lambda_i and K_{I_i,M} for one training molecule.
 
     Handing out L_i lets the callers accumulate (L_i^-1 K_{I_i,M})^T (L_i^-1 K_{I_i,M}), an outer
     product that is *exactly* symmetric and PSD in floating point, contrary to the direct inverse approach
@@ -146,9 +146,8 @@ def molecule_lambda_chol_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta
         jit (float): Relative diagonal jitter added for numerical stability
 
     Returns:
-        tuple[np.ndarray, np.ndarray, np.ndarray, pyscf.gto.Mole]: lower Cholesky factor of
-        Lambda_i (nao_i, nao_i), K_{I_i,M} (nao_i, nao_ref), the jittered metric_i (nao_i, nao_i),
-        and a dummy mol matching molecule i's AO layout.
+        tuple[np.ndarray, np.ndarray]: lower Cholesky factor of Lambda_i (nao_i, nao_i) and
+        K_{I_i,M} (nao_i, nao_ref).
     """
     mol_i = make_dummy_mol(atoms_i, basis=basis.basisname, ignore=True)
     metric_i = tensormap_to_array(mol_i, metatensor.load(paths.metric_matrix.format(mol_idx)), dest='gpr', fast=True)
@@ -174,4 +173,4 @@ def molecule_lambda_chol_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta
     lambda_i = d_i + eta * 0.5*(metric_inv_i + metric_inv_i.T)
     l_lambda_i, _ = robust_cholesky(lambda_i, jit)
 
-    return l_lambda_i, k_nm_i, metric_i, mol_i
+    return l_lambda_i, k_nm_i

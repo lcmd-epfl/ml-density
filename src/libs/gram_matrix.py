@@ -12,6 +12,7 @@ import metatensor
 from libs.target_vector import print_batches, do_work_target_pitc
 from libs.multi import print_nodes, scatter_jobs
 from libs.pitc_lib import kmm_cholesky, molecule_lambda_chol_knm
+from libs.tmap import tmap2averages
 
 # Buffer for the final MPI Reduce of the packed Gram onto rank 0 (communication phase, rank 0 only; larger just means fewer messages).
 DEFAULT_MAX_CHUNK = 1<<30  # 1 GiB
@@ -187,7 +188,7 @@ def do_work_gram_pitc(v_i, gram_mat, chunk_bytes=DEFAULT_GRAM_CHUNK_BYTES):
             gram_mat[start:start+j+1] += block[:j+1, j-j0]
 
 
-def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, gram_mat, target_vec, ml_terms):
+def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, av_coefs, eta, jit, gram_mat, target_vec, ml_terms):
     """Accumulate both the Gram-matrix and target-vector PITC contributions for one training molecule.
 
     Lambda_i/K_{I_i,M} are the expensive part of PITC per molecule (a dense Cholesky factorization
@@ -203,6 +204,7 @@ def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, g
         atoms_i (np.ndarray[int]): Atomic numbers of the training molecule.
         paths (SimpleNamespace): Configured paths and path templates.
         l_mm (np.ndarray): Lower Cholesky factor of the (jittered) dense K_MM.
+        av_coefs (dict[int, np.ndarray]): Per-element l=0 averages (see do_work_target_pitc).
         eta (float): PITC noise scale.
         jit (float): Relative diagonal jitter (see molecule_lambda_chol_knm).
         gram_mat (np.ndarray): Packed lower-triangular Gram-matrix accumulator, updated in place.
@@ -210,10 +212,10 @@ def _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit, g
         ml_terms (np.ndarray): Dense (2,) marginal-likelihood accumulator, updated in place
             (see do_work_target_pitc).
     """
-    l_lambda_i, k_nm_i, metric_i, mol_i = molecule_lambda_chol_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit)
+    l_lambda_i, k_nm_i = molecule_lambda_chol_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta, jit)
     v_i = spl.solve_triangular(l_lambda_i, k_nm_i, lower=True)   # L_i^-1 K_{I_i,M}
     do_work_gram_pitc(v_i, gram_mat)
-    do_work_target_pitc(mol_idx, paths, l_lambda_i, v_i, metric_i, mol_i, target_vec, ml_terms)
+    do_work_target_pitc(mol_idx, paths, basis, atoms_i, av_coefs, l_lambda_i, v_i, target_vec, ml_terms)
 
 
 def _l_mm_for_pitc(basis, ref_elem, paths, o):
@@ -274,7 +276,7 @@ def _l_mm_shared(basis, ref_elem, paths, o, comm):
     return l_mm, win
 
 
-def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices, l_mm, o, gram_mat, target_vec, ml_terms):
+def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices, l_mm, av_coefs, o, gram_mat, target_vec, ml_terms):
     """Dispatch to the PITC (Gram and target together) or SoR (Gram only) accumulation for one training molecule.
 
     Args:
@@ -286,6 +288,8 @@ def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices,
         idx (np.ndarray): Sparse AO start indices, used by the SoR path.
         ref_indices (dict[int, np.ndarray[int]]): Cached reference positions, used by the SoR path.
         l_mm (np.ndarray | None): PITC K_MM Cholesky factor (None unless o.full_gpr).
+        av_coefs (dict[int, np.ndarray] | None): Per-element l=0 averages, used by the PITC target
+            (None unless o.full_gpr).
         o (SimpleNamespace): Configured options (reads o.full_gpr, o.reg, o.jit).
         gram_mat (np.ndarray): Packed lower-triangular matrix accumulator, updated in place.
         target_vec (np.ndarray | None): Dense (nao_ref,) target-vector accumulator, updated in place
@@ -298,7 +302,7 @@ def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices,
     if o.full_gpr:
         # o.reg plays the role of eta here -- see regression.py's PITC branch for why they're
         # the same symbol in the theory, not two separate regularization knobs.
-        _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, o.reg, o.jit, gram_mat, target_vec, ml_terms)
+        _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, av_coefs, o.reg, o.jit, gram_mat, target_vec, ml_terms)
     else:
         do_work_gram(idx, basis.nmax, mol_idx, ref_indices, paths.metric_matrix, paths.kernel_nm, gram_mat)
 
@@ -328,12 +332,13 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
             imol (int): Index in training_idx identifying the molecule.
         """
         mol_idx = training_idx[imol]
-        _accumulate_gram(basis, ref_elem, mol_idx, atomic_numbers[mol_idx], paths, idx, ref_indices, l_mm, o, gram_mat, target_vec, ml_terms)
+        _accumulate_gram(basis, ref_elem, mol_idx, atomic_numbers[mol_idx], paths, idx, ref_indices, l_mm, av_coefs, o, gram_mat, target_vec, ml_terms)
 
     nao_ref = basis.nao_for_mol(ref_elem)
     gram_mat = np.zeros(matsize := symsize(nao_ref))
     target_vec = np.zeros(nao_ref) if o.full_gpr else None
     ml_terms = np.zeros(2) if o.full_gpr else None
+    av_coefs = tmap2averages(metatensor.load(paths.spherical_averages)) if o.full_gpr else None
     idx = basis.sparse_indices(ref_elem)
     ref_indices = _build_ref_indices(ref_elem)
     l_mm_win = None
