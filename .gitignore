@@ -4,6 +4,10 @@
 *.pyc.*
 *.swp
 
+QM7_test/*
+!QM7_test/run.bash
+!QM7_test/slurm.bash
+!QM7_test/config*
 sidechains_examples/INNER/
 sidechains_examples/error.txt
 sidechains_examples/error_gpr.txt
