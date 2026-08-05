@@ -55,7 +55,7 @@ def get_number_of_electrons(use_charges, atomic_numbers, df):
 
 class Error:
     """Prediction errors."""
-    fields = ('abs', 'rel', 'rel_bl', 'rel_bl_N', 'N')
+    fields = ('abs', 'rel', 'rel_bl', 'rel_bl_N', 'N', 'N_rel')
 
     def __init__(self):
         """Initialize an Error instance with 0."""
@@ -101,6 +101,7 @@ def table_legend(use_charges, *, has_variance):
         'nel_pred    : predicted number of electrons, q^T c',
         'nel_ref     : reference number of electrons, q^T c0',
         'ΔN          : nel_pred - nel_ref for this molecule',
+        'ΔN/N        : ΔN relative to the reference electron count, ΔN / nel_ref',
         'corr N      : baselined relative error after projecting the prediction onto q^T c = N,',
         '              where N is the target electron count (see the note below).',
         'MAE         : mean of the above over all molecules in the fraction',
@@ -175,7 +176,7 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
     Returns:
         tuple[Error, list[str]]: The molecule's Error, and its formatted column values in table
         order (mol label, baselined, relative, absolute, [pred var], nel_pred, nel_ref, ΔN,
-        corr N, xyz file). Column widths aren't decided here -- that needs every molecule's
+        ΔN/N, corr N, xyz file). Column widths aren't decided here -- that needs every molecule's
         fields first, so it's the caller's job (see format_row).
     """
     atoms  = atomic_numbers[imol]
@@ -199,6 +200,7 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
     N_pred = qvec @ c
     dN = N_pred - N_c0  # signed, so the printed row reads exactly as nel_pred - nel_ref = ΔN
     error.N = abs(dN)
+    error.N_rel = abs(dN)/abs(N_c0) * 100.0
     dcn = correct_number_of_electrons(c, metric, qvec, N) - c0
     error.rel_bl_N = (dcn @ metric @ dcn) / norm_bl * 100.0
 
@@ -210,7 +212,8 @@ def evaluate_molecule(o, p, df, atomic_numbers, averages, norms, N_all, pred, im
         ]
     if pred_var is not None:
         fields.append(f'{pred_var:.2e} %')
-    fields += [f'{N_pred:.4f}', f'{N_c0:.4f}', f'{dN:+.4f}', f'{error.rel_bl_N:.2e} %']
+    fields += [f'{N_pred:.4f}', f'{N_c0:.4f}', f'{dN:+.4f}', f'{dN/N_c0*100.0:+.2e} %',
+               f'{error.rel_bl_N:.2e} %']
     fields.append(p.xyz.format(mol_name=df['id'][imol]))
     return error, fields
 
@@ -237,8 +240,8 @@ def summary_line(label, err, headers, widths, separators, *, var_value=None):
 
     Args:
         label (str): Line label, e.g. 'MAE' or 'MAX'.
-        err (Error): Aggregated (mean- or max-reduced) baselined, relative, absolute and
-            electron-number-corrected baselined error.
+        err (Error): Aggregated (mean- or max-reduced) baselined, relative, absolute,
+            electron-number (absolute and relative) and electron-number-corrected baselined error.
         headers (list[str]): Table column headers, from main().
         widths (list[int]): Table column widths, from main().
         separators (list[str]): Table column separators, from main().
@@ -256,6 +259,7 @@ def summary_line(label, err, headers, widths, separators, *, var_value=None):
     if var_value is not None:
         fields[headers.index('pred var')] = f'{var_value:.2e} %'
     fields[headers.index('ΔN')] = f'{err.N:+.4f}'
+    fields[headers.index('ΔN/N')] = f'{err.N_rel:.2e} %'
     fields[headers.index('corr N')] = f'{err.rel_bl_N:.2e} %'
     blanks = [' ' * len(sep) for sep in separators]
     return format_row(fields, widths, blanks).rstrip()
@@ -326,7 +330,7 @@ def main():  # noqa: D103
         headers = ['', 'baselined', 'relative', 'absolute']
         if variances is not None:
             headers.append('pred var')
-        headers += ['nel pred', 'nel ref', 'ΔN', 'corr N', 'xyz file']
+        headers += ['nel pred', 'nel ref', 'ΔN', 'ΔN/N', 'corr N', 'xyz file']
 
         # nel_pred - nel_ref = ΔN, spelled out with real operators instead of the usual 3-space gap
         gap_after = {'nel pred': '  -  ', 'nel ref': '  =  '}
