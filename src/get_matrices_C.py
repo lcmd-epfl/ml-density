@@ -22,16 +22,22 @@ def main():  # noqa: D103
     args, o, p = get_settings(return_args=['get_gram_matrix'])
 
     if o.full_gpr:
-        # The C backend (get_a/get_b) implements only the SoR formulation. full_gpr (PITC) is
-        # deliberately Python-only and has no C counterpart: its per-molecule work is a few large dense
-        # LAPACK/BLAS operations (the Cholesky/inverse of Lambda_i and the K^T Lambda^-1 K products), so
-        # it is already BLAS-bound -- a C port would call the same libraries for no speedup, while forcing
-        # us to duplicate and keep in sync the memory-chunked, MPI-parallel reference implementation in
-        # libs/gram_matrix.py. Fail fast rather than silently producing a SoR Gram matrix, which is the
-        # wrong operator for full_gpr (regression.py's PITC branch expects K^T Lambda^-1 K, not K^T M K).
+        # The C backend (get_a/get_b) implements only the SoR formulation.
+        #
+        # PITC is deliberately Python-only and has no C counterpart: its per-molecule work is a few large
+        # dense LAPACK/BLAS operations (the Cholesky/inverse of Lambda_i and the K^T Lambda^-1 K products),
+        # so it is already BLAS-bound -- a C port would call the same libraries for no speedup, while
+        # forcing us to duplicate and keep in sync the memory-chunked, MPI-parallel reference
+        # implementation in libs/gram_matrix.py. Fail fast rather than silently producing a SoR Gram
+        # matrix, the wrong operator for PITC (regression.py expects K^T Lambda^-1 K, not K^T M K).
+        #
+        # DTC *is* the SoR formulation, so this backend would build its Gram matrix and target vector
+        # correctly -- but it does not write the ml_terms file that regression.py's sigma_p^2 fit reads,
+        # so it is excluded too until it does.
         msg = ('get_matrices_C.py (C backend) does not support full_gpr -- it implements only the SoR '
-               'formulation. Run get_matrices.py -b instead, which builds the PITC target vector and '
-               'Gram matrix together in Python.')
+               f'formulation and writes no ml_terms file. Run get_matrices.py instead (with -b for the '
+               f'Gram matrix; full_gpr = {o.full_gpr} also needs the plain invocation for the target '
+               'vector unless it is pitc, which builds both together).')
         raise RuntimeError(msg)
 
     # load molecules

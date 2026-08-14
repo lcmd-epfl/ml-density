@@ -7,7 +7,7 @@ import logging
 import numpy as np
 from .config_parser import Config
 from .config_utils import (CheckFile, WhenMissing, PathSpecs, OptSpecs, defaults, Floats, Bool, Choice,
-                           DEFAULT_DIR_GROUP, DEFAULT_DIR_KEY, DEFAULT_DIR_PLACEHOLDER)
+                           Sparsification, DEFAULT_DIR_GROUP, DEFAULT_DIR_KEY, DEFAULT_DIR_PLACEHOLDER)
 
 logger = logging.getLogger('__main__')
 
@@ -36,7 +36,7 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     'fracs'              : OptSpecs('train_fractions', np.array([1.0]), Floats(), 'Comma-separated training fractions for learning curve.'),
                     'reg'                : OptSpecs('regularisation', 1e-6, float, 'Ridge regularization strength for regression.'),
                     'jit'                : OptSpecs('jitter', 1e-10, float, 'Diagonal regularization for regression, relative to each matrix mean diagonal (so one value suits K_MM, the metric and Sigma_M alike).'),
-                    'full_gpr'           : OptSpecs('full_gpr', default=False, dtype=Bool(), help='Enable full/exact GPR via PITC sparcification, unlocking access to the variance.'),
+                    'full_gpr'           : OptSpecs('full_gpr', default=False, dtype=Sparsification('full_gpr'), help='Sparse-GPR approximation. `false` is the plain SoR fit. `pitc` and `dtc` both unlock the predictive variance; `dtc` solves the very same linear system as SoR and only adds the K**-Q** variance correction, while `pitc` also carries the per-molecule Nystrom residual D_i and so improves the mean at a higher assembly cost.'),
                     },
                 'options.soap': {
                     'soap_sigma'         : OptSpecs('soap_sigma', 0.3, float, 'Gaussian width of atomic neighbor densities in λ-SOAP power spectra.'),
@@ -154,12 +154,14 @@ def read_config(config_path=defaults.config, *, print_help=False):
         paths.weights                 = f'{p['_weightsfilebase']}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
         paths.predictions             = f'{p['_predictfilebase']}_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
         paths.predicted_coeff         = f'{p['_outfilebase']}_tf{{train_frac}}_{{order}}_{{imol}}.dat'
-        # PITC-only outputs
+        # full_gpr-only outputs (o.full_gpr in {'pitc', 'dtc'})
         # ml_terms is written next to the Gram matrix / target vector, so it follows their naming
         # (no reg suffix); sigma_f2 is written next to the weights, so it follows theirs.
+        # The Cholesky factor is of a method-dependent matrix -- Sigma_M for PITC, the SoR matrix A
+        # for DTC -- so the method is part of its name (this also keeps `cholesky_pitc` files valid).
         paths.ml_terms                = f'{p['_mltermsfilebase']}_M{o.M}_trainfrac{{train_frac}}.txt'
         paths.sigma_f2                = f'{p['_weightsfilebase']}_sigma_f2_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.txt'
-        paths.cholesky_pitc           = f'{p['_weightsfilebase']}_cholesky_pitc_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.npy'
+        paths.cholesky                = f'{p['_weightsfilebase']}_cholesky_{o.full_gpr or 'sor'}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.npy'
         paths.var_trace               = f'{p['_predictfilebase']}_vartrace_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.csv'
 
         paths.extra_kernel_nm         = f'{p['_kernelexbase']}{{}}.mts'

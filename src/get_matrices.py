@@ -15,8 +15,10 @@ logger = setup_logger(__name__, __file__)
 def main():  # noqa: D103
     args, o, p = get_settings(return_args=['get_gram_matrix', 'mpi'])
 
-    if o.full_gpr and not args.get_gram_matrix:
-        msg = 'get_matrices.py (without -b) does not support full_gpr -- run get_matrices.py -b instead, which builds both the target vector and Gram matrix together'
+    # DTC is absent from this guard: its Gram and target vector are the SoR ones
+    # (see libs/gram_matrix.py), so it needs both invocations exactly as SoR does.
+    if o.full_gpr=='pitc' and not args.get_gram_matrix:
+        msg = 'get_matrices.py (without -b) does not support full_gpr = pitc -- run get_matrices.py -b instead, which builds both the target vector and Gram matrix together'
         raise RuntimeError(msg)
 
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()

@@ -17,7 +17,7 @@ from libs.functions import Basis, Subset, make_pyscf_mol
 from libs.tmap import tmap_add
 from libs.logger_setup import setup_logger
 from libs.pitc_lib import kmm_cholesky
-from libs.variance_lib import compute_molecule_sigma, load_sigma_f2
+from libs.variance_lib import compute_molecule_sigma, load_sigma_f2, variance_scale
 
 logger = setup_logger(__name__, __file__)
 
@@ -355,7 +355,7 @@ def parse_args():
     parser.add_argument('-p', '--pred', action='store_true', help='Output only the predicted density rho_pred(r).')
     parser.add_argument('-r', '--ref', action='store_true', help='Output only the ab-initio density rho_ref(r).')
     parser.add_argument('-d', '--diff', action='store_true', help='Output only the error field rho_pred(r) - rho_ref(r).')
-    parser.add_argument('-s', '--std', action='store_true', help='Output only the predictive standard-deviation field sigma[rho(r)] = sqrt(phi(r)^T Sigma_c* phi(r)) instead of the mean density. Carries the same units as the density (e/bohr^3). Requires full_gpr=True in the config and ignores --mts.')
+    parser.add_argument('-s', '--std', action='store_true', help='Output only the predictive standard-deviation field sigma[rho(r)] = sqrt(phi(r)^T Sigma_c* phi(r)) instead of the mean density. Carries the same units as the density (e/bohr^3). Requires a full_gpr calculation in the config and ignores --mts.')
     parser.add_argument('-o', '--output', default="CUBE/",help='Prefix for output .cube files. File name constructed by <prefix><mol>[_a<atom>...][_l<l>...][_n<n>...]_<field>.cube, where <field> is ref, pred, diff or std depending on the flags and the optional a/l/n parts record an --atom/--azimuthal/--radial-channel selection (<prefix> default is CUBE/).')
     parser.add_argument('-a', '--atom', type=atom_type, nargs='+', help='Restrict the exported field to these atoms, given as element symbols (every atom of that element) or as 1-based indices into the molecule\'s block of the xyz file (that one atom). Symbols and indices may be mixed and are combined as a union, so "-a O 15" keeps every oxygen plus atom 15. Default: every atom.')
     parser.add_argument('-l', '--azimuthal', type=azimuthal_type, nargs='+', help='Restrict the exported field to these angular momenta, given as integers or spectroscopic letters (e.g. "-l 0 1" or "-l s p"). Default: every l of the basis.')
@@ -412,17 +412,18 @@ def main():  # noqa: D103
     # STD
     if args.std:
         if not o.full_gpr:
-            msg = 'Standard-deviation field requires full_gpr=True in the config (no PITC Cholesky factor exists otherwise)'
+            msg = 'Standard-deviation field requires a full_gpr calculation in the config (no Cholesky factor exists otherwise)'
             logger.info(msg)
         else:
             ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
             basis = Basis(o.basisname, elements=ref_elements)
-            l_factor = np.load(p.cholesky_pitc.format(train_frac=frac))
+            l_factor = np.load(p.cholesky.format(train_frac=frac))
             _, l_mm = kmm_cholesky(basis, ref_elements, metatensor.load(p.kernel_mm), o.jit)
 
             sigma_star = compute_molecule_sigma(basis, atomic_numbers, xyz_index, ref_elements,
                                                 l_factor, l_mm, p.kernel_nm, p.power_spectrum,
-                                                load_sigma_f2(p.sigma_f2.format(train_frac=frac)))
+                                                load_sigma_f2(p.sigma_f2.format(train_frac=frac)),
+                                                variance_scale(o))
             # Var[sum_{i in S} c_i phi_i(r)] = phi_S(r)^T Sigma_SS phi_S(r)
             sigma_star *= np.outer(keep, keep)
             sigma_star = reorder.reorder_ao(mol, sigma_star, src='gpr', dest='pyscf')

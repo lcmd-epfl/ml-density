@@ -17,23 +17,32 @@ from libs.functions import make_dummy_mol
 
 logger = logging.getLogger('__main__')
 
-def fit_sigma_f2(quad, t_dot_x, n_ao):
-    """Closed-form maximum-likelihood estimate of the kernel amplitude sigma_f^2.
+def fit_sigma_f2(quad, t_dot_x, n_ao, lam=1.0):
+    """Closed-form maximum-likelihood estimate of the kernel amplitude sigma_f^2 (the prior scale).
 
     A GP kernel factors as k(x,x') = sigma_f^2 r(x,x') with r(x,x) = 1. kernels_lib builds the
     normalized r (lambda-SOAP).
 
         log p(y) = -1/2 sigma_f^-2 y^T C_1^-1 y - N/2 log sigma_f^2 - 1/2 log|C_1| - N/2 log 2pi
 
-    log p(y) reaches a unique maximum at sigma_f^2 = y^T C_1^-1 y / N. Woodbury on 
-    C_1 = Lambda + K_NM K_MM^-1 K_MN reduces the quadratic form to 
-    y^T C_1^-1 y = sum_i y_i^T Lambda_i^-1 y_i - t^T Sigma_M^-1 t, which t the target vector and 
+    log p(y) reaches a unique maximum at sigma_f^2 = y^T C_1^-1 y / N. Woodbury on
+    C_1 = Lambda + K_NM K_MM^-1 K_MN reduces the quadratic form to
+    y^T C_1^-1 y = sum_i y_i^T Lambda_i^-1 y_i - t^T Sigma_M^-1 t, which t the target vector and
     Sigma_M the PITC marginal covariance that are already solved.
 
+    `lam` exists because the two full-GPR methods scale that identity differently. PITC solves
+    Sigma_M = K_MM + sum_i K^T Lambda_i^-1 K directly and passes both terms in that scaling, so
+    lam = 1. DTC instead solves the SoR matrix A = sum_i K^T M_i K + eta*K_MM = eta*Sigma_M, and
+    supplies the two terms unscaled by eta -- sum_i y_i^T M_i y_i (from p.coef_norms) and t^T A^-1 t
+    -- each of which is eta times its Sigma_M-scaled counterpart. Passing lam = eta divides that
+    factor back out.
+
     Args:
-        quad (float): sum_i y_i^T Lambda_i^-1 y_i, accumulated by do_work_target_pitc.
+        quad (float): sum_i y_i^T Lambda_i^-1 y_i, accumulated by do_work_target_pitc (PITC) or
+            summed from p.coef_norms (DTC, where it is sum_i y_i^T M_i y_i).
         t_dot_x (float): t^T Sigma_M^-1 t, i.e. the target vector dotted with the solved weights.
         n_ao (float): N, the total number of training AO coefficients.
+        lam (float): Scaling of the solved matrix relative to Sigma_M: 1.0 for PITC, o.reg for DTC.
 
     Returns:
         float: The fitted sigma_f^2.
@@ -47,9 +56,9 @@ def fit_sigma_f2(quad, t_dot_x, n_ao):
         msg = (f'Marginal-likelihood quadratic form y^T C^-1 y = {y_c_inv_y:.6e} is not positive '
                f'(sum_i y_i^T Lambda_i^-1 y_i = {quad:.6e}, t^T Sigma_M^-1 t = {t_dot_x:.6e}). '
                'C is positive definite by construction, so this indicates loss of precision in the '
-               'PITC assembly or the solve -- try raising jit.')
+               'assembly or the solve -- try raising jit.')
         raise RuntimeError(msg)
-    return y_c_inv_y / n_ao
+    return y_c_inv_y / (lam * n_ao)
 
 
 def jitter_scale(mat):

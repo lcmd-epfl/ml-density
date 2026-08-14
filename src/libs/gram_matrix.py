@@ -1,7 +1,8 @@
 """Compute the Gram matrix (kernel^T * metric matrix * kernel).
 
 The Gram matrix of the reference-environment kernel columns under the metric-weighted inner
-product: sum_i K_{I_i,M}^T M_i K_{I_i,M} (SoR) or sum_i K_{I_i,M}^T Lambda_i^-1 K_{I_i,M} (PITC).
+product: sum_i K_{I_i,M}^T M_i K_{I_i,M} (SoR and DTC) or sum_i K_{I_i,M}^T Lambda_i^-1 K_{I_i,M}
+(PITC).
 """
 
 import functools
@@ -228,9 +229,10 @@ def _l_mm_for_pitc(basis, ref_elem, paths, o):
         o (SimpleNamespace): Configured options (reads o.full_gpr, o.jit).
 
     Returns:
-        np.ndarray | None: l_mm (None unless o.full_gpr).
+        np.ndarray | None: l_mm (None unless o.full_gpr=='pitc'; DTC and SoR never need K_MM during
+        the assembly, only in regression.py).
     """
-    if not o.full_gpr:
+    if o.full_gpr!='pitc':
         return None
     k_MM = metatensor.load(paths.kernel_mm)
     _, l_mm = kmm_cholesky(basis, ref_elem, k_MM, o.jit)
@@ -256,9 +258,10 @@ def _l_mm_shared(basis, ref_elem, paths, o, comm):
 
     Returns:
         tuple[np.ndarray | None, mpi4py.MPI.Win | None]: the shared l_mm view and its window (both
-        None unless o.full_gpr). Keep the window referenced while l_mm is in use and Free() it after.
+        None unless o.full_gpr=='pitc'). Keep the window referenced while l_mm is in use and Free()
+        it after.
     """
-    if not o.full_gpr:
+    if o.full_gpr!='pitc':
         return None, None
     from mpi4py import MPI  # noqa: PLC0415
     node_comm = comm.Split_type(MPI.COMM_TYPE_SHARED)
@@ -276,42 +279,56 @@ def _l_mm_shared(basis, ref_elem, paths, o, comm):
     return l_mm, win
 
 
-def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices, l_mm, av_coefs, o, gram_mat, target_vec, ml_terms):
-    """Dispatch to the PITC (Gram and target together) or SoR (Gram only) accumulation for one training molecule.
+def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices, l_mm, av_coefs, coef_norms, o, gram_mat, target_vec, ml_terms):
+    """Dispatch to the PITC (Gram and target together) or SoR/DTC (Gram only) accumulation for one training molecule.
+
+    DTC shares the SoR Gram exactly (Lambda^-1 = M/eta), so it takes the same branch and only adds
+    its marginal-likelihood contribution on top -- both terms of which are already known: the
+    quadratic form y_i^T M_i y_i was tabulated by preprocess.py, and the count is the molecule's
+    number of AOs.
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
         ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
         mol_idx (int): Dataset index of the training molecule.
-        atoms_i (np.ndarray[int]): Atomic numbers of the training molecule (only used for PITC).
+        atoms_i (np.ndarray[int]): Atomic numbers of the training molecule (only used for PITC/DTC).
         paths (SimpleNamespace): Configured paths and path templates.
-        idx (np.ndarray): Sparse AO start indices, used by the SoR path.
-        ref_indices (dict[int, np.ndarray[int]]): Cached reference positions, used by the SoR path.
-        l_mm (np.ndarray | None): PITC K_MM Cholesky factor (None unless o.full_gpr).
+        idx (np.ndarray): Sparse AO start indices, used by the SoR/DTC path.
+        ref_indices (dict[int, np.ndarray[int]]): Cached reference positions, used by the SoR/DTC path.
+        l_mm (np.ndarray | None): PITC K_MM Cholesky factor (None unless o.full_gpr=='pitc').
         av_coefs (dict[int, np.ndarray] | None): Per-element l=0 averages, used by the PITC target
-            (None unless o.full_gpr).
+            (None unless o.full_gpr=='pitc').
+        coef_norms (np.ndarray | None): p.coef_norms table, column 1 holding y_i^T M_i y_i per
+            molecule (None unless o.full_gpr=='dtc').
         o (SimpleNamespace): Configured options (reads o.full_gpr, o.reg, o.jit).
         gram_mat (np.ndarray): Packed lower-triangular matrix accumulator, updated in place.
         target_vec (np.ndarray | None): Dense (nao_ref,) target-vector accumulator, updated in place
-            (None unless o.full_gpr; unused by the SoR path -- get_target_vector() builds the SoR
-            target vector separately, since it's a genuinely independent computation there, unlike
-            for PITC).
+            (None unless o.full_gpr=='pitc'; unused by the SoR/DTC path -- get_target_vector()
+            builds their target vector separately, since it's a genuinely independent computation
+            there, unlike for PITC).
         ml_terms (np.ndarray | None): Dense (2,) marginal-likelihood accumulator, updated in place
             (None unless o.full_gpr; see do_work_target_pitc).
     """
-    if o.full_gpr:
+    if o.full_gpr=='pitc':
         # o.reg plays the role of eta here -- see regression.py's PITC branch for why they're
         # the same symbol in the theory, not two separate regularization knobs.
         _accumulate_pitc(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, av_coefs, o.reg, o.jit, gram_mat, target_vec, ml_terms)
-    else:
-        do_work_gram(idx, basis.nmax, mol_idx, ref_indices, paths.metric_matrix, paths.kernel_nm, gram_mat)
+        return
+    do_work_gram(idx, basis.nmax, mol_idx, ref_indices, paths.metric_matrix, paths.kernel_nm, gram_mat)
+    if o.full_gpr=='dtc':
+        # sum_i y_i^T M_i y_i and N_T = sum_i nao_i, the two inputs to fit_sigma_f2(). The eta
+        # scaling of Eq. (24) is applied once in regression.py, not per molecule.
+        ml_terms[0] += coef_norms[mol_idx, 1]
+        ml_terms[1] += basis.nao_for_mol(atoms_i)
 
 
 def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, atomic_numbers, *, use_mpi):
     """Build and save packed Gram matrices for all requested training fractions.
 
-    When o.full_gpr, also builds and saves the target vector and the marginal-likelihood
-    accumulators alongside the Gram matrix in the same per-molecule pass (see _accumulate_pitc())
+    Under o.full_gpr=='pitc', also builds and saves the target vector alongside the Gram matrix in
+    the same per-molecule pass (see _accumulate_pitc()); SoR and DTC build theirs in
+    target_vector.get_target_vector() instead. Both full-GPR methods additionally save the
+    marginal-likelihood accumulators consumed by regression.py's sigma_p^2 fit.
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.
@@ -332,13 +349,16 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
             imol (int): Index in training_idx identifying the molecule.
         """
         mol_idx = training_idx[imol]
-        _accumulate_gram(basis, ref_elem, mol_idx, atomic_numbers[mol_idx], paths, idx, ref_indices, l_mm, av_coefs, o, gram_mat, target_vec, ml_terms)
+        _accumulate_gram(basis, ref_elem, mol_idx, atomic_numbers[mol_idx], paths, idx, ref_indices, l_mm, av_coefs, coef_norms, o, gram_mat, target_vec, ml_terms)
 
     nao_ref = basis.nao_for_mol(ref_elem)
     gram_mat = np.zeros(matsize := symsize(nao_ref))
-    target_vec = np.zeros(nao_ref) if o.full_gpr else None
+    # Only PITC builds its target vector here; SoR and DTC get theirs from get_target_vector().
+    target_vec = np.zeros(nao_ref) if o.full_gpr=='pitc' else None
+    av_coefs = tmap2averages(metatensor.load(paths.spherical_averages)) if o.full_gpr=='pitc' else None
+    coef_norms = np.load(paths.coef_norms) if o.full_gpr=='dtc' else None
+    # ml_terms feeds the sigma_p^2 fit, which both full-GPR methods do.
     ml_terms = np.zeros(2) if o.full_gpr else None
-    av_coefs = tmap2averages(metatensor.load(paths.spherical_averages)) if o.full_gpr else None
     idx = basis.sparse_indices(ref_elem)
     ref_indices = _build_ref_indices(ref_elem)
     l_mm_win = None
@@ -362,7 +382,7 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
 
     if nproc==0:
         print_batches(fracs, ntrains, paths.gram_mat)
-        if o.full_gpr:
+        if target_vec is not None:
             print_batches(fracs, ntrains, paths.target_vec)
     if use_mpi:
         MPI.COMM_WORLD.barrier()
@@ -373,8 +393,9 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
                 logger.info(f'{nproc:4d}: {imol:4d}', extra={'flush': True})
                 do_mol(imol)
             gram_mat.tofile(paths.gram_mat.format(train_frac=frac))
-            if o.full_gpr:
+            if target_vec is not None:
                 np.savetxt(paths.target_vec.format(train_frac=frac), target_vec)
+            if o.full_gpr:
                 np.savetxt(paths.ml_terms.format(train_frac=frac), ml_terms)
         if use_mpi:
             t = MPI.Wtime () - t
@@ -398,11 +419,13 @@ def get_gram_matrix(basis, ref_elem, fracs, ntrains, training_idx, paths, o, ato
                 tt = MPI.Wtime()
                 logger.info(f'batch{ifrac}: t={tt-t:4.2f}', extra={'flush': True})
                 t = tt
-            if o.full_gpr:
+            if target_vec is not None:
                 MPI.COMM_WORLD.Reduce(target_vec, TARGET_VEC if nproc==0 else None, MPI.SUM, 0)
-                MPI.COMM_WORLD.Reduce(ml_terms, ML_TERMS if nproc==0 else None, MPI.SUM, 0)
                 if nproc==0:
                     np.savetxt(paths.target_vec.format(train_frac=frac), TARGET_VEC)
+            if o.full_gpr:
+                MPI.COMM_WORLD.Reduce(ml_terms, ML_TERMS if nproc==0 else None, MPI.SUM, 0)
+                if nproc==0:
                     np.savetxt(paths.ml_terms.format(train_frac=frac), ML_TERMS)
             for i in range(div+1):
                 if (size := bufsize if i<div else rem)==0:

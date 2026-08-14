@@ -24,7 +24,7 @@ from libs.functions import Basis, Subset, get_dataset_paths, make_dummy_mol, rem
 from libs.pitc_lib import kmm_cholesky
 from libs.tmap import tmap2averages
 from libs.variance_lib import (compute_molecule_sigma, molecule_variance_trace, compute_coulomb_metric,
-                               density_self_repulsion, load_sigma_f2)
+                               density_self_repulsion, load_sigma_f2, variance_scale)
 from libs.logger_setup import setup_logger
 
 logger = setup_logger(__name__, __file__)
@@ -80,8 +80,9 @@ def main():  # noqa: D103
     args, o, p = get_settings(return_args=['training', 'extra'])
 
     if not o.full_gpr:
-        msg = 'variance.py requires full_gpr=True in the config (no PITC Cholesky factor exists otherwise)'
+        msg = 'variance.py requires full_gpr = dtc or pitc in the config (no Cholesky factor exists otherwise)'
         raise RuntimeError(msg)
+    var_scale = variance_scale(o)
 
     dataset_paths = get_dataset_paths(p, extra=args.extra)
     ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()
@@ -104,7 +105,7 @@ def main():  # noqa: D103
         subset = 'training' if args.training else 'test'
 
     for frac in frac_list:
-        l_factor = np.load(p.cholesky_pitc.format(train_frac=frac))
+        l_factor = np.load(p.cholesky.format(train_frac=frac))
         sigma_f2 = load_sigma_f2(p.sigma_f2.format(train_frac=frac))
 
         if not args.extra:
@@ -119,7 +120,7 @@ def main():  # noqa: D103
             atoms = atomic_numbers[imol]
             metric = compute_coulomb_metric(atoms, positions[imol], o.basisname)
             sigma_star = compute_molecule_sigma(basis, atoms, imol, ref_elements, l_factor, l_mm,
-                                                 dataset_paths.kernel, dataset_paths.power, sigma_f2)
+                                                 dataset_paths.kernel, dataset_paths.power, sigma_f2, var_scale)
             var_coul = molecule_variance_trace(sigma_star, metric)
             coeffs = load_predicted_coeffs(c_fmter, o, atoms, imol)
             rho_bl_coul = density_self_repulsion(remove_averages(basis.index(atoms), coeffs, av_coefs), metric)

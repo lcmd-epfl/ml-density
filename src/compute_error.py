@@ -147,7 +147,7 @@ def load_variances(o, p, training, frac):
         return None, None
     path = p.var_trace.format(subset='training' if training else 'test', train_frac=frac)
     if not os.path.exists(path):
-        logger.info(f'full_gpr=True but {path} does not exist -- run variance.py to include predicted variance here')
+        logger.info(f'full_gpr={o.full_gpr} but {path} does not exist -- run variance.py to include predicted variance here')
         return None, None
     var_df = pd.read_csv(path)
     relative = dict(zip(var_df['mol_idx'], var_df['var_relative'], strict=True))

@@ -156,3 +156,60 @@ class Choice:
                 raise RuntimeError(msg)
             logger.warning(f'`{x}` not in the recommended options {self.options} for `{self.name}`')
         return x
+
+
+class Sparsification(Choice):
+    """Parser selecting the sparse-GPR approximation: `false | pitc | dtc`.
+
+    Parsed to the union `False | 'pitc' | 'dtc'` rather than to a plain string, so that the many
+    `if o.full_gpr:` sites throughout the pipeline keep meaning "is this a full-GPR run?": `False`
+    is falsy while both method names are truthy. A plain `Choice(str, ['false', 'pitc', 'dtc'])`
+    would return the *string* `'false'`, which is truthy, and would silently turn every one of
+    those guards on.
+
+    The former boolean spelling `true` is rejected rather than aliased to `pitc`: `full_gpr = true`
+    used to mean PITC, and silently keeping that meaning would hide the choice this option now
+    carries.
+    """
+    __name__ = 'Sparsification'
+
+    OFF = 'false'
+    TRUTHY = frozenset({'1', 'true', 'on', 'yes'})
+
+    def __init__(self, name):
+        """Initialize a Sparsification instance.
+
+        Args:
+            name (str): Option name (for logging/error messages).
+        """
+        super().__init__(str, [self.OFF, 'pitc', 'dtc'], name)
+
+    def __call__(self, x):
+        """Parse the sparsification method.
+
+        Args:
+            x (str): Raw input value.
+
+        Returns:
+            bool | str: `False` for the SoR path, otherwise `'pitc'` or `'dtc'`.
+
+        Raises:
+            RuntimeError: Value is a boolean truthy spelling, or not one of the accepted options.
+        """
+        if (x := x.strip().lower()) in self.TRUTHY:
+            msg = (f'`{self.name} = {x}` is no longer accepted: it used to select PITC, but PITC is '
+                   f'now one of several sparsifications. Write `{self.name} = pitc` for the previous '
+                   f'behaviour, or `{self.name} = dtc`.')
+            raise RuntimeError(msg)
+        return False if (x := super().__call__(x)) == self.OFF else x
+
+    def str(self, x):
+        """Render a parsed value back to its configuration spelling.
+
+        Args:
+            x (bool | str): Parsed value.
+
+        Returns:
+            str: The spelling accepted by __call__.
+        """
+        return self.OFF if x is False else x
