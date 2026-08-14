@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run PITC whole-molecule predictive-variance computation for train/test/extrapolation subsets.
+"""Run the sparse-GP whole-molecule predictive-variance computation for train/test/extrapolation subsets.
 
 Reports one number per molecule, computed a priori without the reference coefficients c0:
 
@@ -79,8 +79,8 @@ def load_predicted_coeffs(c_fmter, o, atoms, imol):
 def main():  # noqa: D103
     args, o, p = get_settings(return_args=['training', 'extra'])
 
-    if not o.full_gpr:
-        msg = 'variance.py requires full_gpr = dtc or pitc in the config (no Cholesky factor exists otherwise)'
+    if not o.is_gpr:
+        msg = 'variance.py requires regression_model = gpr_DTC or gpr_PITC in the config (no Cholesky factor exists otherwise)'
         raise RuntimeError(msg)
     var_scale = variance_scale(o)
 

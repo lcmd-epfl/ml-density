@@ -7,7 +7,7 @@ train_size = 2048
 train_fractions = 1.0
 regularisation = 1e-6
 jitter = 1e-10
-full_gpr = false
+regression_model = sagpr
 
 [options.soap]
 soap_sigma = 0.3
@@ -26,7 +26,7 @@ output_coeff_order = gpr
 process_metric = true
 
 [paths]
-default_dir = INNER_SoR/
+default_dir = INNER_sagpr/
 
 [paths.input]
 dataset          = dataset.csv

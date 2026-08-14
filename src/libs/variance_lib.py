@@ -16,6 +16,7 @@ from qstack import reorder
 from libs.kernels_lib import kernel_block_to_dense_rect, kernel_block_to_dense_self, kernel_mm
 from libs.tmap import merge_ref_ps
 from libs.functions import make_pyscf_mol
+from libs.config_utils import GPR_DTC
 
 logger = logging.getLogger('__main__')
 
@@ -40,18 +41,18 @@ def load_sigma_f2(path):
 def variance_scale(o):
     """Scaling of the K_*M (L L^T)^-1 K_M* term implied by which matrix regression.py factorized.
 
-    Both full-GPR methods evaluate Sigma_c* = sigma_p^2 [K_** - Q_** + K_*M Sigma_M^-1 K_M*], but
-    they persist Cholesky factors of different matrices. PITC factorizes Sigma_M itself, so the term
-    comes out directly. DTC factorizes the SoR matrix A = eta*Sigma_M, so its V^T V is
+    Both GP models evaluate Sigma_c* = sigma_p^2 [K_** - Q_** + K_*M Sigma_M^-1 K_M*], but
+    they persist Cholesky factors of different matrices. gpr_PITC factorizes Sigma_M itself, so the term
+    comes out directly. gpr_DTC factorizes the SA-GPR matrix A = eta*Sigma_M, so its V^T V is
     K_*M A^-1 K_M* = K_*M Sigma_M^-1 K_M* / eta and has to be multiplied back by eta.
 
     Args:
-        o (SimpleNamespace): Configured options (reads o.full_gpr, o.reg).
+        o (SimpleNamespace): Configured options (reads o.regression_model, o.reg).
 
     Returns:
         float: The multiplier to pass to compute_molecule_sigma as var_scale.
     """
-    return o.reg if o.full_gpr=='dtc' else 1.0
+    return o.reg if o.regression_model==GPR_DTC else 1.0
 
 
 def compute_molecule_sigma(basis, atoms_star, mol_idx, ref_elem, l_factor, l_mm, path_kern, path_ps, sigma_f2=1.0, var_scale=1.0):
@@ -63,7 +64,7 @@ def compute_molecule_sigma(basis, atoms_star, mol_idx, ref_elem, l_factor, l_mm,
 
     The same expression serves DTC and PITC : the two differ only in the
     matrix L factorizes, which var_scale compensates -- see variance_scale(). The leading
-    K_** - Q_** residual is what both have and SoR does not, and is why their predictive variance
+    K_** - Q_** residual is what both have and SA-GPR does not, and is why their predictive variance
     grows back toward the prior far from the reference set instead of collapsing.
 
     The kernel amplitude enters as a single multiplicative factor (see pitc_lib.fit_sigma_f2), so it
@@ -76,7 +77,7 @@ def compute_molecule_sigma(basis, atoms_star, mol_idx, ref_elem, l_factor, l_mm,
         mol_idx (int): Dataset index of the query molecule.
         ref_elem (np.ndarray[int]): Reference-environment atomic numbers.
         l_factor (np.ndarray): Persisted lower Cholesky factor from regression.py (nao_ref, nao_ref):
-            of Sigma_M for PITC, of the SoR matrix eta*Sigma_M for DTC.
+            of Sigma_M for gpr_PITC, of the SA-GPR matrix eta*Sigma_M for gpr_DTC.
         l_mm (np.ndarray): Lower Cholesky factor of the jittered K_MM, from pitc_lib.kmm_cholesky.
         path_kern (str): Template path to K_{query,M} kernel files.
         path_ps (str): Template path to the query molecule's own power spectrum.

@@ -355,7 +355,7 @@ def parse_args():
     parser.add_argument('-p', '--pred', action='store_true', help='Output only the predicted density rho_pred(r).')
     parser.add_argument('-r', '--ref', action='store_true', help='Output only the ab-initio density rho_ref(r).')
     parser.add_argument('-d', '--diff', action='store_true', help='Output only the error field rho_pred(r) - rho_ref(r).')
-    parser.add_argument('-s', '--std', action='store_true', help='Output only the predictive standard-deviation field sigma[rho(r)] = sqrt(phi(r)^T Sigma_c* phi(r)) instead of the mean density. Carries the same units as the density (e/bohr^3). Requires a full_gpr calculation in the config and ignores --mts.')
+    parser.add_argument('-s', '--std', action='store_true', help='Output only the predictive standard-deviation field sigma[rho(r)] = sqrt(phi(r)^T Sigma_c* phi(r)) instead of the mean density. Carries the same units as the density (e/bohr^3). Requires regression_model = gpr_DTC or gpr_PITC in the config and ignores --mts.')
     parser.add_argument('-o', '--output', default="CUBE/",help='Prefix for output .cube files. File name constructed by <prefix><mol>[_a<atom>...][_l<l>...][_n<n>...]_<field>.cube, where <field> is ref, pred, diff or std depending on the flags and the optional a/l/n parts record an --atom/--azimuthal/--radial-channel selection (<prefix> default is CUBE/).')
     parser.add_argument('-a', '--atom', type=atom_type, nargs='+', help='Restrict the exported field to these atoms, given as element symbols (every atom of that element) or as 1-based indices into the molecule\'s block of the xyz file (that one atom). Symbols and indices may be mixed and are combined as a union, so "-a O 15" keeps every oxygen plus atom 15. Default: every atom.')
     parser.add_argument('-l', '--azimuthal', type=azimuthal_type, nargs='+', help='Restrict the exported field to these angular momenta, given as integers or spectroscopic letters (e.g. "-l 0 1" or "-l s p"). Default: every l of the basis.')
@@ -385,7 +385,7 @@ def main():  # noqa: D103
         args.ref = True
         args.pred = True
         args.diff = True
-        if o.full_gpr:
+        if o.is_gpr:
             args.std = True
         logger.info(f'All output fields ({", ".join([f for f in ["std", "ref", "pred", "diff"] if getattr(args, f)])}) will be written.')
 
@@ -411,8 +411,8 @@ def main():  # noqa: D103
 
     # STD
     if args.std:
-        if not o.full_gpr:
-            msg = 'Standard-deviation field requires a full_gpr calculation in the config (no Cholesky factor exists otherwise)'
+        if not o.is_gpr:
+            msg = 'Standard-deviation field requires regression_model = gpr_DTC or gpr_PITC in the config (no Cholesky factor exists otherwise)'
             logger.info(msg)
         else:
             ref_elements = pd.read_csv(p.reference_environments)['q'].to_numpy()

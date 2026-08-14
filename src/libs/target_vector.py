@@ -53,8 +53,8 @@ def do_work_target_pitc(mol_idx, paths, basis, atoms_i, av_coefs, l_lambda_i, v_
     coefficient vector, rebuilt from p.clean_coefficients and p.spherical_averages exactly as
     preprocess.py built it before projecting.
 
-    The SoR path contracts the kernel against the *projection* w_i = metric_i y_i (p.projection),
-    so it never needs y_i itself; PITC does, because Lambda_i is not proportional to metric_i.
+    The SA-GPR path contracts the kernel against the *projection* w_i = metric_i y_i (p.projection),
+    so it never needs y_i itself; gpr_PITC does, because Lambda_i is not proportional to metric_i.
     Recovering it as metric_i^-1 w_i is algebraically equivalent but numerically lossy: the metric
     has cond ~1e7 here, and the round-trip returns y_i to only ~1e-6 relative accuracy (measured on
     QM7/cc-pvdz-jkfit) instead of the ~1e-16 the direct read gives. It also cost a Cholesky
@@ -90,7 +90,7 @@ def do_work_target_pitc(mol_idx, paths, basis, atoms_i, av_coefs, l_lambda_i, v_
 def get_target_vector(basis, ref_elem, fracs, ntrains, training_idx, paths):
     """Build and save target vectors for all requested training fractions.
 
-    SoR only (full_GPR=False)
+    SA-GPR and gpr_DTC only -- gpr_PITC builds its target vector in gram_matrix.py instead.
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.

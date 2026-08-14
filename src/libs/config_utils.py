@@ -158,58 +158,57 @@ class Choice:
         return x
 
 
-class Sparsification(Choice):
-    """Parser selecting the sparse-GPR approximation: `false | pitc | dtc`.
+SAGPR = 'sagpr'
+GPR_DTC = 'gpr_DTC'
+GPR_PITC = 'gpr_PITC'
+GPR_MODELS = (GPR_DTC, GPR_PITC)
 
-    Parsed to the union `False | 'pitc' | 'dtc'` rather than to a plain string, so that the many
-    `if o.full_gpr:` sites throughout the pipeline keep meaning "is this a full-GPR run?": `False`
-    is falsy while both method names are truthy. A plain `Choice(str, ['false', 'pitc', 'dtc'])`
-    would return the *string* `'false'`, which is truthy, and would silently turn every one of
-    those guards on.
 
-    The former boolean spelling `true` is rejected rather than aliased to `pitc`: `full_gpr = true`
-    used to mean PITC, and silently keeping that meaning would hide the choice this option now
-    carries.
+class RegressionModel(Choice):
+    """Parser selecting the regression model: `sagpr | gpr_DTC | gpr_PITC`.
+
+    - `sagpr`    the deterministic symmetry-adapted GPR fit, which yields a prediction without uncertainty;
+                 Grisafi et al. (2019) & Fabrizio et al. (2019)
+    - `gpr_DTC`  the Deterministic Training Conditional sparse GP, 
+                 which leads to the same prediction but adds a posterior;
+    - `gpr_PITC` the Partially Independent Training Conditional sparse GP, which additionally
+                 carries the per-molecule Nystrom residual D_i=K_ii - K_iM K_MM K_Mi.
+
+    Values are matched case-insensitively.
+
+    The retired spellings of the former `full_gpr` option are rejected rather than aliased.
     """
-    __name__ = 'Sparsification'
+    __name__ = 'RegressionModel'
 
-    OFF = 'false'
-    TRUTHY = frozenset({'1', 'true', 'on', 'yes'})
+    # Retired `full_gpr` spellings -> the model they used to select.
+    RETIRED = {'1': GPR_PITC, 'true': GPR_PITC, 'on': GPR_PITC, 'yes': GPR_PITC, 'pitc': GPR_PITC,
+               '0': SAGPR, 'false': SAGPR, 'off': SAGPR, 'no': SAGPR, 'sor': SAGPR, 'dtc': GPR_DTC}
 
     def __init__(self, name):
-        """Initialize a Sparsification instance.
+        """Initialize a RegressionModel instance.
 
         Args:
             name (str): Option name (for logging/error messages).
         """
-        super().__init__(str, [self.OFF, 'pitc', 'dtc'], name)
+        super().__init__(str, [SAGPR, GPR_DTC, GPR_PITC], name)
+        self._canonical = {value.lower(): value for value in self.options}
 
     def __call__(self, x):
-        """Parse the sparsification method.
+        """Parse the regression model.
 
         Args:
-            x (str): Raw input value.
+            x (str): Raw input value, matched case-insensitively.
 
         Returns:
-            bool | str: `False` for the SoR path, otherwise `'pitc'` or `'dtc'`.
+            str: One of SAGPR, GPR_DTC, GPR_PITC.
 
         Raises:
-            RuntimeError: Value is a boolean truthy spelling, or not one of the accepted options.
+            RuntimeError: Value is a retired `full_gpr` spelling, or not one of the accepted options.
         """
-        if (x := x.strip().lower()) in self.TRUTHY:
-            msg = (f'`{self.name} = {x}` is no longer accepted: it used to select PITC, but PITC is '
-                   f'now one of several sparsifications. Write `{self.name} = pitc` for the previous '
-                   f'behaviour, or `{self.name} = dtc`.')
+        x = x.strip().lower()
+        if x not in self._canonical and x in self.RETIRED:
+            msg = (f'`{self.name} = {x}` is a retired spelling of the old `full_gpr` option. '
+                   f'Write `{self.name} = {self.RETIRED[x]}` instead (accepted values: '
+                   f'{self.options}).')
             raise RuntimeError(msg)
-        return False if (x := super().__call__(x)) == self.OFF else x
-
-    def str(self, x):
-        """Render a parsed value back to its configuration spelling.
-
-        Args:
-            x (bool | str): Parsed value.
-
-        Returns:
-            str: The spelling accepted by __call__.
-        """
-        return self.OFF if x is False else x
+        return super().__call__(self._canonical.get(x, x))

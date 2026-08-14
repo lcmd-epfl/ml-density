@@ -7,7 +7,7 @@ import logging
 import numpy as np
 from .config_parser import Config
 from .config_utils import (CheckFile, WhenMissing, PathSpecs, OptSpecs, defaults, Floats, Bool, Choice,
-                           Sparsification, DEFAULT_DIR_GROUP, DEFAULT_DIR_KEY, DEFAULT_DIR_PLACEHOLDER)
+                           RegressionModel, SAGPR, DEFAULT_DIR_GROUP, DEFAULT_DIR_KEY, DEFAULT_DIR_PLACEHOLDER)
 
 logger = logging.getLogger('__main__')
 
@@ -36,7 +36,7 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     'fracs'              : OptSpecs('train_fractions', np.array([1.0]), Floats(), 'Comma-separated training fractions for learning curve.'),
                     'reg'                : OptSpecs('regularisation', 1e-6, float, 'Ridge regularization strength for regression.'),
                     'jit'                : OptSpecs('jitter', 1e-10, float, 'Diagonal regularization for regression, relative to each matrix mean diagonal (so one value suits K_MM, the metric and Sigma_M alike).'),
-                    'full_gpr'           : OptSpecs('full_gpr', default=False, dtype=Sparsification('full_gpr'), help='Sparse-GPR approximation. `false` is the plain SoR fit. `pitc` and `dtc` both unlock the predictive variance; `dtc` solves the very same linear system as SoR and only adds the K**-Q** variance correction, while `pitc` also carries the per-molecule Nystrom residual D_i and so improves the mean at a higher assembly cost.'),
+                    'regression_model'   : OptSpecs('regression_model', default=SAGPR, dtype=RegressionModel('regression_model'), help='Which model to fit. All three are sparse over the M reference environments. `sagpr` is the deterministic SA-GPR fit and produces no uncertainty. `gpr_DTC` and `gpr_PITC` are sparse Gaussian processes and unlock the predictive variance; gpr_DTC solves the very same linear system as sagpr and only adds the K**-Q** variance correction, while gpr_PITC also carries the per-molecule Nystrom residual D_i and so improves the mean at a higher assembly cost.'),
                     },
                 'options.soap': {
                     'soap_sigma'         : OptSpecs('soap_sigma', 0.3, float, 'Gaussian width of atomic neighbor densities in λ-SOAP power spectra.'),
@@ -124,6 +124,7 @@ def read_config(config_path=defaults.config, *, print_help=False):
         o = dict(ChainMap(*[d for group, d in parsed.items() if group.startswith('options.')]))
         if o['use_charges']=='none':
             o['use_charges'] = None
+        o['is_gpr'] = o['regression_model']!=SAGPR
         return SimpleNamespace(o)
 
     def postprocess_paths(parsed, o):
@@ -154,14 +155,14 @@ def read_config(config_path=defaults.config, *, print_help=False):
         paths.weights                 = f'{p['_weightsfilebase']}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
         paths.predictions             = f'{p['_predictfilebase']}_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
         paths.predicted_coeff         = f'{p['_outfilebase']}_tf{{train_frac}}_{{order}}_{{imol}}.dat'
-        # full_gpr-only outputs (o.full_gpr in {'pitc', 'dtc'})
+        # GP-only outputs (o.is_gpr)
         # ml_terms is written next to the Gram matrix / target vector, so it follows their naming
         # (no reg suffix); sigma_f2 is written next to the weights, so it follows theirs.
-        # The Cholesky factor is of a method-dependent matrix -- Sigma_M for PITC, the SoR matrix A
-        # for DTC -- so the method is part of its name (this also keeps `cholesky_pitc` files valid).
+        # The Cholesky factor is of a model-dependent matrix -- Sigma_M for gpr_PITC, the SA-GPR
+        # matrix A for gpr_DTC -- so the model is part of its name.
         paths.ml_terms                = f'{p['_mltermsfilebase']}_M{o.M}_trainfrac{{train_frac}}.txt'
         paths.sigma_f2                = f'{p['_weightsfilebase']}_sigma_f2_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.txt'
-        paths.cholesky                = f'{p['_weightsfilebase']}_cholesky_{o.full_gpr or 'sor'}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.npy'
+        paths.cholesky                = f'{p['_weightsfilebase']}_cholesky_{o.regression_model}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.npy'
         paths.var_trace               = f'{p['_predictfilebase']}_vartrace_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.csv'
 
         paths.extra_kernel_nm         = f'{p['_kernelexbase']}{{}}.mts'

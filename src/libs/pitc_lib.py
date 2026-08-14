@@ -1,6 +1,6 @@
 """PITC (Partially Independent Training Conditional) sparsification helpers.
 
-Shared by the full_gpr=True branches of target_vector.py/gram_matrix.py/regression.py to
+Shared by the sparse-GP (gpr_PITC/gpr_DTC) branches of target_vector.py/gram_matrix.py/regression.py to
 build, per training molecule i, the precision matrix Lambda_i = D_i + eta*metric_i^-1, with
 D_i = K_{I_i,I_i} - K_{I_i,M} K_MM^-1 K_{M,I_i} (all three matrices are block-diagonal per molecule),
 and the shared K_MM Cholesky factor both target_vector.py and gram_matrix.py need.
@@ -30,9 +30,9 @@ def fit_sigma_f2(quad, t_dot_x, n_ao, lam=1.0):
     y^T C_1^-1 y = sum_i y_i^T Lambda_i^-1 y_i - t^T Sigma_M^-1 t, which t the target vector and
     Sigma_M the PITC marginal covariance that are already solved.
 
-    `lam` exists because the two full-GPR methods scale that identity differently. PITC solves
+    `lam` exists because the two GP models scale that identity differently. PITC solves
     Sigma_M = K_MM + sum_i K^T Lambda_i^-1 K directly and passes both terms in that scaling, so
-    lam = 1. DTC instead solves the SoR matrix A = sum_i K^T M_i K + eta*K_MM = eta*Sigma_M, and
+    lam = 1. gpr_DTC instead solves the SA-GPR matrix A = sum_i K^T M_i K + eta*K_MM = eta*Sigma_M, and
     supplies the two terms unscaled by eta -- sum_i y_i^T M_i y_i (from p.coef_norms) and t^T A^-1 t
     -- each of which is eta times its Sigma_M-scaled counterpart. Passing lam = eta divides that
     factor back out.
@@ -150,7 +150,7 @@ def molecule_lambda_chol_knm(basis, ref_elem, mol_idx, atoms_i, paths, l_mm, eta
         paths (SimpleNamespace): Configured paths and path templates.
         l_mm (np.ndarray): Lower Cholesky factor of the dense K_MM, from kmm_cholesky().
         eta (float): Noise scale (the theory document's eta; callers pass o.reg -- eta and the
-            SoR path's regularization coefficient are the same symbol in the theory, see
+            SA-GPR path's regularization coefficient are the same symbol in the theory, see
             regression.py's PITC branch).
         jit (float): Relative diagonal jitter added for numerical stability
 

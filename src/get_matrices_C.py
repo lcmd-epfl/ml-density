@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Assemble the regression Gram matrix and target vector (C backend, SoR only).
+"""Assemble the regression Gram matrix and target vector (C backend, SA-GPR only).
 
-full_gpr (PITC) is not implemented here -- run the Python get_matrices.py for it. See the guard
-in main() for the rationale.
+The sparse-GP models (gpr_PITC, gpr_DTC) are not implemented here -- run the Python
+get_matrices.py for them. See the guard in main() for the rationale.
 """
 
 import sys
@@ -21,23 +21,23 @@ logger = setup_logger(__name__, __file__)
 def main():  # noqa: D103
     args, o, p = get_settings(return_args=['get_gram_matrix'])
 
-    if o.full_gpr:
-        # The C backend (get_a/get_b) implements only the SoR formulation.
+    if o.is_gpr:
+        # The C backend (get_a/get_b) implements only the SA-GPR formulation.
         #
         # PITC is deliberately Python-only and has no C counterpart: its per-molecule work is a few large
         # dense LAPACK/BLAS operations (the Cholesky/inverse of Lambda_i and the K^T Lambda^-1 K products),
         # so it is already BLAS-bound -- a C port would call the same libraries for no speedup, while
         # forcing us to duplicate and keep in sync the memory-chunked, MPI-parallel reference
-        # implementation in libs/gram_matrix.py. Fail fast rather than silently producing a SoR Gram
-        # matrix, the wrong operator for PITC (regression.py expects K^T Lambda^-1 K, not K^T M K).
+        # implementation in libs/gram_matrix.py. Fail fast rather than silently producing an SA-GPR Gram
+        # matrix, the wrong operator for gpr_PITC (regression.py expects K^T Lambda^-1 K, not K^T M K).
         #
-        # DTC *is* the SoR formulation, so this backend would build its Gram matrix and target vector
+        # gpr_DTC solves the SA-GPR system, so this backend would build its Gram matrix and target vector
         # correctly -- but it does not write the ml_terms file that regression.py's sigma_p^2 fit reads,
         # so it is excluded too until it does.
-        msg = ('get_matrices_C.py (C backend) does not support full_gpr -- it implements only the SoR '
-               f'formulation and writes no ml_terms file. Run get_matrices.py instead (with -b for the '
-               f'Gram matrix; full_gpr = {o.full_gpr} also needs the plain invocation for the target '
-               'vector unless it is pitc, which builds both together).')
+        msg = (f'get_matrices_C.py (C backend) does not support regression_model = {o.regression_model} '
+               '-- it implements only the SA-GPR formulation and writes no ml_terms file. Run '
+               'get_matrices.py instead (with -b for the Gram matrix; gpr_DTC also needs the plain '
+               'invocation for the target vector, gpr_PITC builds both together).')
         raise RuntimeError(msg)
 
     # load molecules

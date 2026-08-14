@@ -8,7 +8,7 @@
 #SBATCH --time=5-00:00:00
 #SBATCH --output=logs/qm7-%j.out
 #
-# Full SA-GPR / lambda-SOAP pipeline for the QM7 set, full_gpr=true.
+# Full SA-GPR / lambda-SOAP pipeline for the QM7 set, regression_model=gpr_PITC.
 # Runs training -> prediction -> extrapolation for the src/*.py pipeline.
 #
 # One config file per basis selects everything (basis name, metric input dir, coeffs filename
@@ -18,7 +18,7 @@
 #     config_dz.txt      -> cc-pvdz-jkfit      -> metric/      -> default_dir = INNER/
 #     config_tz.txt      -> cc-pvtz-jkfit      -> metric_tz/   -> default_dir = INNER_tz/
 #     config_aqz.txt     -> aug-cc-pvqz-jkfit  -> metric_aqz/  -> default_dir = INNER_aqz/
-#     config_dz_SoR.txt  -> cc-pvdz-jkfit      -> metric/      -> default_dir = INNER_SoR/  (full_gpr=false, see run_SoR.bash)
+#     config_dz_sagpr.txt  -> cc-pvdz-jkfit      -> metric/      -> default_dir = INNER_sagpr/  (regression_model=sagpr, see run_sagpr.bash)
 #
 # Submit from THIS directory (QM7_test) so the relative paths in the config resolve.
 #
@@ -120,9 +120,9 @@ run_step "power_spectra_reference"       "$src/power_spectra_reference.py --conf
 run_step "kernel_mm"                     "$src/kernel_mm.py --config=$cfg"                          # K_MM
 run_step "kernel_nm"                     "$MPI $src/kernel_nm.py --config=$cfg"                     # K_NM (MPI)
 run_step "get_matrices"                  "$MPI $src/get_matrices.py -b --config=$cfg"               # full GPR: -b builds A and B (MPI)
-run_step "regression"                    "$src/regression.py --config=$cfg"                         # solve -> weights (+ PITC Cholesky)
+run_step "regression"                    "$src/regression.py --config=$cfg"                         # solve -> weights (+ GP Cholesky)
 run_step "prediction"                    "$src/prediction.py --config=$cfg"                         # predict test-set coefficients
-run_step "variance"                      "$src/variance.py --config=$cfg"                           # PITC predictive variance
+run_step "variance"                      "$src/variance.py --config=$cfg"                           # sparse-GP predictive variance
 run_step "compute_error"                 "$src/compute_error.py --config=$cfg > error_gpr_${SLURM_JOB_NAME:-?}.txt"
 
 # --- extrapolation / out-of-sample (extra/qm7_extra.xyz) ---

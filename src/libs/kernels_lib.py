@@ -64,7 +64,7 @@ def kernel_block_to_dense_rect(basis, atoms_left, elem_right, k_tmap):
     prediction einsum ('mMr,rMn->mn') and regression.fill_matrix()'s diagonal-in-n placement. A full
     np.tile(dk, (nsize, nsize)) broadcast would instead couple every (n_left, n_right) pair, which is
     a different, rank-deficient operator (rank msize per block, ~nsize too large) inconsistent with
-    prediction -- the cause of the earlier full_gpr fit failure.
+    prediction -- the cause of the earlier sparse-GP fit failure.
 
     Args:
         basis (.functions.Basis): Basis used for AO indexing.

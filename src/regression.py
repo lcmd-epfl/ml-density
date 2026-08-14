@@ -9,6 +9,7 @@ from numba import jit
 import metatensor
 from libs.tmap import vector2tmap
 from libs.config import get_settings
+from libs.config_utils import GPR_DTC, GPR_PITC
 from libs.functions import Basis
 from libs.pitc_lib import kmm_cholesky, robust_cholesky, fit_sigma_f2
 from libs.logger_setup import setup_logger
@@ -27,10 +28,10 @@ def main():  # noqa: D103
 
     logger.debug(f'problem dimensionality = {nao_ref}')
 
-    def save_full_gpr(frac, mat, target_vec, lam, jit):
-        """Cholesky-solve one full-GPR system, then save the factor, the prior scale and the weights.
+    def save_gpr(frac, mat, target_vec, lam, jit):
+        """Cholesky-solve one sparse-GP system, then save the factor, the prior scale and the weights.
 
-        Shared by the PITC and DTC branches, which differ only in the matrix handed in: PITC's
+        Shared by the gpr_PITC and gpr_DTC branches, which differ only in the matrix handed in: PITC's
         Sigma_M = Gram + K_MM, DTC's A = Gram + eta*K_MM = eta*Sigma_M. That single factor of eta
         is what `lam` carries into the sigma_p^2 fit; it cancels from the weights themselves, since
         DTC's target vector is eta times PITC's in the same way. This multiplication by eta is
@@ -42,11 +43,11 @@ def main():  # noqa: D103
             target_vec (np.ndarray): The right-hand side.
             lam (float): Scaling of `mat` relative to Sigma_M (1.0 for PITC, o.reg for DTC).
             jit (float): Relative jitter robust_cholesky starts from. o.jit for PITC; 0.0 for DTC,
-                whose jitter is already inside `mat` in SoR's absolute convention (see the branch).
+                whose jitter is already inside `mat` in SA-GPR's absolute convention (see the branch).
         """
         L, used_jit = robust_cholesky(mat, jit)
         if used_jit!=jit:
-            logger.warning(f'{o.full_gpr} system needed relative jitter {used_jit} (bigger than {jit}) to be positive definite')
+            logger.warning(f'{o.regression_model} system needed relative jitter {used_jit} (bigger than {jit}) to be positive definite')
         x = spl.cho_solve((L, True), target_vec)
         np.save(p.cholesky.format(train_frac=frac), L)
 
@@ -57,7 +58,7 @@ def main():  # noqa: D103
 
         metatensor.save(p.weights.format(train_frac=frac), vector2tmap(ref_elements, basis.llist, x))
 
-    if o.full_gpr=='pitc':
+    if o.regression_model==GPR_PITC:
         k_MM_tmap = metatensor.load(p.kernel_mm)
         k_mm_dense, _ = kmm_cholesky(basis, ref_elements, k_MM_tmap, o.jit)
 
@@ -66,7 +67,7 @@ def main():  # noqa: D103
             mat[:] = 0
             unravel_tril(mat, np.fromfile(p.gram_mat.format(train_frac=frac)), 0.0)
             mat += k_mm_dense
-            save_full_gpr(frac, mat, target_vec, lam=1.0, jit=o.jit)
+            save_gpr(frac, mat, target_vec, lam=1.0, jit=o.jit)
     else:
         k_MM = metatensor.load(p.kernel_mm)
         idx = basis.sparse_indices(ref_elements)
@@ -74,13 +75,14 @@ def main():  # noqa: D103
         for frac in o.fracs:
             target_vec = np.loadtxt(p.target_vec.format(train_frac=frac))
             mat[:] = 0
-            # DTC solves the same system as SoR. 
-            # the two share this call unchanged -- including o.jit as an *absolute* diagonal
+            # gpr_DTC solves the same system as SA-GPR, so the two share this call unchanged --
+            # including o.jit as an *absolute* diagonal addition, unlike the relative jitter the GP
+            # models use elsewhere.
             fill_matrix(mat, k_MM, p.gram_mat.format(train_frac=frac), idx, basis.nmax, o.jit, o.reg)
-            if o.full_gpr=='dtc':
+            if o.regression_model==GPR_DTC:
                 # robust_cholesky starts at 0 and escalates only if the factorization actually
-                # fails, so DTC and SoR solve one and the same matrix.
-                save_full_gpr(frac, mat, target_vec, lam=o.reg, jit=0.0)
+                # fails, so gpr_DTC and SA-GPR solve one and the same matrix.
+                save_gpr(frac, mat, target_vec, lam=o.reg, jit=0.0)
                 continue
             weights = spl.solve(mat, target_vec, assume_a='sym', lower=True, overwrite_a=True, overwrite_b=True)
             weights = vector2tmap(ref_elements, basis.llist, weights)

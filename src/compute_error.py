@@ -140,14 +140,14 @@ def load_variances(o, p, training, frac):
         tuple[dict[int, float] | None, dict[int, float] | None]: Mappings from dataset molecule index
         to (a) the dimensionless predicted variance relative to the baselined density, as a
         percentage, and (b) the raw Tr(Sigma_c* M) in Hartree, used for the calibration check. Both
-        are None if full_gpr is disabled or variance.py hasn't been run yet for this subset/fraction;
+        are None if the regression model is not a GP or variance.py hasn't been run yet for this subset/fraction;
         the second alone is None for CSVs written before var_absolute was recorded.
     """
-    if not o.full_gpr:
+    if not o.is_gpr:
         return None, None
     path = p.var_trace.format(subset='training' if training else 'test', train_frac=frac)
     if not os.path.exists(path):
-        logger.info(f'full_gpr={o.full_gpr} but {path} does not exist -- run variance.py to include predicted variance here')
+        logger.info(f'regression_model={o.regression_model} but {path} does not exist -- run variance.py to include predicted variance here')
         return None, None
     var_df = pd.read_csv(path)
     relative = dict(zip(var_df['mol_idx'], var_df['var_relative'], strict=True))

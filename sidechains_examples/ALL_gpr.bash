@@ -1,6 +1,6 @@
 path=../src
 
-# Requires full_gpr = true in config.txt
+# Requires regression_model = gpr_PITC in config.txt
 
 $path/preprocess.py
 $path/training_selection.py
@@ -9,7 +9,7 @@ $path/select_reference_environments.py
 $path/power_spectra_reference.py
 $path/kernel_mm.py
 $path/kernel_nm.py
-$path/get_matrices.py -b   # also computes the target vector under full_gpr, no separate call needed
+$path/get_matrices.py -b   # also computes the target vector under gpr_PITC, no separate call needed
 $path/regression.py
 $path/prediction.py
 $path/variance.py

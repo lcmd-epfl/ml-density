@@ -1,14 +1,14 @@
-# SoR counterpart of config_aqz.txt: identical in every respect except full_gpr = false.
+# SA-GPR counterpart of config_aqz.txt: identical in every respect except regression_model = sagpr.
 #
-# Everything up to and including kernel_nm.py is independent of full_gpr, so this config reads
+# Everything up to and including kernel_nm.py is independent of the regression model, so this config reads
 # those artefacts straight out of INNER_aqz/ instead of recomputing a private copy (INNER_aqz/ is
 # 244 GB and the raid is at 99 %). That also removes the last confound from the comparison: the
 # two models see byte-identical projections, train/test split, reference set, K_MM and K_NM.
 # Only the artefacts that actually differ (gram matrix, target vector, weights, predictions)
 # are written under default_dir.
 #
-# Run with:  sbatch run_SoR.bash config_aqz_SoR.txt
-# and compare the resulting error_aqz_SoR.txt against error_gpr_aqz.txt.
+# Run with:  sbatch run_sagpr.bash config_aqz_sagpr.txt
+# and compare the resulting error_aqz_sagpr.txt against error_gpr_aqz.txt.
 
 [options]
 
@@ -19,7 +19,7 @@ train_size = 2048
 train_fractions = 1.0
 regularisation = 1e-6
 jitter = 1e-10
-full_gpr = false
+regression_model = sagpr
 
 [options.soap]
 soap_sigma = 0.3
@@ -38,7 +38,7 @@ output_coeff_order = gpr
 process_metric = true
 
 [paths]
-default_dir = INNER_aqz_SoR/
+default_dir = INNER_aqz_sagpr/
 
 [paths.input]
 dataset          = dataset.csv
@@ -47,9 +47,9 @@ metrics          = metric_aqz/{mol_name}.npy
 coeffs           = computed/coeffsCCSDccpvdz-augccpvqzjkfit-{mol_name}.npy
 
 [paths.internal]
-# Shared with the full_gpr run: produced by preprocess/training_selection/power_spectra/
+# Shared with the gpr_PITC run: produced by preprocess/training_selection/power_spectra/
 # select_reference_environments/power_spectra_reference/kernel_mm/kernel_nm, none of which
-# look at full_gpr. Read-only here -- run_SoR.bash starts at get_matrices.py.
+# look at regression_model. Read-only here -- run_sagpr.bash starts at get_matrices.py.
 xyz                          = INNER_aqz/dataset.xyz
 coeffs_base                  = INNER_aqz/coeff/mol
 metric_matrix_base           = INNER_aqz/metric/mol
@@ -62,7 +62,7 @@ power_spectra_split_base     = INNER_aqz/PS/PS
 power_spectra_reference_base = INNER_aqz/PS
 kmm_base                     = INNER_aqz/KMM
 kernel_nm_base               = INNER_aqz/KERNELS/kernel_conf
-# Written here: these are the SoR-vs-PITC divergence point.
+# Written here: these are the SA-GPR-vs-gpr_PITC divergence point.
 target_vector_base           = {default_dir}target_vec
 gram_matrix_base             = {default_dir}gram_mat
 
