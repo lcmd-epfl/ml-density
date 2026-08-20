@@ -7,7 +7,8 @@ import logging
 import numpy as np
 from .config_parser import Config
 from .config_utils import (CheckFile, WhenMissing, PathSpecs, OptSpecs, defaults, Floats, Bool, Choice,
-                           RegressionModel, SAGPR, DEFAULT_DIR_GROUP, DEFAULT_DIR_KEY, DEFAULT_DIR_PLACEHOLDER)
+                           RegressionModel, FloatOrFit, SAGPR, GPR_DTC, FIT_REG,
+                           DEFAULT_DIR_GROUP, DEFAULT_DIR_KEY, DEFAULT_DIR_PLACEHOLDER)
 
 logger = logging.getLogger('__main__')
 
@@ -34,7 +35,8 @@ def read_config(config_path=defaults.config, *, print_help=False):
                     'seed'               : OptSpecs('seed', 1, int, 'Random seed for train/test splitting.'),
                     'train'              : OptSpecs('train_size', 1000, int, 'Number of molecules to assign to the training subset.'),
                     'fracs'              : OptSpecs('train_fractions', np.array([1.0]), Floats(), 'Comma-separated training fractions for learning curve.'),
-                    'reg'                : OptSpecs('regularisation', 1e-6, float, 'Ridge regularization strength for regression.'),
+                    'reg'                : OptSpecs('regularisation', 1e-6, FloatOrFit('regularisation'), f'Ridge regularization strength for regression (the sparse-GP noise scale eta). A positive float fixes it; `{FIT_REG}` makes regression.py choose it by maximizing the DTC marginal likelihood, which is only defined for regression_model = {GPR_DTC}.'),
+                    'sigma_p2'           : OptSpecs('prior_scale', None, FloatOrFit('prior_scale'), f'Prior variance sigma_p^2 (main.pdf Sec. IIF): the single overall factor on the predictive variance. A positive float pins it; `{FIT_REG}` (the default) makes regression.py determine it by type-II maximum likelihood, Eq. 26. It does not enter the predictive mean, so changing it never changes a prediction.'),
                     'jit'                : OptSpecs('jitter', 1e-10, float, 'Diagonal regularization for regression, relative to each matrix mean diagonal (so one value suits K_MM, the metric and Sigma_M alike).'),
                     'regression_model'   : OptSpecs('regression_model', default=SAGPR, dtype=RegressionModel('regression_model'), help='Which model to fit. All three are sparse over the M reference environments. `sagpr` is the deterministic SA-GPR fit and produces no uncertainty. `gpr_DTC` and `gpr_PITC` are sparse Gaussian processes and unlock the predictive variance; gpr_DTC solves the very same linear system as sagpr and only adds the K**-Q** variance correction, while gpr_PITC also carries the per-molecule Nystrom residual D_i and so improves the mean at a higher assembly cost.'),
                     },
@@ -120,11 +122,29 @@ def read_config(config_path=defaults.config, *, print_help=False):
 
         Returns:
             types.SimpleNamespace: Post-processed options namespace.
+
+        Raises:
+            RuntimeError: `regularisation = fit` was combined with a model whose assembly depends
+                on eta, so the fit cannot be done in regression.py alone.
         """
         o = dict(ChainMap(*[d for group, d in parsed.items() if group.startswith('options.')]))
         if o['use_charges']=='none':
             o['use_charges'] = None
         o['is_gpr'] = o['regression_model']!=SAGPR
+        o['fit_reg'] = o['reg'] is None
+        if o['fit_reg'] and o['regression_model']!=GPR_DTC:
+            # sagpr has no likelihood to maximize, and gpr_PITC's Lambda_i = D_i + eta*S_i^-1 puts
+            # eta inside the assembly, so scanning it would mean re-running get_matrices.py per
+            # trial value rather than one extra Cholesky in regression.py.
+            msg = (f'`regularisation = {FIT_REG}` requires regression_model = {GPR_DTC}, '
+                   f'got {o["regression_model"]}. Only DTC assembles a Gram matrix and target '
+                   'vector that are independent of eta, which is what makes the fit cheap.')
+            raise RuntimeError(msg)
+        # Output file names carry eta. It is not known until regression.py has run when it is
+        # fitted, so the tag stands in for it and the fitted value goes to p.fitted_reg. A fixed
+        # eta formats exactly as before, so existing trees keep their file names.
+        o['reg_tag'] = FIT_REG if o['fit_reg'] else o['reg']
+        o['fit_sigma_p2'] = o['sigma_p2'] is None
         return SimpleNamespace(o)
 
     def postprocess_paths(parsed, o):
@@ -152,18 +172,25 @@ def read_config(config_path=defaults.config, *, print_help=False):
 
         paths.target_vec              = f'{p['_targetvecfilebase']}_M{o.M}_trainfrac{{train_frac}}.txt'
         paths.gram_mat                = f'{p['_grammatfilebase']}_M{o.M}_trainfrac{{train_frac}}.dat'
-        paths.weights                 = f'{p['_weightsfilebase']}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
-        paths.predictions             = f'{p['_predictfilebase']}_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}_jit{o.jit}.mts'
+        paths.weights                 = f'{p['_weightsfilebase']}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg_tag}_jit{o.jit}.mts'
+        paths.predictions             = f'{p['_predictfilebase']}_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg_tag}_jit{o.jit}.mts'
         paths.predicted_coeff         = f'{p['_outfilebase']}_tf{{train_frac}}_{{order}}_{{imol}}.dat'
         # GP-only outputs (o.is_gpr)
         # ml_terms is written next to the Gram matrix / target vector, so it follows their naming
-        # (no reg suffix); sigma_f2 is written next to the weights, so it follows theirs.
+        # (no reg suffix); sigma_p2 is written next to the weights, so it follows theirs.
         # The Cholesky factor is of a model-dependent matrix -- Sigma_M for gpr_PITC, the SA-GPR
         # matrix A for gpr_DTC -- so the model is part of its name.
         paths.ml_terms                = f'{p['_mltermsfilebase']}_M{o.M}_trainfrac{{train_frac}}.txt'
-        paths.sigma_f2                = f'{p['_weightsfilebase']}_sigma_f2_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.txt'
-        paths.cholesky                = f'{p['_weightsfilebase']}_cholesky_{o.regression_model}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.npy'
-        paths.var_trace               = f'{p['_predictfilebase']}_vartrace_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg}.csv'
+        paths.sigma_p2                = f'{p['_weightsfilebase']}_sigma_p2_M{o.M}_trainfrac{{train_frac}}_reg{o.reg_tag}.txt'
+        paths.cholesky                = f'{p['_weightsfilebase']}_cholesky_{o.regression_model}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg_tag}.npy'
+        # sigma_p^2 scales the variance and nothing else (main.pdf Eq. 21 does not contain it), so
+        # it tags the variance table alone -- and only when pinned, leaving fitted runs' names as
+        # they were. Weights and predictions are unaffected by it and keep their names either way.
+        sp2_tag = '' if o.sigma_p2 is None else f'_sp2{o.sigma_p2}'
+        paths.var_trace               = f'{p['_predictfilebase']}_vartrace_{{subset}}_M{o.M}_trainfrac{{train_frac}}_reg{o.reg_tag}{sp2_tag}.csv'
+        # Written by regression.py only when eta is fitted; read back by whatever needs the number
+        # itself rather than just a file name (variance_lib.dtc_lambda).
+        paths.fitted_reg              = f'{p['_weightsfilebase']}_fitted_reg_M{o.M}_trainfrac{{train_frac}}.txt'
 
         paths.extra_kernel_nm         = f'{p['_kernelexbase']}{{}}.mts'
         paths.extra_power_spectrum    = f'{p['_powerexbase']}_{{}}.mts'

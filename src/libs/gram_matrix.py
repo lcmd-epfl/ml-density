@@ -12,7 +12,8 @@ import scipy.linalg as spl
 import metatensor
 from libs.target_vector import print_batches, do_work_target_pitc
 from libs.multi import print_nodes, scatter_jobs
-from libs.pitc_lib import kmm_cholesky, molecule_lambda_chol_knm
+from libs.gp_common import kmm_cholesky
+from libs.pitc_lib import molecule_lambda_chol_knm
 from libs.tmap import tmap2averages
 from libs.config_utils import GPR_DTC, GPR_PITC
 
@@ -317,8 +318,9 @@ def _accumulate_gram(basis, ref_elem, mol_idx, atoms_i, paths, idx, ref_indices,
         return
     do_work_gram(idx, basis.nmax, mol_idx, ref_indices, paths.metric_matrix, paths.kernel_nm, gram_mat)
     if o.regression_model==GPR_DTC:
-        # sum_i y_i^T M_i y_i and N_T = sum_i nao_i, the two inputs to fit_sigma_f2(). The eta
-        # scaling of Eq. (24) is applied once in regression.py, not per molecule.
+        # (c~_T - c_av)^T M_T (c~_T - c_av) and N_T = sum_i nao_i, the two data-side inputs to
+        # main.pdf Eq. 26. The 1/lambda it carries is applied once in regression.py, not per
+        # molecule (see dtc_lib.fit_prior_scale).
         ml_terms[0] += coef_norms[mol_idx, 1]
         ml_terms[1] += basis.nao_for_mol(atoms_i)
 

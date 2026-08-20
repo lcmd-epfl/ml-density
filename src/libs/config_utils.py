@@ -117,6 +117,66 @@ class Bool:
         raise TypeError(msg)
 
 
+FIT_REG = 'fit'
+
+
+class FloatOrFit:
+    """Parser for a hyperparameter that is either pinned to a positive float or fitted from data.
+
+    Used for both hyperparameters of main.pdf Sec. IIF -- `regularisation` (lambda, Eq. 17) and
+    `prior_scale` (sigma_p^2, Eq. 26). `fit` is represented as None throughout, so that any code
+    reading the option as a number fails loudly instead of silently using a placeholder: the fitted
+    value only exists once training has run, and is read back from the file regression.py writes.
+    """
+    __name__ = 'FloatOrFit'
+
+    def __init__(self, name):
+        """Initialize a FloatOrFit instance.
+
+        Args:
+            name (str): Option name, used in error messages.
+        """
+        self.name = name
+
+    def __repr__(self):
+        return f'{self.__name__}(name="{self.name}")'
+
+    def __call__(self, x):
+        """Parse the option value.
+
+        Args:
+            x (str): Raw input value.
+
+        Returns:
+            float | None: The pinned value, or None when it is to be fitted.
+
+        Raises:
+            RuntimeError: The value is neither `fit` nor a positive float.
+        """
+        if str(x).strip().lower() == FIT_REG:
+            return None
+        try:
+            value = float(x)
+        except ValueError:
+            msg = f'Wrong input for `{self.name}`: "{x}" is neither a float nor "{FIT_REG}"'
+            raise RuntimeError(msg) from None
+        if value <= 0.0:
+            msg = f'`{self.name}` must be positive, got {value}'
+            raise RuntimeError(msg)
+        return value
+
+    def str(self, x):
+        """Render a parsed value back into config syntax.
+
+        Args:
+            x (float | None): Parsed value.
+
+        Returns:
+            str: The config representation.
+        """
+        return FIT_REG if x is None else str(x)
+
+
 class Choice:
     """Parser wrapper enforcing membership in an allowed option set."""
     __name__ = 'Choice'

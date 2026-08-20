@@ -98,10 +98,13 @@ class Config:
     def print_help(self):
         """Print an example configuration file generated from registered specs."""
         def get_value(spec):
-            if spec.default is None:
-                return '<required>'
+            # The dtype gets first say, because for some of them None is a meaningful default rather
+            # than a missing one: FloatOrFit renders it as `fit`, its "determine this from the data"
+            # setting. Only a spec that cannot render its own default is reported as required.
             if (dtype:=getattr(spec, 'dtype', None)) and (str_:=getattr(dtype, 'str', None)):
                 return str_(spec.default)
+            if spec.default is None:
+                return '<required>'
             return str(spec.default)
 
         def get_help(spec):
