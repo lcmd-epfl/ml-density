@@ -426,7 +426,7 @@ def parse_args():
     parser.add_argument('-r', '--ref', action='store_true', help='Output only the ab-initio density rho_ref(r).')
     parser.add_argument('-d', '--diff', action='store_true', help='Output only the error field rho_pred(r) - rho_ref(r).')
     parser.add_argument('-s', '--std', action='store_true', help='Output only the predictive standard-deviation field sigma[rho(r)] = sqrt(phi(r)^T Sigma_c* phi(r)) instead of the mean density. Carries the same units as the density (e/bohr^3). Requires regression_model = gpr_DTC or gpr_PITC in the config and ignores --mts.')
-    parser.add_argument('-o', '--output', default="CUBE/",help='Prefix for output .cube files. File name constructed by <prefix><mol>[_a<atom>...][_l<l>...][_n<n>...]_<field>.cube, where <field> is ref, pred, diff or std depending on the flags, the optional a/l/n parts record an --atom/--azimuthal/--radial-channel selection and the optional _tf<frac> part records a non-default --train-frac (<prefix> default is CUBE/).')
+    parser.add_argument('-o', '--output', default="CUBE/",help='Prefix for output .cube files. File name constructed by <prefix><mol>[_a<atom>...][_l<l>...][_n<n>...]_<field>.cube, where <field> is ref, pred, diff or std depending on the flags, the optional a/l/n parts record an --atom/--azimuthal/--radial-channel selection and the optional _tf<frac> part records a non-default --train-frac (<prefix> default is CUBE/, extended to CUBE/<tag> when the config is named config_<tag>.txt).')
     parser.add_argument('-a', '--atom', type=atom_type, nargs='+', help='Restrict the exported field to these atoms, given as element symbols (every atom of that element) or as 1-based indices into the molecule\'s block of the xyz file (that one atom). Symbols and indices may be mixed and are combined as a union, so "-a O 15" keeps every oxygen plus atom 15. Default: every atom.')
     parser.add_argument('-l', '--azimuthal', type=azimuthal_type, nargs='+', help='Restrict the exported field to these angular momenta, given as integers or spectroscopic letters (e.g. "-l 0 1" or "-l s p"). Default: every l of the basis.')
     parser.add_argument('-n', '--radial-channel', type=int, nargs='+', help='Restrict the exported field to these radial channels within each selected l. 0-based, ordered from the tightest to the most diffuse primitive -- the JKFIT auxiliary basis is uncontracted and has no principal quantum number. The number of channels differs per element and per l (cc-pvdz-jkfit: 10 s channels on C, 4 on H). Default: every radial channel.')
@@ -449,7 +449,20 @@ def parse_args():
     if args.mol is not None:  # deduplicate, in the order given
         args.mol = list(dict.fromkeys(args.mol))
     if args.config != "config.txt" and args.output == "CUBE/":
-        logger.warning("Config file is not default but output name is. Are you sure you will not overwrite important files?")
+        # a config named config_<tag>.txt gets its own output prefix, so runs of two configs never
+        # silently overwrite each other's cubes; anything else cannot be named apart, so ask.
+        name = os.path.basename(args.config)
+        tag = name[len("config_"):-len(".txt")] if name.startswith("config_") and name.endswith(".txt") else ""
+        if tag:
+            args.output += tag
+            logger.info(f"Config file is not default but output name is: deriving the output prefix "
+                        f"{args.output!r} from {name!r}.")
+        else:
+            logger.warning("Config file is not default but output name is. Are you sure you will not overwrite important files?")
+            answer = input("Continue? [y/N] ")
+            if answer.lower() != "y":
+                logger.info("Aborting.")
+                sys.exit(0)
     return args
 
 
